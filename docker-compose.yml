@@ -1,0 +1,45 @@
+# Local dev / prototype VPS run: `docker compose up --build` (or `podman-compose up --build` —
+# both read this file). Copy .env.example to .env first; the `:-` defaults below only cover a
+# quick out-of-the-box try, real use should set a real AUTH_SECRET (e.g. `openssl rand -hex 32`).
+#
+# `db` here is a throwaway MySQL for local/compose use — a real deployment points DATABASE_URL at
+# whatever MySQL instance the VPS/host actually runs.
+services:
+  db:
+    image: docker.io/library/mariadb:11
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+      MARIADB_USER: studio
+      MARIADB_PASSWORD: studio
+      MARIADB_DATABASE: studio
+    volumes:
+      - studio_mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u studio -pstudio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: localhost/studio-go:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "mysql://studio:studio@db:3306/studio"
+      AUTH_SECRET: "${AUTH_SECRET:-dev-only-insecure-secret-change-me}"
+      ALLOW_DEV_LOGIN: "${ALLOW_DEV_LOGIN:-true}"
+      MEDIA_STORAGE_DIR: /data/media-storage
+    volumes:
+      - studio_media:/data/media-storage
+    restart: unless-stopped
+
+volumes:
+  studio_media:
+  studio_mysqldata:

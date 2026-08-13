@@ -1,0 +1,27 @@
+// Package web holds cross-cutting presentation: the shared page layout, small reusable templ UI
+// components (ui.templ, added alongside the first module that needs them), and HTTP middleware.
+package web
+
+templ Layout(title string, body templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } · Studio</title>
+			<link rel="stylesheet" href="/static/css/app.css"/>
+		</head>
+		<body>
+			<main class="container">
+				@body
+			</main>
+		</body>
+	</html>
+}
+
+templ Placeholder(message string) {
+	<div class="card">
+		<h1>Studio</h1>
+		<p class="page-subtitle">{ message }</p>
+	</div>
+}
