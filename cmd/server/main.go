@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"studio/internal/assets"
 	"studio/internal/auth"
 	"studio/internal/clients"
 	"studio/internal/config"
@@ -67,6 +68,7 @@ func main() {
 	settings.Mount(mux, &settings.Service{Pool: pool, Auth: authSvc})
 	dashboard.Mount(mux, &dashboard.Service{Pool: pool, Auth: authSvc})
 	clients.Mount(mux, &clients.Service{Pool: pool, Auth: authSvc})
+	assets.Mount(mux, &assets.Service{Pool: pool, Auth: authSvc})
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

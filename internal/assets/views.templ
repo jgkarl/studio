@@ -1,0 +1,465 @@
+package assets
+
+import (
+	"database/sql"
+	"encoding/json"
+	"strconv"
+
+	"studio/internal/clients"
+	"studio/internal/settings"
+	"studio/internal/web"
+)
+
+templ ListPage(c web.Chrome, rows []ListRow) {
+	@web.AppLayout("Assets", c, listBody(rows))
+}
+
+templ listBody(rows []ListRow) {
+	@web.PageHeader("Assets", "The physical objects being conserved.", newAssetLink())
+	@web.Card() {
+		if len(rows) == 0 {
+			<p class="empty-state">No assets yet.</p>
+		}
+		<ul class="entity-list">
+			for _, row := range rows {
+				<li class="entity-list-row">
+					<div>
+						<a href={ templ.URL("/assets/" + row.ID) } class="entity-list-name">
+							if row.Title.Valid {
+								{ row.Title.String }
+							} else {
+								{ row.ReferenceCode }
+							}
+						</a>
+						<div class="page-subtitle">{ row.ReferenceCode } · { row.AssetTypeTitle } · owner: { row.ClientName }</div>
+					</div>
+					<div class="row-actions">
+						if row.CurrentStateCondition.Valid {
+							<span class="badge badge-amber">{ row.CurrentStateCondition.String }</span>
+						}
+						<span class="page-subtitle">{ strconv.Itoa(row.ProjectCount) } workflow(s)</span>
+					</div>
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ newAssetLink() {
+	<a class="btn btn-primary" href="/assets/new">New asset</a>
+}
+
+templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes, materials []settings.Classifier, preselectedClientID string) {
+	@web.AppLayout("New asset", c, newBody(allClients, assetTypes, materials, preselectedClientID))
+}
+
+templ newBody(allClients []clients.Client, assetTypes, materials []settings.Classifier, preselectedClientID string) {
+	@web.PageHeader("New asset", "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action="/assets" class="form-grid">
+			<div class="form-row-2">
+				@web.Field("Client", "") {
+					<select class="input" name="clientId" required>
+						<option value="" disabled selected?={ preselectedClientID == "" }>Select a client…</option>
+						for _, cl := range allClients {
+							<option value={ cl.ID } selected?={ cl.ID == preselectedClientID }>{ cl.Name }</option>
+						}
+					</select>
+				}
+				@web.Field("Asset type", "") {
+					<select class="input" name="assetTypeId" required>
+						<option value="" disabled selected>Select a type…</option>
+						for _, at := range assetTypes {
+							<option value={ at.ID }>{ at.Title }</option>
+						}
+					</select>
+				}
+			</div>
+			@web.Field("Reference code", "unique identifier for this asset") {
+				<input class="input" name="referenceCode" required placeholder="e.g. 2026-014"/>
+			}
+			<div class="form-row-2">
+				@web.Field("Title", "") {
+					<input class="input" name="title" placeholder="Untitled"/>
+				}
+				@web.Field("Artist", "") {
+					<input class="input" name="artist"/>
+				}
+			</div>
+			<div class="form-row-2">
+				@web.Field("Creation period", "") {
+					<input class="input" name="creationPeriod" placeholder="c. 1920"/>
+				}
+				@web.Field("Dimensions", "") {
+					<input class="input" name="dimensions" placeholder="60cm x 80cm"/>
+				}
+			</div>
+			<div class="form-row-2">
+				@web.Field("Medium", "") {
+					<input class="input" name="medium"/>
+				}
+				@web.Field("Weight", "") {
+					<input class="input" name="weight" placeholder="e.g. 4.2 kg"/>
+				}
+			</div>
+			@web.Field("Description", "") {
+				<textarea class="input" name="description" rows="2"></textarea>
+			}
+			@web.Field("Signature / marks", "") {
+				<input class="input" name="signatureMarks" placeholder="e.g. Signed lower right, illegible"/>
+			}
+			@web.Field("Provenance", "") {
+				<textarea class="input" name="provenance" rows="2"></textarea>
+			}
+			<div class="form-row-3">
+				@web.Field("Acquisition date", "") {
+					<input class="input" type="date" name="acquisitionDate"/>
+				}
+				@web.Field("Estimated value", "") {
+					<input class="input" type="number" step="0.01" name="estimatedValue"/>
+				}
+				@web.Field("Insured", "") {
+					<select class="input" name="isInsured">
+						<option value="">Unknown</option>
+						<option value="true">Yes</option>
+						<option value="false">No</option>
+					</select>
+				}
+			</div>
+			@web.Field("Location in studio", "") {
+				<input class="input" name="locationInStudio" placeholder="e.g. Shelf B3, Wet Room"/>
+			}
+			@web.Field("Materials", "") {
+				<div class="checkbox-grid">
+					for _, m := range materials {
+						<label class="checkbox-field">
+							<input type="checkbox" name="materialIds" value={ m.ID }/>
+							{ m.Title }
+						</label>
+					}
+				</div>
+			}
+			@web.Field("Tags", "comma-separated") {
+				<input class="input" name="tags" placeholder="oil painting, urgent, restoration"/>
+			}
+			<div class="form-section">
+				<p class="form-section-title">Intake condition</p>
+				@web.Field("Notes", "") {
+					<textarea class="input" name="intakeDescription" rows="2" placeholder="Condition on arrival…"></textarea>
+				}
+				<p class="page-subtitle">Photo attachment lands with the Media module.</p>
+			</div>
+			<button type="submit" class="btn btn-primary">Create asset</button>
+		</form>
+	}
+}
+
+templ DetailPage(c web.Chrome, asset Asset, client *clients.Client, assetType *settings.Classifier, materials []Material,
+	availableMaterials []settings.Classifier, states []State, projects []ProjectSummary, tagAssignments []settings.TagAssignment,
+	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier) {
+	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, materials, availableMaterials, states, projects, tagAssignments, conditions, conditionByCode))
+}
+
+templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classifier, materials []Material,
+	availableMaterials []settings.Classifier, states []State, projects []ProjectSummary, tagAssignments []settings.TagAssignment,
+	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier) {
+	@web.PageHeader(asset.DisplayName(), assetSubtitle(asset, client, assetType), assetActions(asset))
+	<div class="detail-grid">
+		<div class="detail-main">
+			@web.Card() {
+				<h2 class="dashboard-heading">Details</h2>
+				<dl class="detail-dl">
+					@detailField("Artist", asset.Artist.String)
+					@detailField("Creation period", asset.CreationPeriod.String)
+					@detailField("Dimensions", asset.Dimensions.String)
+					@detailField("Medium", asset.Medium.String)
+					@detailField("Weight", asset.Weight.String)
+					@detailField("Signature / marks", asset.SignatureMarks.String)
+					@detailField("Location in studio", asset.LocationInStudio.String)
+					@detailField("Insured", insuredLabel(asset.IsInsured))
+					@detailField("Estimated value", estimatedValueLabel(asset.EstimatedValue))
+					@detailField("Acquisition date", acquisitionDateLabel(asset.AcquisitionDate))
+				</dl>
+				if asset.Description.Valid {
+					<p class="detail-paragraph">{ asset.Description.String }</p>
+				}
+				if asset.Provenance.Valid {
+					<p class="detail-paragraph"><strong>Provenance:</strong> { asset.Provenance.String }</p>
+				}
+
+				<div class="subsection">
+					<h3 class="subsection-heading">Materials</h3>
+					if len(materials) > 0 {
+						<div class="tag-pills">
+							for _, m := range materials {
+								<span class="tag-pill tag-pill-neutral">
+									{ m.Title }
+									if m.Role.Valid {
+										<span class="page-subtitle">({ m.Role.String })</span>
+									}
+									<form method="post" action={ templ.URL("/assets/" + asset.ID + "/materials/" + m.ID + "/delete") } data-confirm={ "Remove material \"" + m.Title + "\"?" }>
+										<button type="submit" class="tag-pill-remove" aria-label="Remove material">×</button>
+									</form>
+								</span>
+							}
+						</div>
+					}
+					if len(availableMaterials) > 0 {
+						<form method="post" action={ templ.URL("/assets/" + asset.ID + "/materials") } class="inline-edit-form">
+							<div class="inline-edit-grid">
+								@web.Field("Material", "") {
+									<select class="input" name="materialId" required>
+										<option value="" disabled selected>Select…</option>
+										for _, m := range availableMaterials {
+											<option value={ m.ID }>{ m.Title }</option>
+										}
+									</select>
+								}
+								@web.Field("Role", "optional, e.g. support/frame") {
+									<input class="input" name="role"/>
+								}
+							</div>
+							<button type="submit" class="btn btn-secondary">Add material</button>
+						</form>
+					}
+				</div>
+
+				<div class="subsection">
+					<h3 class="subsection-heading">Tags</h3>
+					if len(tagAssignments) > 0 {
+						<div class="tag-pills">
+							for _, a := range tagAssignments {
+								<span class="tag-pill">
+									#{ a.Tag.Name }
+									<form method="post" action={ templ.URL("/assets/" + asset.ID + "/tags/" + a.AssignmentID + "/delete") } data-confirm={ "Remove tag \"" + a.Tag.Name + "\"?" }>
+										<button type="submit" class="tag-pill-remove" aria-label="Remove tag">×</button>
+									</form>
+								</span>
+							}
+						</div>
+					}
+					<form method="post" action={ templ.URL("/assets/" + asset.ID + "/tags") } class="inline-edit-form">
+						@web.Field("Tag name", "") {
+							<input class="input" name="name" required placeholder="e.g. urgent"/>
+						}
+						<button type="submit" class="btn btn-secondary">Add tag</button>
+					</form>
+				</div>
+			}
+
+			@web.Card() {
+				<h2 class="dashboard-heading">Condition history <span class="page-subtitle">(newest first)</span></h2>
+				if len(states) == 0 {
+					<p class="empty-state">No condition records yet.</p>
+				}
+				<ul class="condition-list">
+					for _, s := range states {
+						<li class="condition-item">
+							<div class="row-actions">
+								<span class={ "badge", severityToneClass(conditionByCode, s.Condition) }>{ conditionTitle(conditionByCode, s.Condition) }</span>
+								<span class="page-subtitle">{ s.RecordedAt.Format("2006-01-02 15:04") }</span>
+							</div>
+							<p class="detail-paragraph">{ s.Description }</p>
+						</li>
+					}
+				</ul>
+
+				<form method="post" action={ templ.URL("/assets/" + asset.ID + "/states") } class="inline-edit-form form-section">
+					<p class="form-section-title">Record condition manually</p>
+					@web.Field("Condition", "") {
+						<select class="input" name="condition">
+							for _, cond := range conditions {
+								<option value={ cond.Code }>{ cond.Title }</option>
+							}
+						</select>
+					}
+					@web.Field("Description", "") {
+						<textarea class="input" name="description" rows="2" required></textarea>
+					}
+					<p class="page-subtitle">Photo attachment lands with the Media module.</p>
+					<button type="submit" class="btn btn-secondary">Save condition record</button>
+				</form>
+			}
+
+			@web.Card() {
+				<h2 class="dashboard-heading">Workflows on this asset</h2>
+				if len(projects) == 0 {
+					<p class="empty-state">No workflows yet.</p>
+				}
+				<ul class="entity-list">
+					for _, p := range projects {
+						<li class="entity-list-row">
+							<div>
+								<a href={ templ.URL("/workflows/" + p.ID) }>{ p.Title }</a>
+								<div class="page-subtitle">
+									{ p.Stage }
+									if p.OrderNumber.Valid {
+										· order { p.OrderNumber.String }
+									} else {
+										· no order yet
+									}
+								</div>
+							</div>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+
+		<div>
+			@web.Card() {
+				<h2 class="dashboard-heading">Current state</h2>
+				if asset.CurrentStateID.Valid && len(states) > 0 {
+					<span class={ "badge", severityToneClass(conditionByCode, states[0].Condition) }>{ conditionTitle(conditionByCode, states[0].Condition) }</span>
+				} else {
+					<p class="page-subtitle">Not yet assessed.</p>
+				}
+			}
+
+			@web.Card() {
+				<h2 class="dashboard-heading">Edit profile</h2>
+				<form method="post" action={ templ.URL("/assets/" + asset.ID + "/update") } class="form-grid">
+					@web.Field("Title", "") {
+						<input class="input" name="title" value={ asset.Title.String }/>
+					}
+					@web.Field("Artist", "") {
+						<input class="input" name="artist" value={ asset.Artist.String }/>
+					}
+					@web.Field("Creation period", "") {
+						<input class="input" name="creationPeriod" value={ asset.CreationPeriod.String }/>
+					}
+					@web.Field("Dimensions", "") {
+						<input class="input" name="dimensions" value={ asset.Dimensions.String }/>
+					}
+					@web.Field("Medium", "") {
+						<input class="input" name="medium" value={ asset.Medium.String }/>
+					}
+					@web.Field("Weight", "") {
+						<input class="input" name="weight" value={ asset.Weight.String }/>
+					}
+					@web.Field("Signature / marks", "") {
+						<input class="input" name="signatureMarks" value={ asset.SignatureMarks.String }/>
+					}
+					@web.Field("Location in studio", "") {
+						<input class="input" name="locationInStudio" value={ asset.LocationInStudio.String }/>
+					}
+					@web.Field("Description", "") {
+						<textarea class="input" name="description" rows="2">{ asset.Description.String }</textarea>
+					}
+					@web.Field("Provenance", "") {
+						<textarea class="input" name="provenance" rows="2">{ asset.Provenance.String }</textarea>
+					}
+					@web.Field("Acquisition date", "") {
+						<input class="input" type="date" name="acquisitionDate" value={ acquisitionDateInputValue(asset) }/>
+					}
+					@web.Field("Estimated value", "") {
+						<input class="input" type="number" step="0.01" name="estimatedValue" value={ estimatedValueInputValue(asset) }/>
+					}
+					@web.Field("Insured", "") {
+						<select class="input" name="isInsured">
+							<option value="" selected?={ !asset.IsInsured.Valid }>Unknown</option>
+							<option value="true" selected?={ asset.IsInsured.Valid && asset.IsInsured.Bool }>Yes</option>
+							<option value="false" selected?={ asset.IsInsured.Valid && !asset.IsInsured.Bool }>No</option>
+						</select>
+					}
+					<button type="submit" class="btn btn-secondary">Save profile</button>
+				</form>
+			}
+		</div>
+	</div>
+}
+
+templ assetActions(asset Asset) {
+	<a class="btn btn-secondary" href={ templ.URL("/workflows/new?assetId=" + asset.ID) }>Start workflow</a>
+}
+
+templ detailField(label, value string) {
+	<div>
+		<dt class="detail-dt">{ label }</dt>
+		<dd class="detail-dd">
+			if value == "" {
+				—
+			} else {
+				{ value }
+			}
+		</dd>
+	</div>
+}
+
+func assetSubtitle(asset Asset, client *clients.Client, assetType *settings.Classifier) string {
+	typeTitle := ""
+	if assetType != nil {
+		typeTitle = assetType.Title
+	}
+	clientName := ""
+	if client != nil {
+		clientName = client.Name
+	}
+	return asset.ReferenceCode + " · " + typeTitle + " · owner: " + clientName
+}
+
+func insuredLabel(b sql.NullBool) string {
+	if !b.Valid {
+		return ""
+	}
+	if b.Bool {
+		return "Yes"
+	}
+	return "No"
+}
+
+func estimatedValueLabel(f sql.NullFloat64) string {
+	if !f.Valid {
+		return ""
+	}
+	return strconv.FormatFloat(f.Float64, 'f', 2, 64)
+}
+
+func estimatedValueInputValue(asset Asset) string {
+	if !asset.EstimatedValue.Valid {
+		return ""
+	}
+	return strconv.FormatFloat(asset.EstimatedValue.Float64, 'f', 2, 64)
+}
+
+func acquisitionDateLabel(t sql.NullTime) string {
+	if !t.Valid {
+		return ""
+	}
+	return t.Time.Format("2006-01-02")
+}
+
+func acquisitionDateInputValue(asset Asset) string {
+	if !asset.AcquisitionDate.Valid {
+		return ""
+	}
+	return asset.AcquisitionDate.Time.Format("2006-01-02")
+}
+
+func conditionTitle(byCode map[string]settings.Classifier, code string) string {
+	if c, ok := byCode[code]; ok {
+		return c.Title
+	}
+	return code
+}
+
+func severityToneClass(byCode map[string]settings.Classifier, code string) string {
+	c, ok := byCode[code]
+	if !ok || !c.Data.Valid {
+		return ""
+	}
+	var data struct {
+		Severity *int `json:"severity"`
+	}
+	if err := json.Unmarshal([]byte(c.Data.String), &data); err != nil || data.Severity == nil {
+		return ""
+	}
+	switch {
+	case *data.Severity <= 1:
+		return "badge-green"
+	case *data.Severity <= 3:
+		return "badge-amber"
+	default:
+		return "badge-red"
+	}
+}

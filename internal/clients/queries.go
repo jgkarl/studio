@@ -22,6 +22,12 @@ func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Client, error
 	return studiodb.QueryOne(ctx, q, "SELECT "+clientColumns+" FROM Client WHERE id = ?", scanClient, id)
 }
 
+// ListAllSortedByName is every Client, name-ordered - the option list for the Asset/Quote
+// "pick a client" selects (modules 6, 9).
+func ListAllSortedByName(ctx context.Context, q studiodb.Querier) ([]Client, error) {
+	return studiodb.Query(ctx, q, "SELECT "+clientColumns+" FROM Client ORDER BY name ASC", scanClient)
+}
+
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
 	err := rows.Scan(&r.ID, &r.Name, &r.Email, &r.Type, &r.AssetCount, &r.OrderCount)
