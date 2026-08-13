@@ -606,3 +606,132 @@ h1 {
 .dashboard-list a:hover {
   text-decoration: underline;
 }
+
+/* --- Entity lists (Clients/Assets/etc.) -------------------------------------------------- */
+
+.entity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entity-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.entity-list-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.entity-list-name {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.entity-list-name:hover {
+  text-decoration: underline;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* --- Detail pages (Client/Asset/etc.) ------------------------------------------------------ */
+
+.detail-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .detail-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.detail-main .card + .card {
+  margin-top: 1rem;
+}
+
+.tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 999px;
+  background: var(--blue-bg);
+  color: var(--blue-text);
+  padding: 0.125rem 0.375rem 0.125rem 0.625rem;
+  font-size: 0.75rem;
+}
+
+.tag-pill form {
+  display: inline;
+}
+
+.tag-pill-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.tag-pill-remove:hover {
+  opacity: 1;
+}
+
+/* --- Forms ----------------------------------------------------------------------------------- */
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-row-2 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.form-row-3 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 560px) {
+  .form-row-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-row-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

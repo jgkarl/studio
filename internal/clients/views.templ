@@ -1,0 +1,294 @@
+package clients
+
+import (
+	"strconv"
+
+	"studio/internal/settings"
+	"studio/internal/web"
+)
+
+templ ListPage(c web.Chrome, rows []ListRow, typeLabels map[string]string) {
+	@web.AppLayout("Clients", c, listBody(rows, typeLabels))
+}
+
+templ listBody(rows []ListRow, typeLabels map[string]string) {
+	@web.PageHeader("Clients", "Every client, with their assets and orders at a glance.", newClientLink())
+	@web.Card() {
+		if len(rows) == 0 {
+			<p class="empty-state">No clients yet.</p>
+		}
+		<ul class="entity-list">
+			for _, row := range rows {
+				<li class="entity-list-row">
+					<div>
+						<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-name">{ row.Name }</a>
+						<div class="page-subtitle">
+							if row.Email.Valid {
+								{ row.Email.String }
+							} else {
+								no email on file
+							}
+						</div>
+					</div>
+					<div class="row-actions">
+						<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
+						<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
+						<span class="page-subtitle">{ strconv.Itoa(row.OrderCount) } orders</span>
+					</div>
+				</li>
+			}
+		</ul>
+	}
+}
+
+func labelFor(m map[string]string, code string) string {
+	if l, ok := m[code]; ok {
+		return l
+	}
+	return code
+}
+
+templ newClientLink() {
+	<a class="btn btn-primary" href="/clients/new">New client</a>
+}
+
+templ NewPage(c web.Chrome, clientTypes, contactMethods []settings.Classifier) {
+	@web.AppLayout("New client", c, newBody(clientTypes, contactMethods))
+}
+
+templ newBody(clientTypes, contactMethods []settings.Classifier) {
+	@web.PageHeader("New client", "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action="/clients" class="form-grid">
+			<div class="form-row-2">
+				@web.Field("Type", "") {
+					<select class="input" name="type">
+						for _, ct := range clientTypes {
+							<option value={ ct.Code }>{ ct.Title }</option>
+						}
+					</select>
+				}
+				@web.Field("Name", "") {
+					<input class="input" name="name" required placeholder="Jane Doe"/>
+				}
+			</div>
+			<div class="form-row-2">
+				@web.Field("Organization", "optional") {
+					<input class="input" name="organizationName"/>
+				}
+				@web.Field("Contact person", "optional") {
+					<input class="input" name="contactPerson"/>
+				}
+			</div>
+			<div class="form-row-3">
+				@web.Field("Email", "") {
+					<input class="input" type="email" name="email" placeholder="jane@example.com"/>
+				}
+				@web.Field("Phone", "") {
+					<input class="input" name="phone" placeholder="+1 555 0100"/>
+				}
+				@web.Field("Preferred contact method", "") {
+					<select class="input" name="preferredContactMethod">
+						<option value="">—</option>
+						for _, m := range contactMethods {
+							<option value={ m.Code }>{ m.Title }</option>
+						}
+					</select>
+				}
+			</div>
+			@web.Field("Address", "") {
+				<textarea class="input" name="address" rows="2"></textarea>
+			}
+			<div class="form-row-3">
+				@web.Field("City", "") {
+					<input class="input" name="city"/>
+				}
+				@web.Field("Postal code", "") {
+					<input class="input" name="postalCode"/>
+				}
+				@web.Field("Country", "") {
+					<input class="input" name="country"/>
+				}
+			</div>
+			<div class="form-row-2">
+				@web.Field("Tax ID", "optional") {
+					<input class="input" name="taxId"/>
+				}
+				@web.Field("Referral source", "optional") {
+					<input class="input" name="referralSource"/>
+				}
+			</div>
+			@web.Field("Notes", "") {
+				<textarea class="input" name="notes" rows="3"></textarea>
+			}
+			<button type="submit" class="btn btn-primary">Create client</button>
+		</form>
+	}
+}
+
+templ DetailPage(c web.Chrome, client Client, typeLabel string, assets []AssetSummary, quotes []QuoteSummary, orders []OrderSummary, clientTypes, contactMethods []settings.Classifier, tagAssignments []settings.TagAssignment) {
+	@web.AppLayout(client.Name, c, detailBody(client, typeLabel, assets, quotes, orders, clientTypes, contactMethods, tagAssignments))
+}
+
+templ detailBody(client Client, typeLabel string, assets []AssetSummary, quotes []QuoteSummary, orders []OrderSummary, clientTypes, contactMethods []settings.Classifier, tagAssignments []settings.TagAssignment) {
+	@web.PageHeader(client.Name, detailSubtitle(client, typeLabel), templ.NopComponent)
+	<div class="detail-grid">
+		<div class="detail-main">
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Assets</h2>
+					<a class="btn btn-secondary" href={ templ.URL("/assets/new?clientId=" + client.ID) }>Add asset</a>
+				</div>
+				if len(assets) == 0 {
+					<p class="empty-state">No assets yet.</p>
+				}
+				<ul class="entity-list">
+					for _, a := range assets {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/assets/" + a.ID) }>
+								if a.Title.Valid {
+									{ a.Title.String }
+								} else {
+									{ a.ReferenceCode }
+								}
+							</a>
+							<span class="page-subtitle">{ a.ReferenceCode }</span>
+						</li>
+					}
+				</ul>
+			}
+
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Quotes</h2>
+					<a class="btn btn-secondary" href={ templ.URL("/clients/quotes/new?clientId=" + client.ID) }>New quote</a>
+				</div>
+				if len(quotes) == 0 {
+					<p class="empty-state">No quotes yet.</p>
+				}
+				<ul class="entity-list">
+					for _, q := range quotes {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/clients/quotes/" + q.ID) }>Quote — { strconv.FormatFloat(q.TotalEstimate, 'f', 2, 64) }</a>
+							<span class={ "badge", templ.KV("badge-green", q.Status == "accepted") }>{ q.Status }</span>
+						</li>
+					}
+				</ul>
+			}
+
+			@web.Card() {
+				<h2 class="dashboard-heading">Tags</h2>
+				if len(tagAssignments) > 0 {
+					<div class="tag-pills">
+						for _, a := range tagAssignments {
+							<span class="tag-pill">
+								#{ a.Tag.Name }
+								<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags/" + a.AssignmentID + "/delete") } data-confirm={ "Remove tag \"" + a.Tag.Name + "\"?" }>
+									<button type="submit" class="tag-pill-remove" aria-label="Remove tag">×</button>
+								</form>
+							</span>
+						}
+					</div>
+				}
+				<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags") } class="inline-edit-form">
+					@web.Field("Tag name", "") {
+						<input class="input" name="name" required placeholder="e.g. vip"/>
+					}
+					<button type="submit" class="btn btn-secondary">Add tag</button>
+				</form>
+			}
+
+			@web.Card() {
+				<h2 class="dashboard-heading">Orders</h2>
+				if len(orders) == 0 {
+					<p class="empty-state">No orders yet.</p>
+				}
+				<ul class="entity-list">
+					for _, o := range orders {
+						<li class="entity-list-row">
+							<div>
+								<a href={ templ.URL("/clients/orders/" + o.ID) }>{ o.OrderNumber }</a>
+								<div class="page-subtitle">{ strconv.Itoa(o.InvoiceCount) } invoice(s)</div>
+							</div>
+							<span class="badge badge-blue">{ o.Status }</span>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+
+		<div>
+			@web.Card() {
+				<h2 class="dashboard-heading">Profile</h2>
+				<form method="post" action={ templ.URL("/clients/" + client.ID + "/update") } class="form-grid">
+					@web.Field("Type", "") {
+						<select class="input" name="type">
+							for _, ct := range clientTypes {
+								<option value={ ct.Code } selected?={ ct.Code == client.Type }>{ ct.Title }</option>
+							}
+						</select>
+					}
+					@web.Field("Name", "") {
+						<input class="input" name="name" value={ client.Name } required/>
+					}
+					@web.Field("Organization", "") {
+						<input class="input" name="organizationName" value={ client.OrganizationName.String }/>
+					}
+					@web.Field("Contact person", "") {
+						<input class="input" name="contactPerson" value={ client.ContactPerson.String }/>
+					}
+					@web.Field("Email", "") {
+						<input class="input" type="email" name="email" value={ client.Email.String }/>
+					}
+					@web.Field("Phone", "") {
+						<input class="input" name="phone" value={ client.Phone.String }/>
+					}
+					@web.Field("Preferred contact method", "") {
+						<select class="input" name="preferredContactMethod">
+							<option value="">—</option>
+							for _, m := range contactMethods {
+								<option value={ m.Code } selected?={ m.Code == client.PreferredContactMethod.String }>{ m.Title }</option>
+							}
+						</select>
+					}
+					@web.Field("Address", "") {
+						<textarea class="input" name="address" rows="2">{ client.Address.String }</textarea>
+					}
+					<div class="form-row-2">
+						@web.Field("City", "") {
+							<input class="input" name="city" value={ client.City.String }/>
+						}
+						@web.Field("Postal code", "") {
+							<input class="input" name="postalCode" value={ client.PostalCode.String }/>
+						}
+					</div>
+					@web.Field("Country", "") {
+						<input class="input" name="country" value={ client.Country.String }/>
+					}
+					@web.Field("Tax ID", "") {
+						<input class="input" name="taxId" value={ client.TaxID.String }/>
+					}
+					@web.Field("Referral source", "") {
+						<input class="input" name="referralSource" value={ client.ReferralSource.String }/>
+					}
+					@web.Field("Notes", "") {
+						<textarea class="input" name="notes" rows="4">{ client.Notes.String }</textarea>
+					}
+					<button type="submit" class="btn btn-secondary">Save profile</button>
+				</form>
+			}
+		</div>
+	</div>
+}
+
+func detailSubtitle(client Client, typeLabel string) string {
+	email := "no email"
+	if client.Email.Valid {
+		email = client.Email.String
+	}
+	phone := "no phone"
+	if client.Phone.Valid {
+		phone = client.Phone.String
+	}
+	return typeLabel + " · " + email + " · " + phone
+}
