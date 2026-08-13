@@ -71,9 +71,9 @@ func (svc *Service) handleIndex(w http.ResponseWriter, r *http.Request, user *au
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	openOrders, err := studiodb.Query(ctx, svc.Pool,
-		"SELECT o.id, o.orderNumber, o.status, c.name FROM `Order` o JOIN Client c ON c.id = o.clientId "+
-			"WHERE o.status NOT IN ('completed', 'archived') ORDER BY o.updatedAt DESC LIMIT 6", scanOpenOrder)
+	openOrders, err := studiodb.Query(ctx, svc.Pool, `
+		SELECT o.id, o.orderNumber, o.status, c.name FROM "Order" o JOIN Client c ON c.id = o.clientId
+		WHERE o.status NOT IN ('completed', 'archived') ORDER BY o.updatedAt DESC LIMIT 6`, scanOpenOrder)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

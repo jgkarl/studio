@@ -1,5 +1,7 @@
 .env
 /media-storage/
+/data/
+/bin/
 *_templ.go
 /tmp/
 *.log

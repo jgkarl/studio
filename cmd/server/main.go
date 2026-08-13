@@ -1,4 +1,4 @@
-// Command server is the Studio app's single entrypoint: load config, open the MySQL pool, apply
+// Command server is the Studio app's single entrypoint: load config, open the SQLite pool, apply
 // pending migrations, mount every module's routes, and serve.
 package main
 
@@ -22,12 +22,9 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("config: %v", err)
-	}
+	cfg := config.Load()
 
-	pool, err := db.Open(cfg.DatabaseURL)
+	pool, err := db.Open(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("db: %v", err)
 	}

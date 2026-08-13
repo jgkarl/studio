@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	studiodb "studio/internal/db"
 )
@@ -46,7 +47,7 @@ func SetPasswordHash(ctx context.Context, q studiodb.Querier, userID, hash strin
 }
 
 func MarkEmailVerified(ctx context.Context, q studiodb.Querier, userID string) error {
-	_, err := studiodb.Execute(ctx, q, "UPDATE User SET emailVerifiedAt = NOW() WHERE id = ?", userID)
+	_, err := studiodb.Execute(ctx, q, "UPDATE User SET emailVerifiedAt = ? WHERE id = ?", time.Now(), userID)
 	return err
 }
 
@@ -76,6 +77,6 @@ func insertVerificationToken(ctx context.Context, q studiodb.Querier, userID str
 }
 
 func markVerificationTokenUsed(ctx context.Context, q studiodb.Querier, id string) error {
-	_, err := studiodb.Execute(ctx, q, "UPDATE VerificationToken SET usedAt = NOW() WHERE id = ?", id)
+	_, err := studiodb.Execute(ctx, q, "UPDATE VerificationToken SET usedAt = ? WHERE id = ?", time.Now(), id)
 	return err
 }

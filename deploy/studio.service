@@ -1,0 +1,32 @@
+# systemd unit for the git-clone + prebuilt-binary VPS deploy — see docs/deploy.md.
+#
+# Install: sudo cp deploy/studio.service /etc/systemd/system/studio.service
+#          sudo systemctl daemon-reload && sudo systemctl enable --now studio
+#
+# WorkingDirectory matters: dist/server reads db/migrations/ and static/ via relative paths, so
+# the process's cwd must be the repo root (where this file's ExecStart= path assumes the repo was
+# cloned to /opt/studio — edit both paths below if you cloned it somewhere else).
+[Unit]
+Description=Studio (conservation studio management)
+After=network.target
+
+[Service]
+Type=simple
+User=studio
+Group=studio
+WorkingDirectory=/opt/studio
+EnvironmentFile=/opt/studio/.env
+ExecStart=/opt/studio/dist/server
+Restart=on-failure
+RestartSec=2
+
+# Basic hardening — the app only needs to read its own directory tree and write to data/ and
+# media-storage/ (both under DB_PATH/MEDIA_STORAGE_DIR, which .env.example points at
+# /opt/studio/data by default).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/studio/data
+
+[Install]
+WantedBy=multi-user.target

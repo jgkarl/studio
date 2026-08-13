@@ -3,6 +3,7 @@ package assets
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	studiodb "studio/internal/db"
 )
@@ -69,11 +70,11 @@ func Create(ctx context.Context, q studiodb.Querier, clientID, assetTypeID, refe
 		INSERT INTO Asset (id, clientId, assetTypeId, referenceCode, title, artist, creationPeriod, dimensions,
 			description, medium, signatureMarks, weight, provenance, acquisitionDate, estimatedValue, isInsured,
 			locationInStudio, updatedAt)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3))`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, clientID, assetTypeID, referenceCode, nullIfEmpty(in.Title), nullIfEmpty(in.Artist), nullIfEmpty(in.CreationPeriod),
 		nullIfEmpty(in.Dimensions), nullIfEmpty(in.Description), nullIfEmpty(in.Medium), nullIfEmpty(in.SignatureMarks),
 		nullIfEmpty(in.Weight), nullIfEmpty(in.Provenance), in.AcquisitionDate, in.EstimatedValue, in.IsInsured,
-		nullIfEmpty(in.LocationInStudio))
+		nullIfEmpty(in.LocationInStudio), time.Now())
 	return id, err
 }
 
@@ -81,11 +82,11 @@ func UpdateProfile(ctx context.Context, q studiodb.Querier, id string, in Input)
 	_, err := studiodb.Execute(ctx, q, `
 		UPDATE Asset SET title = ?, artist = ?, creationPeriod = ?, dimensions = ?, description = ?, medium = ?,
 			signatureMarks = ?, weight = ?, provenance = ?, acquisitionDate = ?, estimatedValue = ?, isInsured = ?,
-			locationInStudio = ?, updatedAt = NOW(3)
+			locationInStudio = ?, updatedAt = ?
 		WHERE id = ?`,
 		nullIfEmpty(in.Title), nullIfEmpty(in.Artist), nullIfEmpty(in.CreationPeriod), nullIfEmpty(in.Dimensions),
 		nullIfEmpty(in.Description), nullIfEmpty(in.Medium), nullIfEmpty(in.SignatureMarks), nullIfEmpty(in.Weight),
-		nullIfEmpty(in.Provenance), in.AcquisitionDate, in.EstimatedValue, in.IsInsured, nullIfEmpty(in.LocationInStudio), id)
+		nullIfEmpty(in.Provenance), in.AcquisitionDate, in.EstimatedValue, in.IsInsured, nullIfEmpty(in.LocationInStudio), time.Now(), id)
 	return err
 }
 
@@ -150,7 +151,7 @@ func scanState(rows *sql.Rows) (State, error) {
 }
 
 func ListStates(ctx context.Context, q studiodb.Querier, assetID string) ([]State, error) {
-	return studiodb.Query(ctx, q, "SELECT id, `condition`, description, recordedAt FROM AssetState WHERE assetId = ? ORDER BY recordedAt DESC", scanState, assetID)
+	return studiodb.Query(ctx, q, `SELECT id, "condition", description, recordedAt FROM AssetState WHERE assetId = ? ORDER BY recordedAt DESC`, scanState, assetID)
 }
 
 // RecordState inserts a condition snapshot and updates Asset.currentStateId - the Notebook's
@@ -160,7 +161,7 @@ func RecordState(ctx context.Context, pool *sql.DB, assetID, condition, descript
 	return studiodb.WithTransaction(ctx, pool, func(tx *sql.Tx) (string, error) {
 		id := studiodb.NewID()
 		if _, err := studiodb.Execute(ctx, tx,
-			"INSERT INTO AssetState (id, assetId, projectId, recordedViaActivityId, `condition`, description) VALUES (?, ?, ?, ?, ?, ?)",
+			`INSERT INTO AssetState (id, assetId, projectId, recordedViaActivityId, "condition", description) VALUES (?, ?, ?, ?, ?, ?)`,
 			id, assetID, ptrToAny(projectID), ptrToAny(recordedViaActivityID), condition, description); err != nil {
 			return "", err
 		}
@@ -188,6 +189,6 @@ func scanProjectSummary(rows *sql.Rows) (ProjectSummary, error) {
 
 func ListProjectsForAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]ProjectSummary, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT p.id, p.title, p.stage, o.orderNumber FROM Project p LEFT JOIN `+"`Order`"+` o ON o.id = p.orderId
+		SELECT p.id, p.title, p.stage, o.orderNumber FROM Project p LEFT JOIN "Order" o ON o.id = p.orderId
 		WHERE p.assetId = ? ORDER BY p.createdAt DESC`, scanProjectSummary, assetID)
 }

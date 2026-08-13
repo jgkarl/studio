@@ -15,11 +15,13 @@ RUN go mod download
 
 COPY . .
 RUN templ generate
-RUN CGO_ENABLED=1 go build -o /out/server ./cmd/server
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /out/server ./cmd/server
 
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends libvips-dev ca-certificates \
+# Runtime only needs the shared library, not -dev headers — same package the VPS deploy docs
+# (docs/deploy.md) tell you to `apt install` directly for the no-Docker binary deploy path.
+RUN apt-get update && apt-get install -y --no-install-recommends libvips42 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -28,5 +30,7 @@ COPY --from=builder /src/db/migrations ./db/migrations
 COPY --from=builder /src/static ./static
 
 ENV PORT=3000
+ENV DB_PATH=/data/studio.db
+ENV MEDIA_STORAGE_DIR=/data/media-storage
 EXPOSE 3000
 CMD ["./server"]

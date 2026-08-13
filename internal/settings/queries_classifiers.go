@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	studiodb "studio/internal/db"
 )
@@ -95,16 +96,16 @@ type ClassifierInput struct {
 func CreateClassifier(ctx context.Context, q studiodb.Querier, in ClassifierInput) (string, error) {
 	id := studiodb.NewID()
 	_, err := studiodb.Execute(ctx, q,
-		"INSERT INTO Classifier (id, type, code, title, description, sequence, data, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3))",
-		id, in.Type, in.Code, in.Title, nullIfEmpty(in.Description), in.Sequence, nullIfEmpty(in.Data),
+		"INSERT INTO Classifier (id, type, code, title, description, sequence, data, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		id, in.Type, in.Code, in.Title, nullIfEmpty(in.Description), in.Sequence, nullIfEmpty(in.Data), time.Now(),
 	)
 	return id, err
 }
 
 func UpdateClassifier(ctx context.Context, q studiodb.Querier, id string, in ClassifierInput) error {
 	_, err := studiodb.Execute(ctx, q,
-		"UPDATE Classifier SET title = ?, description = ?, sequence = ?, isActive = ?, data = ?, updatedAt = NOW(3) WHERE id = ?",
-		in.Title, nullIfEmpty(in.Description), in.Sequence, in.IsActive, nullIfEmpty(in.Data), id,
+		"UPDATE Classifier SET title = ?, description = ?, sequence = ?, isActive = ?, data = ?, updatedAt = ? WHERE id = ?",
+		in.Title, nullIfEmpty(in.Description), in.Sequence, in.IsActive, nullIfEmpty(in.Data), time.Now(), id,
 	)
 	return err
 }

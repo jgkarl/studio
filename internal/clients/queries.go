@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	studiodb "studio/internal/db"
 )
@@ -38,7 +39,7 @@ func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 	return studiodb.Query(ctx, q, `
 		SELECT c.id, c.name, c.email, c.type,
 		       (SELECT COUNT(*) FROM Asset a WHERE a.clientId = c.id) AS assetCount,
-		       (SELECT COUNT(*) FROM `+"`Order`"+` o WHERE o.clientId = c.id) AS orderCount
+		       (SELECT COUNT(*) FROM "Order" o WHERE o.clientId = c.id) AS orderCount
 		FROM Client c ORDER BY c.createdAt DESC`, scanListRow)
 }
 
@@ -71,11 +72,11 @@ func Create(ctx context.Context, q studiodb.Querier, in Input) (string, error) {
 	_, err := studiodb.Execute(ctx, q, `
 		INSERT INTO Client (id, name, type, email, phone, address, city, postalCode, country,
 			organizationName, contactPerson, taxId, preferredContactMethod, referralSource, notes, updatedAt)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3))`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, in.Name, in.Type, nullIfEmpty(in.Email), nullIfEmpty(in.Phone), nullIfEmpty(in.Address),
 		nullIfEmpty(in.City), nullIfEmpty(in.PostalCode), nullIfEmpty(in.Country),
 		nullIfEmpty(in.OrganizationName), nullIfEmpty(in.ContactPerson), nullIfEmpty(in.TaxID),
-		nullIfEmpty(in.PreferredContactMethod), nullIfEmpty(in.ReferralSource), nullIfEmpty(in.Notes))
+		nullIfEmpty(in.PreferredContactMethod), nullIfEmpty(in.ReferralSource), nullIfEmpty(in.Notes), time.Now())
 	return id, err
 }
 
@@ -83,12 +84,12 @@ func Update(ctx context.Context, q studiodb.Querier, id string, in Input) error 
 	_, err := studiodb.Execute(ctx, q, `
 		UPDATE Client SET name = COALESCE(NULLIF(?, ''), name), type = ?, email = ?, phone = ?, address = ?, city = ?,
 			postalCode = ?, country = ?, organizationName = ?, contactPerson = ?, taxId = ?, preferredContactMethod = ?,
-			referralSource = ?, notes = ?, updatedAt = NOW(3)
+			referralSource = ?, notes = ?, updatedAt = ?
 		WHERE id = ?`,
 		in.Name, in.Type, nullIfEmpty(in.Email), nullIfEmpty(in.Phone), nullIfEmpty(in.Address),
 		nullIfEmpty(in.City), nullIfEmpty(in.PostalCode), nullIfEmpty(in.Country),
 		nullIfEmpty(in.OrganizationName), nullIfEmpty(in.ContactPerson), nullIfEmpty(in.TaxID),
-		nullIfEmpty(in.PreferredContactMethod), nullIfEmpty(in.ReferralSource), nullIfEmpty(in.Notes), id)
+		nullIfEmpty(in.PreferredContactMethod), nullIfEmpty(in.ReferralSource), nullIfEmpty(in.Notes), time.Now(), id)
 	return err
 }
 
@@ -108,8 +109,8 @@ func FindOrCreateByEmail(ctx context.Context, q studiodb.Querier, email, name st
 		displayName = email
 	}
 	id := studiodb.NewID()
-	if _, err := studiodb.Execute(ctx, q, "INSERT INTO Client (id, email, name, type, updatedAt) VALUES (?, ?, ?, ?, NOW(3))",
-		id, email, displayName, "individual"); err != nil {
+	if _, err := studiodb.Execute(ctx, q, "INSERT INTO Client (id, email, name, type, updatedAt) VALUES (?, ?, ?, ?, ?)",
+		id, email, displayName, "individual", time.Now()); err != nil {
 		return nil, err
 	}
 	return GetByID(ctx, q, id)
@@ -146,7 +147,7 @@ func ListOrdersForClient(ctx context.Context, q studiodb.Querier, clientID strin
 		err := rows.Scan(&r.ID, &r.OrderNumber, &r.Status)
 		return r, err
 	}
-	orderRows, err := studiodb.Query(ctx, q, "SELECT id, orderNumber, status FROM `Order` WHERE clientId = ? ORDER BY createdAt DESC", scan, clientID)
+	orderRows, err := studiodb.Query(ctx, q, `SELECT id, orderNumber, status FROM "Order" WHERE clientId = ? ORDER BY createdAt DESC`, scan, clientID)
 	if err != nil {
 		return nil, err
 	}

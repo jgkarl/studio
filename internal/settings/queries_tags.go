@@ -49,7 +49,7 @@ func SetTags(ctx context.Context, pool *sql.DB, taggableType, taggableID, rawInp
 				return struct{}{}, err
 			}
 			if _, err := studiodb.Execute(ctx, tx,
-				"INSERT IGNORE INTO TagAssignment (id, tagId, taggableType, taggableId) VALUES (?, ?, ?, ?)",
+				"INSERT OR IGNORE INTO TagAssignment (id, tagId, taggableType, taggableId) VALUES (?, ?, ?, ?)",
 				studiodb.NewID(), tag.ID, taggableType, taggableID); err != nil {
 				return struct{}{}, err
 			}
@@ -99,7 +99,7 @@ func AddTagToEntity(ctx context.Context, pool *sql.DB, taggableType, taggableID,
 			return struct{}{}, err
 		}
 		_, err = studiodb.Execute(ctx, tx,
-			"INSERT IGNORE INTO TagAssignment (id, tagId, taggableType, taggableId) VALUES (?, ?, ?, ?)",
+			"INSERT OR IGNORE INTO TagAssignment (id, tagId, taggableType, taggableId) VALUES (?, ?, ?, ?)",
 			studiodb.NewID(), tag.ID, taggableType, taggableID)
 		return struct{}{}, err
 	})

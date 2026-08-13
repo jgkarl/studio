@@ -11,14 +11,16 @@ import (
 )
 
 // Migrate applies every *.sql file in dir that isn't already recorded in schema_migrations, in
-// filename order (hence the 0001_, 0002_... prefixes) — a direct port of the Node app's
-// db/migrate.ts, same idea, no external migration framework. MySQL auto-commits DDL statements
-// (CREATE/ALTER TABLE), so there's no real transactional atomicity to gain by wrapping each file
-// in BEGIN/COMMIT; a failed migration is a stop-and-fix-by-hand situation either way.
+// filename order (hence the 0001_, 0002_... prefixes) — no external migration framework. Each
+// file is split into individual statements and executed one at a time: unlike the MySQL driver
+// this app used to run on, SQLite has no "run several ;-separated statements in one Exec" mode,
+// so this driver doesn't either. Splitting on a bare ";" is safe here because every migration
+// file is hand-written DDL this app controls — no semicolons inside string literals to worry
+// about.
 func Migrate(ctx context.Context, pool *sql.DB, dir string) error {
 	if _, err := pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
-			filename VARCHAR(255) NOT NULL PRIMARY KEY,
+			filename TEXT NOT NULL PRIMARY KEY,
 			applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`); err != nil {
 		return fmt.Errorf("ensuring schema_migrations table: %w", err)
@@ -63,12 +65,36 @@ func Migrate(ctx context.Context, pool *sql.DB, dir string) error {
 		if err != nil {
 			return fmt.Errorf("reading migration %q: %w", name, err)
 		}
-		if _, err := pool.ExecContext(ctx, string(sqlBytes)); err != nil {
-			return fmt.Errorf("applying migration %q: %w", name, err)
+		for _, stmt := range splitStatements(string(sqlBytes)) {
+			if _, err := pool.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("applying migration %q: %w", name, err)
+			}
 		}
 		if _, err := pool.ExecContext(ctx, "INSERT INTO schema_migrations (filename) VALUES (?)", name); err != nil {
 			return fmt.Errorf("recording migration %q: %w", name, err)
 		}
 	}
 	return nil
+}
+
+// splitStatements splits a .sql file's content into individual, trimmed, non-empty statements on
+// top-level ";" boundaries, dropping full-line "--" comments first (SQLite would otherwise choke
+// on a comment-only trailing fragment after the last real statement).
+func splitStatements(sqlText string) []string {
+	var kept []string
+	for _, line := range strings.Split(sqlText, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	cleaned := strings.Join(kept, "\n")
+
+	var out []string
+	for _, part := range strings.Split(cleaned, ";") {
+		if s := strings.TrimSpace(part); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
