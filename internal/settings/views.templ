@@ -1,0 +1,321 @@
+package settings
+
+import (
+	"fmt"
+	"strconv"
+
+	"studio/internal/web"
+)
+
+templ IndexPage(classifierCount, classifierTypeCount, tagCount, pendingUserCount int) {
+	@web.Layout("Settings", indexBody(classifierCount, classifierTypeCount, tagCount, pendingUserCount))
+}
+
+templ indexBody(classifierCount, classifierTypeCount, tagCount, pendingUserCount int) {
+	@web.PageHeader("Settings", "Manage classifiers, tags, and users.", templ.NopComponent)
+	<div class="settings-grid">
+		@settingsCard("Classifiers", fmt.Sprintf("%d options across %d types", classifierCount, classifierTypeCount), "/settings/classifiers")
+		@settingsCard("Tags", fmt.Sprintf("%d tags", tagCount), "/settings/tags")
+		if pendingUserCount > 0 {
+			@settingsCard("Users", fmt.Sprintf("%d pending approval", pendingUserCount), "/settings/users")
+		} else {
+			@settingsCard("Users", "Manage roles and approvals", "/settings/users")
+		}
+	</div>
+}
+
+templ settingsCard(title, hint, href string) {
+	@web.Card() {
+		<div class="settings-card">
+			<div>
+				<div class="settings-card-title">{ title }</div>
+				<div class="page-subtitle">{ hint }</div>
+			</div>
+			<a class="btn btn-secondary" href={ templ.URL(href) }>Manage</a>
+		</div>
+	}
+}
+
+templ ClassifiersIndexPage(counts map[ClassifierType]int) {
+	@web.Layout("Classifiers", classifiersIndexBody(counts))
+}
+
+templ classifiersIndexBody(counts map[ClassifierType]int) {
+	@web.PageHeader("Classifiers", "One screen manages every pick-from-a-list field in the app.", backLink("/settings", "Back to settings"))
+	<div class="settings-grid">
+		for _, t := range ClassifierTypes {
+			@settingsCard(ClassifierTypeLabels[t], fmt.Sprintf("%d options", counts[t]), "/settings/classifiers/"+string(t))
+		}
+	</div>
+}
+
+templ backLink(href, label string) {
+	<a class="btn btn-ghost" href={ templ.URL(href) }>{ label }</a>
+}
+
+templ ClassifierTypePage(t ClassifierType, rows []Classifier, editID string) {
+	@web.Layout(ClassifierTypeLabels[t], classifierTypeBody(t, rows, editID))
+}
+
+templ classifierTypeBody(t ClassifierType, rows []Classifier, editID string) {
+	@web.PageHeader(ClassifierTypeLabels[t], "Type: "+string(t), backLink("/settings/classifiers", "All classifiers"))
+	@web.Card() {
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Seq</th>
+						<th>Code</th>
+						<th>Title</th>
+						<th>Description</th>
+						<th>Active</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					for i, row := range rows {
+						if row.ID == editID {
+							@classifierEditRow(t, row)
+						} else {
+							@classifierRow(t, row, i == 0, i == len(rows)-1)
+						}
+					}
+					if len(rows) == 0 {
+						<tr>
+							<td colspan="6" class="empty-state">No options yet.</td>
+						</tr>
+					}
+					@classifierAddRow(t, len(rows))
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ classifierRow(t ClassifierType, row Classifier, isFirst, isLast bool) {
+	<tr>
+		<td>
+			@moveButtons("/settings/classifiers/"+string(t)+"/"+row.ID+"/reorder", isFirst, isLast)
+		</td>
+		<td>
+			if row.IsActive {
+				<span class="badge badge-green">{ row.Code }</span>
+			} else {
+				<span class="badge">{ row.Code }</span>
+			}
+		</td>
+		<td>{ row.Title }</td>
+		<td class="page-subtitle">{ row.Description.String }</td>
+		<td class="page-subtitle">
+			if row.IsActive {
+				Yes
+			} else {
+				No
+			}
+		</td>
+		<td>
+			<div class="row-actions">
+				<a class="btn btn-ghost" href={ templ.URL("/settings/classifiers/" + string(t) + "?edit=" + row.ID) }>Edit</a>
+				<form method="post" action={ templ.URL("/settings/classifiers/" + string(t) + "/" + row.ID + "/delete") } data-confirm={ "Delete \"" + row.Title + "\"?" }>
+					<button type="submit" class="btn btn-ghost">Delete</button>
+				</form>
+			</div>
+		</td>
+	</tr>
+}
+
+templ moveButtons(action string, isFirst, isLast bool) {
+	<div class="move-buttons">
+		if !isFirst {
+			<form method="post" action={ templ.URL(action) }>
+				<input type="hidden" name="direction" value="up"/>
+				<button type="submit" class="btn btn-ghost" aria-label="Move up">↑</button>
+			</form>
+		}
+		if !isLast {
+			<form method="post" action={ templ.URL(action) }>
+				<input type="hidden" name="direction" value="down"/>
+				<button type="submit" class="btn btn-ghost" aria-label="Move down">↓</button>
+			</form>
+		}
+	</div>
+}
+
+templ classifierEditRow(t ClassifierType, row Classifier) {
+	<tr>
+		<td colspan="6">
+			<form method="post" action={ templ.URL("/settings/classifiers/" + string(t) + "/" + row.ID + "/update") } class="inline-edit-form">
+				<span class="badge">{ row.Code }</span>
+				<div class="inline-edit-grid">
+					@web.Field("Sequence", "") {
+						<input class="input" type="number" name="sequence" value={ strconv.Itoa(row.Sequence) }/>
+					}
+					@web.Field("Title", "") {
+						<input class="input" name="title" value={ row.Title } required/>
+					}
+					<label class="checkbox-field">
+						<input type="checkbox" name="isActive" checked?={ row.IsActive }/>
+						Active
+					</label>
+				</div>
+				@web.Field("Description", "") {
+					<textarea class="input" name="description" rows="1">{ row.Description.String }</textarea>
+				}
+				@web.Field("Extra data (JSON)", `e.g. {"defaultRate": 60}`) {
+					<textarea class="input mono" name="data" rows="2">{ row.Data.String }</textarea>
+				}
+				<div class="row-actions">
+					<button type="submit" class="btn btn-secondary">Save</button>
+					<a class="btn btn-ghost" href={ templ.URL("/settings/classifiers/" + string(t)) }>Cancel</a>
+				</div>
+			</form>
+		</td>
+	</tr>
+}
+
+templ classifierAddRow(t ClassifierType, nextSequence int) {
+	<tr>
+		<td colspan="6">
+			<form method="post" action={ templ.URL("/settings/classifiers/" + string(t)) } class="inline-edit-form">
+				<div class="inline-edit-grid">
+					@web.Field("Code", "lowercase_with_underscores") {
+						<input class="input" name="code" required placeholder="e.g. in_progress"/>
+					}
+					@web.Field("Title", "") {
+						<input class="input" name="title" required placeholder="Display name"/>
+					}
+					@web.Field("Sequence", "") {
+						<input class="input" type="number" name="sequence" value={ strconv.Itoa(nextSequence) }/>
+					}
+				</div>
+				@web.Field("Description", "") {
+					<textarea class="input" name="description" rows="1"></textarea>
+				}
+				@web.Field("Extra data (JSON)", `optional, e.g. {"defaultRate": 60}`) {
+					<textarea class="input mono" name="data" rows="1"></textarea>
+				}
+				<button type="submit" class="btn btn-primary">Add option</button>
+			</form>
+		</td>
+	</tr>
+}
+
+templ TagsIndexPage(tags []TagUsage, editID string) {
+	@web.Layout("Tags", tagsIndexBody(tags, editID))
+}
+
+templ tagsIndexBody(tags []TagUsage, editID string) {
+	@web.PageHeader("Tags", "Free-form labels for Clients, Assets, Workflows, and Orders.", backLink("/settings", "Back to settings"))
+	@web.Card() {
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Seq</th>
+						<th>Name</th>
+						<th>Category</th>
+						<th>Usage</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					for i, tag := range tags {
+						if tag.ID == editID {
+							@tagEditRow(tag)
+						} else {
+							@tagRow(tag, i == 0, i == len(tags)-1)
+						}
+					}
+					if len(tags) == 0 {
+						<tr>
+							<td colspan="5" class="empty-state">No tags yet.</td>
+						</tr>
+					}
+					@tagAddRow()
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ tagRow(tag TagUsage, isFirst, isLast bool) {
+	<tr>
+		<td>
+			@moveButtons("/settings/tags/"+tag.ID+"/reorder", isFirst, isLast)
+		</td>
+		<td>{ tag.Name }</td>
+		<td class="page-subtitle">
+			if tag.Category.Valid {
+				{ tag.Category.String }
+			} else {
+				—
+			}
+		</td>
+		<td>
+			if tag.Total == 0 {
+				<span class="page-subtitle">unused</span>
+			} else {
+				<div class="row-actions">
+					<span class="badge badge-blue">{ strconv.Itoa(tag.Total) } total</span>
+					for typeName, count := range tag.ByType {
+						<span class="badge">{ typeName }: { strconv.Itoa(count) }</span>
+					}
+				</div>
+			}
+		</td>
+		<td>
+			<div class="row-actions">
+				<a class="btn btn-ghost" href={ templ.URL("/settings/tags?edit=" + tag.ID) }>Edit</a>
+				<form method="post" action={ templ.URL("/settings/tags/" + tag.ID + "/delete") } data-confirm={ deleteConfirmText(tag) }>
+					<button type="submit" class="btn btn-ghost">Delete</button>
+				</form>
+			</div>
+		</td>
+	</tr>
+}
+
+func deleteConfirmText(tag TagUsage) string {
+	if tag.Total > 0 {
+		return fmt.Sprintf("%q is used %d time(s) — delete it anyway?", tag.Name, tag.Total)
+	}
+	return fmt.Sprintf("Delete %q?", tag.Name)
+}
+
+templ tagEditRow(tag TagUsage) {
+	<tr>
+		<td colspan="5">
+			<form method="post" action={ templ.URL("/settings/tags/" + tag.ID + "/rename") } class="inline-edit-form">
+				<div class="inline-edit-grid">
+					@web.Field("Name", "") {
+						<input class="input" name="name" value={ tag.Name } required/>
+					}
+					@web.Field("Category", "optional grouping") {
+						<input class="input" name="category" value={ tag.Category.String }/>
+					}
+				</div>
+				<div class="row-actions">
+					<button type="submit" class="btn btn-secondary">Save</button>
+					<a class="btn btn-ghost" href="/settings/tags">Cancel</a>
+				</div>
+			</form>
+		</td>
+	</tr>
+}
+
+templ tagAddRow() {
+	<tr>
+		<td colspan="5">
+			<form method="post" action="/settings/tags" class="inline-edit-form">
+				<div class="inline-edit-grid">
+					@web.Field("Name", "") {
+						<input class="input" name="name" required placeholder="e.g. urgent"/>
+					}
+					@web.Field("Category", "optional grouping") {
+						<input class="input" name="category" placeholder="e.g. priority"/>
+					}
+				</div>
+				<button type="submit" class="btn btn-primary">Add tag</button>
+			</form>
+		</td>
+	</tr>
+}

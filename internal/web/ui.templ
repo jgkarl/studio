@@ -26,3 +26,19 @@ templ Alert(tone string) {
 		{ children... }
 	</p>
 }
+
+// PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page
+// uses. actions is a slot for buttons/links — pass templ.NopComponent when there are none.
+templ PageHeader(title, subtitle string, actions templ.Component) {
+	<div class="page-header">
+		<div>
+			<h1>{ title }</h1>
+			if subtitle != "" {
+				<p class="page-subtitle">{ subtitle }</p>
+			}
+		</div>
+		<div class="actions">
+			@actions
+		</div>
+	</div>
+}

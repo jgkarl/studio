@@ -13,6 +13,7 @@ import (
 	"studio/internal/db"
 	"studio/internal/mail"
 	"studio/internal/session"
+	"studio/internal/settings"
 	"studio/internal/web"
 )
 
@@ -60,6 +61,7 @@ func main() {
 	})
 
 	auth.Mount(mux, authSvc)
+	settings.Mount(mux, &settings.Service{Pool: pool, Auth: authSvc})
 
 	// Placeholder landing page until the Dashboard module (module 4) replaces it — gated so the
 	// login flow is exercised end to end from the very first module that needs it.
