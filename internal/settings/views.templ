@@ -7,8 +7,8 @@ import (
 	"studio/internal/web"
 )
 
-templ IndexPage(classifierCount, classifierTypeCount, tagCount, pendingUserCount int) {
-	@web.Layout("Settings", indexBody(classifierCount, classifierTypeCount, tagCount, pendingUserCount))
+templ IndexPage(c web.Chrome, classifierCount, classifierTypeCount, tagCount, pendingUserCount int) {
+	@web.AppLayout("Settings", c, indexBody(classifierCount, classifierTypeCount, tagCount, pendingUserCount))
 }
 
 templ indexBody(classifierCount, classifierTypeCount, tagCount, pendingUserCount int) {
@@ -36,8 +36,8 @@ templ settingsCard(title, hint, href string) {
 	}
 }
 
-templ ClassifiersIndexPage(counts map[ClassifierType]int) {
-	@web.Layout("Classifiers", classifiersIndexBody(counts))
+templ ClassifiersIndexPage(c web.Chrome, counts map[ClassifierType]int) {
+	@web.AppLayout("Classifiers", c, classifiersIndexBody(counts))
 }
 
 templ classifiersIndexBody(counts map[ClassifierType]int) {
@@ -53,8 +53,8 @@ templ backLink(href, label string) {
 	<a class="btn btn-ghost" href={ templ.URL(href) }>{ label }</a>
 }
 
-templ ClassifierTypePage(t ClassifierType, rows []Classifier, editID string) {
-	@web.Layout(ClassifierTypeLabels[t], classifierTypeBody(t, rows, editID))
+templ ClassifierTypePage(c web.Chrome, t ClassifierType, rows []Classifier, editID string) {
+	@web.AppLayout(ClassifierTypeLabels[t], c, classifierTypeBody(t, rows, editID))
 }
 
 templ classifierTypeBody(t ClassifierType, rows []Classifier, editID string) {
@@ -200,8 +200,8 @@ templ classifierAddRow(t ClassifierType, nextSequence int) {
 	</tr>
 }
 
-templ TagsIndexPage(tags []TagUsage, editID string) {
-	@web.Layout("Tags", tagsIndexBody(tags, editID))
+templ TagsIndexPage(c web.Chrome, tags []TagUsage, editID string) {
+	@web.AppLayout("Tags", c, tagsIndexBody(tags, editID))
 }
 
 templ tagsIndexBody(tags []TagUsage, editID string) {

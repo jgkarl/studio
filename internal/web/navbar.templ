@@ -1,0 +1,95 @@
+package web
+
+import "studio/internal/theme"
+
+type navItem struct {
+	href, label string
+}
+
+func navItems(c Chrome) []navItem {
+	items := []navItem{
+		{"/", c.Dict.Nav.Dashboard},
+		{"/clients", c.Dict.Nav.Clients},
+		{"/assets", c.Dict.Nav.Assets},
+		{"/workflows", c.Dict.Nav.Workflows},
+		{"/clients/orders", c.Dict.Nav.Orders},
+		{"/reporter", c.Dict.Nav.Reporter},
+		{"/album", c.Dict.Nav.Album},
+	}
+	if c.ShowSettings {
+		items = append(items, navItem{"/settings", c.Dict.Nav.Settings})
+	}
+	return items
+}
+
+templ Navbar(c Chrome) {
+	<header class="navbar">
+		<input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox"/>
+		<div class="navbar-row">
+			<a href="/" class="navbar-brand">Studio</a>
+			<label for="nav-toggle" class="nav-toggle-btn" aria-label="Menu">☰</label>
+		</div>
+		<div class="navbar-menu">
+			<nav class="navbar-links">
+				for _, item := range navItems(c) {
+					<a href={ templ.URL(item.href) } class={ "navbar-link", templ.KV("navbar-link-active", item.href == c.Active) }>
+						{ item.label }
+					</a>
+				}
+			</nav>
+			<div class="navbar-controls">
+				<span class="navbar-user">{ c.UserName } <span class="page-subtitle">({ c.UserRole })</span></span>
+				<form method="post" action="/locale/toggle">
+					<button type="submit" class="btn btn-ghost" title={ localeToggleTitle(c) }>🌐</button>
+				</form>
+				<form method="post" action="/theme/toggle">
+					<button type="submit" class="btn btn-ghost" title={ themeToggleTitle(c) }>
+						if c.Theme == theme.Dark {
+							☀
+						} else {
+							🌙
+						}
+					</button>
+				</form>
+				<form method="post" action="/logout">
+					<button type="submit" class="btn btn-ghost">{ c.Dict.Common.SignOut }</button>
+				</form>
+			</div>
+		</div>
+	</header>
+}
+
+func localeToggleTitle(c Chrome) string {
+	if c.Locale == "en" {
+		return c.Dict.Common.SwitchToEstonian
+	}
+	return c.Dict.Common.SwitchToEnglish
+}
+
+func themeToggleTitle(c Chrome) string {
+	if c.Theme == theme.Dark {
+		return c.Dict.Common.SwitchToLightTheme
+	}
+	return c.Dict.Common.SwitchToDarkTheme
+}
+
+// AppLayout is the persistent app shell (Navbar + 1200px container) every in-app page (dashboard
+// onward) renders through, replacing the bare Layout for anything reachable after sign-in.
+templ AppLayout(title string, c Chrome, body templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme={ string(c.Theme) }>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } · Studio</title>
+			<link rel="stylesheet" href="/static/css/app.css"/>
+		</head>
+		<body>
+			@Navbar(c)
+			<main class="container">
+				@body
+			</main>
+			<script src="/static/js/confirm.js" defer></script>
+		</body>
+	</html>
+}

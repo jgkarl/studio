@@ -1,0 +1,71 @@
+package dashboard
+
+import (
+	"strconv"
+
+	"studio/internal/web"
+)
+
+templ Page(c web.Chrome, clientCount, assetCount int, activeProjects []activeProject, openOrders []openOrder, draftReports int, orderStatusLabels map[string]string) {
+	@web.AppLayout(c.Dict.Dashboard.Title, c, pageBody(c, clientCount, assetCount, activeProjects, openOrders, draftReports, orderStatusLabels))
+}
+
+templ pageBody(c web.Chrome, clientCount, assetCount int, activeProjects []activeProject, openOrders []openOrder, draftReports int, orderStatusLabels map[string]string) {
+	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, templ.NopComponent)
+	<div class="stat-grid">
+		@statCard(strconv.Itoa(clientCount), c.Dict.Dashboard.Clients, "/clients")
+		@statCard(strconv.Itoa(assetCount), c.Dict.Dashboard.Assets, "/assets")
+		@statCard(strconv.Itoa(len(activeProjects)), c.Dict.Dashboard.ActiveWorkflows, "/workflows")
+		@statCard(strconv.Itoa(draftReports), c.Dict.Dashboard.DraftReports, "/reporter")
+	</div>
+	<div class="dashboard-columns">
+		@web.Card() {
+			<h2 class="dashboard-heading">{ c.Dict.Dashboard.ActiveWorkflowsHeading }</h2>
+			if len(activeProjects) == 0 {
+				<p class="empty-state">{ c.Dict.Dashboard.NothingInProgress }</p>
+			}
+			<ul class="dashboard-list">
+				for _, p := range activeProjects {
+					<li>
+						<a href={ templ.URL("/workflows/" + p.ID) }>{ p.Title }</a>
+						<div class="page-subtitle">
+							if p.AssetTitle != "" {
+								{ p.AssetTitle }
+							} else {
+								{ p.AssetReferenceCode }
+							}
+							· { p.Stage }
+						</div>
+					</li>
+				}
+			</ul>
+		}
+		@web.Card() {
+			<h2 class="dashboard-heading">{ c.Dict.Dashboard.OpenOrdersHeading }</h2>
+			if len(openOrders) == 0 {
+				<p class="empty-state">{ c.Dict.Dashboard.NoOpenOrders }</p>
+			}
+			<ul class="dashboard-list">
+				for _, o := range openOrders {
+					<li>
+						<a href={ templ.URL("/clients/orders/" + o.ID) }>{ o.OrderNumber } — { o.ClientName }</a>
+						<div class="page-subtitle">
+							if label, ok := orderStatusLabels[o.Status]; ok {
+								{ label }
+							} else {
+								{ o.Status }
+							}
+						</div>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+templ statCard(value, label, href string) {
+	<a href={ templ.URL(href) } class="stat-card">
+		<div class="stat-value">{ value }</div>
+		<div class="stat-label">{ label }</div>
+	</a>
+}

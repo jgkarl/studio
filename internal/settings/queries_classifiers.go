@@ -42,6 +42,20 @@ func GetClassifierLabel(ctx context.Context, q studiodb.Querier, t ClassifierTyp
 	return row.Title, nil
 }
 
+// GetClassifierLabelMap builds a {code: title} map for a type — handy for label lookups without
+// N+1 queries (e.g. rendering a list of Orders, each with its own status code).
+func GetClassifierLabelMap(ctx context.Context, q studiodb.Querier, t ClassifierType) (map[string]string, error) {
+	rows, err := studiodb.Query(ctx, q, "SELECT "+classifierColumns+" FROM Classifier WHERE type = ?", scanClassifier, t)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]string, len(rows))
+	for _, row := range rows {
+		m[row.Code] = row.Title
+	}
+	return m, nil
+}
+
 func CountClassifiers(ctx context.Context, q studiodb.Querier, types []ClassifierType) (int, error) {
 	if len(types) == 0 {
 		return 0, nil

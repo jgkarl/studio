@@ -11,7 +11,12 @@ import (
 
 	"studio/internal/auth"
 	studiodb "studio/internal/db"
+	"studio/internal/web"
 )
+
+func chromeFor(r *http.Request, user *auth.User, active string) web.Chrome {
+	return web.BuildChrome(r, user.Name, string(user.Role), user.HasRole(auth.RoleAdmin), active)
+}
 
 type Service struct {
 	Pool *sql.DB
@@ -71,7 +76,7 @@ func (svc *Service) handleIndex(w http.ResponseWriter, r *http.Request, user *au
 	if pendingRow != nil {
 		pendingCount = *pendingRow
 	}
-	writeHTML(w, r, IndexPage(classifierCount, len(ClassifierTypes), tagCount, pendingCount))
+	writeHTML(w, r, IndexPage(chromeFor(r, user, "/settings"), classifierCount, len(ClassifierTypes), tagCount, pendingCount))
 }
 
 // --- Classifiers -----------------------------------------------------------------------------
@@ -86,7 +91,7 @@ func (svc *Service) handleClassifiersIndex(w http.ResponseWriter, r *http.Reques
 		}
 		counts[t] = n
 	}
-	writeHTML(w, r, ClassifiersIndexPage(counts))
+	writeHTML(w, r, ClassifiersIndexPage(chromeFor(r, user, "/settings/classifiers"), counts))
 }
 
 func (svc *Service) handleClassifierType(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -100,7 +105,7 @@ func (svc *Service) handleClassifierType(w http.ResponseWriter, r *http.Request,
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, ClassifierTypePage(t, rows, r.URL.Query().Get("edit")))
+	writeHTML(w, r, ClassifierTypePage(chromeFor(r, user, "/settings/classifiers"), t, rows, r.URL.Query().Get("edit")))
 }
 
 func parseClassifierData(raw string) (string, error) {
@@ -218,7 +223,7 @@ func (svc *Service) handleTagsIndex(w http.ResponseWriter, r *http.Request, user
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, TagsIndexPage(tags, r.URL.Query().Get("edit")))
+	writeHTML(w, r, TagsIndexPage(chromeFor(r, user, "/settings/tags"), tags, r.URL.Query().Get("edit")))
 }
 
 func (svc *Service) handleTagCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {

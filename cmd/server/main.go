@@ -10,6 +10,7 @@ import (
 
 	"studio/internal/auth"
 	"studio/internal/config"
+	"studio/internal/dashboard"
 	"studio/internal/db"
 	"studio/internal/mail"
 	"studio/internal/session"
@@ -60,18 +61,10 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	web.MountToggles(mux)
 	auth.Mount(mux, authSvc)
 	settings.Mount(mux, &settings.Service{Pool: pool, Auth: authSvc})
-
-	// Placeholder landing page until the Dashboard module (module 4) replaces it — gated so the
-	// login flow is exercised end to end from the very first module that needs it.
-	mux.HandleFunc("GET /{$}", authSvc.RequireUser(func(w http.ResponseWriter, r *http.Request, user *auth.User) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		page := web.Layout("Studio", web.Placeholder("Signed in as "+user.Name+" ("+string(user.Role)+")."))
-		if err := page.Render(r.Context(), w); err != nil {
-			log.Printf("render error: %v", err)
-		}
-	}))
+	dashboard.Mount(mux, &dashboard.Service{Pool: pool, Auth: authSvc})
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)
