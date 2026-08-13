@@ -2,6 +2,7 @@ package assets
 
 import (
 	"database/sql"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,13 +11,15 @@ import (
 
 	"studio/internal/auth"
 	"studio/internal/clients"
+	"studio/internal/media"
 	"studio/internal/settings"
 	"studio/internal/web"
 )
 
 type Service struct {
-	Pool *sql.DB
-	Auth *auth.Service
+	Pool  *sql.DB
+	Auth  *auth.Service
+	Media *media.Service
 }
 
 func Mount(mux *http.ServeMux, svc *Service) {
@@ -105,8 +108,31 @@ func formInput(r *http.Request) Input {
 	}
 }
 
+// formPhotos reads every non-empty file from a multipart <input type="file" name="photos"
+// multiple> into media.UploadedFile values, ready for Service.Media.UploadAllAndAttach.
+func formPhotos(r *http.Request) []*media.UploadedFile {
+	if r.MultipartForm == nil {
+		return nil
+	}
+	var out []*media.UploadedFile
+	for _, fh := range r.MultipartForm.File["photos"] {
+		f, err := fh.Open()
+		if err != nil {
+			continue
+		}
+		data, err := io.ReadAll(f)
+		f.Close()
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		mimeType := fh.Header.Get("Content-Type")
+		out = append(out, &media.UploadedFile{MimeType: mimeType, Data: data})
+	}
+	return out
+}
+
 func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
@@ -136,7 +162,12 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 		}
 	}
 	if intake := strings.TrimSpace(r.FormValue("intakeDescription")); intake != "" {
-		if _, err := RecordState(ctx, svc.Pool, id, "intake", intake, nil, nil); err != nil {
+		stateID, err := RecordState(ctx, svc.Pool, id, "intake", intake, nil, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := svc.Media.UploadAllAndAttach(ctx, formPhotos(r), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -213,8 +244,18 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		conditionByCode[c.Code] = c
 	}
 
+	stateMedia := map[string][]media.ReferenceWithMedia{}
+	for _, st := range states {
+		refs, err := svc.Media.GetReferencedMedia(ctx, media.RefAssetState, st.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		stateMedia[st.ID] = refs
+	}
+
 	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, materials, available, states,
-		projects, tagAssignments, conditions, conditionByCode))
+		projects, tagAssignments, conditions, conditionByCode, stateMedia))
 }
 
 func (svc *Service) handleUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -231,17 +272,23 @@ func (svc *Service) handleUpdate(w http.ResponseWriter, r *http.Request, user *a
 }
 
 func (svc *Service) handleRecordState(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
+	ctx := r.Context()
 	id := r.PathValue("id")
 	condition := r.FormValue("condition")
 	if condition == "" {
 		condition = "other"
 	}
 	description := strings.TrimSpace(r.FormValue("description"))
-	if _, err := RecordState(r.Context(), svc.Pool, id, condition, description, nil, nil); err != nil {
+	stateID, err := RecordState(ctx, svc.Pool, id, condition, description, nil, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if _, err := svc.Media.UploadAllAndAttach(ctx, formPhotos(r), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

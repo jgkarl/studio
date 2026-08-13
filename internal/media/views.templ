@@ -1,0 +1,197 @@
+package media
+
+import (
+	"strconv"
+
+	"studio/internal/web"
+)
+
+templ AlbumPage(c web.Chrome, items []AlbumItem) {
+	@web.AppLayout("Album", c, albumBody(items))
+}
+
+templ albumBody(items []AlbumItem) {
+	@web.PageHeader("Album", "Every photo, video, and document uploaded anywhere in the app.", templ.NopComponent)
+	<div id="album-root" class="album-root">
+		<div class="album-controls">
+			<input type="text" id="album-search" class="input album-search" placeholder="Search…"/>
+			<div class="album-kind-filters" id="album-kind-filters">
+				<button type="button" class="btn btn-secondary album-kind-btn is-active" data-kind="all">All</button>
+				<button type="button" class="btn btn-secondary album-kind-btn" data-kind="image">Images</button>
+				<button type="button" class="btn btn-secondary album-kind-btn" data-kind="video">Video</button>
+				<button type="button" class="btn btn-secondary album-kind-btn" data-kind="document">Documents</button>
+			</div>
+			<label class="checkbox-field album-group-toggle">
+				<input type="checkbox" id="album-group-toggle"/>
+				Group by workflow
+			</label>
+			<span class="badge" id="album-count">{ strconv.Itoa(len(items)) } items</span>
+		</div>
+
+		if len(items) == 0 {
+			<p class="empty-state">No media uploaded yet.</p>
+		}
+
+		<div class="album-grid" id="album-grid">
+			for _, item := range items {
+				@albumCard(item)
+			}
+		</div>
+	</div>
+	<script src="/static/js/album.js" defer></script>
+}
+
+templ albumCard(item AlbumItem) {
+	<a
+		href={ templ.URL("/album/view/" + item.ID) }
+		class="album-card"
+		data-kind={ string(item.Kind) }
+		data-project-id={ item.ProjectID.String }
+		data-project-title={ projectGroupTitle(item) }
+		data-search={ albumSearchHaystack(item) }
+	>
+		<div class="album-thumb">
+			if item.Kind == KindVideo {
+				<video src={ "/api/media/" + item.ID + "?variant=original" } muted></video>
+			} else if item.Kind == KindImage {
+				<img src={ "/api/media/" + item.ID } alt={ item.Role.String }/>
+			} else {
+				<div class="album-thumb-doc">{ item.MimeType }</div>
+			}
+		</div>
+		<div class="album-card-body">
+			<div class="album-card-title">
+				if item.Role.Valid && item.Role.String != "" {
+					{ item.Role.String }
+				} else {
+					{ string(item.Kind) }
+				}
+			</div>
+			<div class="album-card-sub">
+				if item.AssetTitle.Valid {
+					{ item.AssetTitle.String }
+				} else if item.ClientName.Valid {
+					{ item.ClientName.String }
+				} else {
+					unattached
+				}
+			</div>
+		</div>
+	</a>
+}
+
+func projectGroupTitle(item AlbumItem) string {
+	if item.ProjectTitle.Valid {
+		return item.ProjectTitle.String
+	}
+	return "No workflow"
+}
+
+func albumSearchHaystack(item AlbumItem) string {
+	parts := []string{item.Role.String, item.AssetTitle.String, item.ProjectTitle.String, item.ClientName.String, item.MimeType, item.UploadedByName}
+	out := ""
+	for _, p := range parts {
+		if p != "" {
+			out += p + " "
+		}
+	}
+	return out
+}
+
+templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Reference, edits []Media) {
+	@web.AppLayout(mediaViewTitle(m, reference), c, mediaViewBody(m, uploadedByName, reference, edits))
+}
+
+templ mediaViewBody(m Media, uploadedByName string, reference *Reference, edits []Media) {
+	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m))
+	@web.Card() {
+		<div class="row-actions" style="margin-bottom: 0.75rem;">
+			<span class="badge">{ string(m.Kind) }</span>
+			<span class="badge">{ m.MimeType }</span>
+			if m.Width.Valid && m.Height.Valid {
+				<span class="badge">{ strconv.FormatInt(m.Width.Int64, 10) }×{ strconv.FormatInt(m.Height.Int64, 10) }px</span>
+			}
+			if m.DurationSeconds.Valid {
+				<span class="badge">{ strconv.FormatInt(m.DurationSeconds.Int64, 10) }s</span>
+			}
+			if m.EditedFromID.Valid {
+				<span class="badge badge-blue">
+					edited from <a href={ templ.URL("/album/view/" + m.EditedFromID.String) } style="text-decoration: underline;">original</a>
+				</span>
+			}
+		</div>
+
+		if len(edits) > 0 {
+			<p class="page-subtitle" style="margin-bottom: 0.75rem;">
+				{ strconv.Itoa(len(edits)) } edited version(s):
+				for i, e := range edits {
+					if i > 0 {
+						{ ", " }
+					}
+					<a href={ templ.URL("/album/view/" + e.ID) } style="text-decoration: underline;">{ e.CreatedAt.Format("2006-01-02") }</a>
+				}
+			</p>
+		}
+
+		if m.Kind == KindImage {
+			<div id="iiif-viewer" class="iiif-viewer" data-media-id={ m.ID }></div>
+			<p class="page-subtitle" style="text-align: center; margin-top: 0.5rem;">Scroll or pinch to zoom · drag to pan</p>
+		}
+		if m.Kind == KindVideo {
+			<video controls class="media-view-video" src={ "/api/media/" + m.ID + "?variant=original" }></video>
+		}
+		if m.Kind == KindDocument {
+			<p class="page-subtitle">No preview available for this file type.</p>
+		}
+	}
+	if m.Kind == KindImage {
+		<script src="/static/vendor/openseadragon/openseadragon.min.js"></script>
+		<script src="/static/js/iiif-viewer.js" defer></script>
+		<script src="/static/js/image-editor.js" defer></script>
+	}
+}
+
+templ mediaViewActions(m Media) {
+	if m.Kind == KindImage {
+		<button type="button" class="btn btn-secondary" id="edit-image-btn" data-source-media-id={ m.ID }>Edit image</button>
+	}
+	<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>Download original</a>
+	<a class="btn btn-ghost" href="/album">Back to album</a>
+}
+
+func mediaViewTitle(m Media, reference *Reference) string {
+	if reference != nil && reference.Role.Valid && reference.Role.String != "" {
+		return reference.Role.String
+	}
+	return string(m.Kind)
+}
+
+func mediaViewSubtitle(m Media, uploadedByName string) string {
+	return "Uploaded by " + uploadedByName + " · " + m.CreatedAt.Format("2006-01-02 15:04") + " · " + strconv.FormatInt(m.SizeBytes/1024, 10) + " KB"
+}
+
+// MediaGrid renders every media reference for one entity (Asset/AssetState/Activity/Report) - a
+// small grid of thumbnails linking to the deep-zoom viewer (images) or the raw file (video).
+// Reusable from every future module's detail page (Workflows, Reporter, ...).
+templ MediaGrid(refs []ReferenceWithMedia) {
+	if len(refs) > 0 {
+		<div class="media-grid">
+			for _, ref := range refs {
+				<a href={ mediaGridHref(ref) } target="_blank" rel="noreferrer" class="media-grid-item">
+					if ref.Media.Kind == KindVideo {
+						<video src={ "/api/media/" + ref.MediaID + "?variant=original" } muted></video>
+					} else {
+						<img src={ "/api/media/" + ref.MediaID } alt={ ref.Role.String }/>
+					}
+				</a>
+			}
+		</div>
+	}
+}
+
+func mediaGridHref(ref ReferenceWithMedia) templ.SafeURL {
+	if ref.Media.Kind == KindVideo {
+		return templ.URL("/api/media/" + ref.MediaID + "?variant=original")
+	}
+	return templ.URL("/album/view/" + ref.MediaID)
+}

@@ -15,6 +15,7 @@ import (
 	"studio/internal/dashboard"
 	"studio/internal/db"
 	"studio/internal/mail"
+	"studio/internal/media"
 	"studio/internal/session"
 	"studio/internal/settings"
 	"studio/internal/web"
@@ -42,6 +43,14 @@ func main() {
 	}
 	log.Println("database ready, migrations applied")
 
+	media.InitImageProcessing()
+	defer media.ShutdownImageProcessing()
+
+	storage, err := media.NewLocalDiskAdapter(cfg.MediaStorageDir)
+	if err != nil {
+		log.Fatalf("media storage: %v", err)
+	}
+
 	authSvc := &auth.Service{
 		Pool:     pool,
 		Sessions: session.New(cfg.AuthSecret),
@@ -55,6 +64,7 @@ func main() {
 		AppURL:        cfg.AppURL,
 		AllowDevLogin: cfg.AllowDevLogin,
 	}
+	mediaSvc := &media.Service{Pool: pool, Storage: storage}
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -68,7 +78,8 @@ func main() {
 	settings.Mount(mux, &settings.Service{Pool: pool, Auth: authSvc})
 	dashboard.Mount(mux, &dashboard.Service{Pool: pool, Auth: authSvc})
 	clients.Mount(mux, &clients.Service{Pool: pool, Auth: authSvc})
-	assets.Mount(mux, &assets.Service{Pool: pool, Auth: authSvc})
+	assets.Mount(mux, &assets.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
+	media.Mount(mux, &media.HandlerService{Service: mediaSvc, Auth: authSvc})
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

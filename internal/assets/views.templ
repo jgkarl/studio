@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"studio/internal/clients"
+	"studio/internal/media"
 	"studio/internal/settings"
 	"studio/internal/web"
 )
@@ -56,7 +57,7 @@ templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes, materials [
 templ newBody(allClients []clients.Client, assetTypes, materials []settings.Classifier, preselectedClientID string) {
 	@web.PageHeader("New asset", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/assets" class="form-grid">
+		<form method="post" action="/assets" enctype="multipart/form-data" class="form-grid">
 			<div class="form-row-2">
 				@web.Field("Client", "") {
 					<select class="input" name="clientId" required>
@@ -147,7 +148,9 @@ templ newBody(allClients []clients.Client, assetTypes, materials []settings.Clas
 				@web.Field("Notes", "") {
 					<textarea class="input" name="intakeDescription" rows="2" placeholder="Condition on arrival…"></textarea>
 				}
-				<p class="page-subtitle">Photo attachment lands with the Media module.</p>
+				@web.Field("Photos", "On a phone this opens your camera directly.") {
+					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+				}
 			</div>
 			<button type="submit" class="btn btn-primary">Create asset</button>
 		</form>
@@ -156,13 +159,13 @@ templ newBody(allClients []clients.Client, assetTypes, materials []settings.Clas
 
 templ DetailPage(c web.Chrome, asset Asset, client *clients.Client, assetType *settings.Classifier, materials []Material,
 	availableMaterials []settings.Classifier, states []State, projects []ProjectSummary, tagAssignments []settings.TagAssignment,
-	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier) {
-	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, materials, availableMaterials, states, projects, tagAssignments, conditions, conditionByCode))
+	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia) {
+	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, materials, availableMaterials, states, projects, tagAssignments, conditions, conditionByCode, stateMedia))
 }
 
 templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classifier, materials []Material,
 	availableMaterials []settings.Classifier, states []State, projects []ProjectSummary, tagAssignments []settings.TagAssignment,
-	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier) {
+	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia) {
 	@web.PageHeader(asset.DisplayName(), assetSubtitle(asset, client, assetType), assetActions(asset))
 	<div class="detail-grid">
 		<div class="detail-main">
@@ -260,11 +263,12 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 								<span class="page-subtitle">{ s.RecordedAt.Format("2006-01-02 15:04") }</span>
 							</div>
 							<p class="detail-paragraph">{ s.Description }</p>
+							@media.MediaGrid(stateMedia[s.ID])
 						</li>
 					}
 				</ul>
 
-				<form method="post" action={ templ.URL("/assets/" + asset.ID + "/states") } class="inline-edit-form form-section">
+				<form method="post" action={ templ.URL("/assets/" + asset.ID + "/states") } enctype="multipart/form-data" class="inline-edit-form form-section">
 					<p class="form-section-title">Record condition manually</p>
 					@web.Field("Condition", "") {
 						<select class="input" name="condition">
@@ -276,7 +280,9 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 					@web.Field("Description", "") {
 						<textarea class="input" name="description" rows="2" required></textarea>
 					}
-					<p class="page-subtitle">Photo attachment lands with the Media module.</p>
+					@web.Field("Photos", "On a phone this opens your camera directly.") {
+						<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+					}
 					<button type="submit" class="btn btn-secondary">Save condition record</button>
 				</form>
 			}

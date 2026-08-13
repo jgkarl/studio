@@ -812,3 +812,224 @@ h1 {
   padding-left: 0.75rem;
   margin-bottom: 1rem;
 }
+
+/* --- Album ------------------------------------------------------------------------------- */
+
+.album-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.album-search {
+  max-width: 16rem;
+}
+
+.album-kind-filters {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.album-kind-btn.is-active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.album-group-toggle {
+  margin-left: auto;
+}
+
+.album-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.album-grid-grouped {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+
+.album-group-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.album-card {
+  display: block;
+  width: 10rem;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--surface);
+  text-decoration: none;
+  color: inherit;
+}
+
+.album-thumb {
+  height: 7rem;
+  width: 10rem;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.album-thumb img, .album-thumb video {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.album-thumb-doc {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.album-card-body {
+  padding: 0.5rem;
+}
+
+.album-card-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-card-sub {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- IIIF deep-zoom viewer + video --------------------------------------------------------- */
+
+.iiif-viewer {
+  height: 45vh;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: #1c1917;
+}
+
+@media (min-width: 640px) {
+  .iiif-viewer {
+    height: 60vh;
+  }
+}
+
+@media (min-width: 1024px) {
+  .iiif-viewer {
+    height: 70vh;
+  }
+}
+
+.media-view-video {
+  max-height: 60vh;
+  width: 100%;
+  border-radius: 0.5rem;
+  background: #000;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .media-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .media-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.media-grid-item {
+  display: block;
+  height: 8rem;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.media-grid-item img, .media-grid-item video {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+/* --- Image editor -------------------------------------------------------------------------- */
+
+.image-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.75);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.image-editor-panel {
+  background: var(--surface);
+  border-radius: 0.5rem;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.image-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.image-editor-spacer {
+  flex: 1;
+}
+
+.image-editor-canvas-wrap {
+  position: relative;
+  overflow: auto;
+  padding: 0.5rem;
+}
+
+.image-editor-bg, .image-editor-fg {
+  max-width: 80vw;
+  max-height: 70vh;
+}
+
+.image-editor-fg {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  touch-action: none;
+  cursor: crosshair;
+}
