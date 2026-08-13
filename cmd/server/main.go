@@ -8,8 +8,11 @@ import (
 	"net/http"
 	"time"
 
+	"studio/internal/auth"
 	"studio/internal/config"
 	"studio/internal/db"
+	"studio/internal/mail"
+	"studio/internal/session"
 	"studio/internal/web"
 )
 
@@ -35,19 +38,38 @@ func main() {
 	}
 	log.Println("database ready, migrations applied")
 
+	authSvc := &auth.Service{
+		Pool:     pool,
+		Sessions: session.New(cfg.AuthSecret),
+		Mailer: mail.New(mail.Config{
+			Host: cfg.SMTPHost,
+			Port: cfg.SMTPPort,
+			User: cfg.SMTPUser,
+			Pass: cfg.SMTPPass,
+			From: cfg.SMTPFrom,
+		}),
+		AppURL:        cfg.AppURL,
+		AllowDevLogin: cfg.AllowDevLogin,
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+
+	auth.Mount(mux, authSvc)
+
+	// Placeholder landing page until the Dashboard module (module 4) replaces it — gated so the
+	// login flow is exercised end to end from the very first module that needs it.
+	mux.HandleFunc("GET /{$}", authSvc.RequireUser(func(w http.ResponseWriter, r *http.Request, user *auth.User) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		page := web.Layout("Studio", web.Placeholder("Go/templ/MySQL rewrite — scaffold module complete."))
+		page := web.Layout("Studio", web.Placeholder("Signed in as "+user.Name+" ("+string(user.Role)+")."))
 		if err := page.Render(r.Context(), w); err != nil {
 			log.Printf("render error: %v", err)
 		}
-	})
+	}))
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

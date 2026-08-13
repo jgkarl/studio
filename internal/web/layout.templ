@@ -19,6 +19,26 @@ templ Layout(title string, body templ.Component) {
 	</html>
 }
 
+// AuthLayout is the same page shell as Layout but wraps content in the narrower, centered
+// .auth-shell container instead of the full 1200px .container — used by login/register/
+// forgot-reset-password/verify-email, none of which need the wide in-app layout.
+templ AuthLayout(title string, body templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } · Studio</title>
+			<link rel="stylesheet" href="/static/css/app.css"/>
+		</head>
+		<body>
+			<div class="auth-shell">
+				@body
+			</div>
+		</body>
+	</html>
+}
+
 templ Placeholder(message string) {
 	<div class="card">
 		<h1>Studio</h1>

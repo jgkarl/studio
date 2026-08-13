@@ -1,0 +1,181 @@
+package auth
+
+import "studio/internal/web"
+
+templ loginForm(errorCode, noticeCode string) {
+	@web.Card() {
+		if errorCode != "" {
+			@web.Alert("error") {
+				{ authMessage(errorCode) }
+			}
+		}
+		if noticeCode != "" {
+			@web.Alert("success") {
+				{ authMessage(noticeCode) }
+			}
+		}
+		<form method="post" action="/login">
+			@web.Field("Email", "") {
+				<input class="input" type="email" name="email" required autocomplete="email"/>
+			}
+			@web.Field("Password", "") {
+				<input class="input" type="password" name="password" required autocomplete="current-password"/>
+			}
+			<button type="submit" class="btn btn-primary btn-block">Sign in</button>
+		</form>
+		<div class="auth-links">
+			<a href="/register">Create an account</a>
+			<a href="/forgot-password">Forgot password?</a>
+		</div>
+	}
+}
+
+templ devLoginList(users []User) {
+	<div class="dev-login">
+		<p class="dev-login-heading">Dev login</p>
+		if len(users) == 0 {
+			<p class="page-subtitle">No users yet — seed some with the seed command.</p>
+		}
+		for _, u := range users {
+			<form method="post" action="/login/dev">
+				<input type="hidden" name="userId" value={ u.ID }/>
+				<button type="submit" class="btn btn-secondary">
+					<span>{ u.Name }</span>
+					<span class="page-subtitle">{ string(u.Role) }</span>
+				</button>
+			</form>
+		}
+	</div>
+}
+
+templ LoginPage(errorCode, noticeCode string, devLoginEnabled bool, devUsers []User) {
+	@web.AuthLayout("Sign in", loginBody(errorCode, noticeCode, devLoginEnabled, devUsers))
+}
+
+templ loginBody(errorCode, noticeCode string, devLoginEnabled bool, devUsers []User) {
+	<h1>Studio</h1>
+	<p class="tagline">Conservation studio management</p>
+	@loginForm(errorCode, noticeCode)
+	if devLoginEnabled {
+		@devLoginList(devUsers)
+	}
+}
+
+templ RegisterPage() {
+	@web.AuthLayout("Create account", registerBody())
+}
+
+templ registerBody() {
+	<h1>Create your account</h1>
+	<p class="tagline">Conservation studio management</p>
+	@web.Card() {
+		<form method="post" action="/register">
+			@web.Field("Name", "") {
+				<input class="input" name="name" required autocomplete="name"/>
+			}
+			@web.Field("Email", "") {
+				<input class="input" type="email" name="email" required autocomplete="email"/>
+			}
+			@web.Field("Password", "At least 8 characters") {
+				<input class="input" type="password" name="password" required minlength="8" autocomplete="new-password"/>
+			}
+			@web.Field("Confirm password", "") {
+				<input class="input" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password"/>
+			}
+			<button type="submit" class="btn btn-primary btn-block">Create account</button>
+		</form>
+		<p class="below">Your account needs email confirmation, then admin approval, before you can sign in.</p>
+	}
+	<p class="below">
+		Already have an account? <a href="/login">Sign in</a>
+	</p>
+}
+
+templ CheckEmailPage(title, body string) {
+	@web.AuthLayout(title, checkEmailBody(title, body))
+}
+
+templ checkEmailBody(title, body string) {
+	<h1>{ title }</h1>
+	@web.Card() {
+		<p>{ body }</p>
+		<div class="below">
+			<a href="/login">Back to sign in</a>
+		</div>
+	}
+}
+
+templ ForgotPasswordPage() {
+	@web.AuthLayout("Forgot password", forgotPasswordBody())
+}
+
+templ forgotPasswordBody() {
+	<h1>Reset your password</h1>
+	@web.Card() {
+		<form method="post" action="/forgot-password">
+			@web.Field("Email", "") {
+				<input class="input" type="email" name="email" required autocomplete="email"/>
+			}
+			<button type="submit" class="btn btn-primary btn-block">Send reset link</button>
+		</form>
+	}
+}
+
+templ ResetPasswordPage(token, errorCode string) {
+	@web.AuthLayout("Reset password", resetPasswordBody(token, errorCode))
+}
+
+templ resetPasswordBody(token, errorCode string) {
+	<h1>Choose a new password</h1>
+	@web.Card() {
+		if errorCode != "" {
+			@web.Alert("error") {
+				{ authMessage(errorCode) }
+			}
+		}
+		if token != "" {
+			<form method="post" action="/reset-password">
+				<input type="hidden" name="token" value={ token }/>
+				@web.Field("New password", "At least 8 characters") {
+					<input class="input" type="password" name="password" required minlength="8" autocomplete="new-password"/>
+				}
+				@web.Field("Confirm new password", "") {
+					<input class="input" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password"/>
+				}
+				<button type="submit" class="btn btn-primary btn-block">Update password</button>
+			</form>
+		} else {
+			<p>
+				This link is missing its reset token.
+				<a href="/forgot-password">Request a new one</a>.
+			</p>
+		}
+	}
+}
+
+templ VerifyEmailPage(verifiedUser *User) {
+	@web.AuthLayout("Verify email", verifyEmailBody(verifiedUser))
+}
+
+templ verifyEmailBody(verifiedUser *User) {
+	if verifiedUser != nil {
+		<h1>Email confirmed</h1>
+		@web.Card() {
+			<p>Thanks, { verifiedUser.Name } — your email is confirmed. An admin still needs to approve your account before you can sign in.</p>
+			<div class="below">
+				<a href="/login">Back to sign in</a>
+			</div>
+		}
+	} else {
+		<h1>Invalid or expired link</h1>
+		@web.Card() {
+			<p>This verification link is invalid or has already been used. Request a new one:</p>
+			<form method="post" action="/verify-email/resend">
+				@web.Field("Email", "") {
+					<input class="input" type="email" name="email" required autocomplete="email"/>
+				}
+				<button type="submit" class="btn btn-secondary btn-block">Resend verification email</button>
+			</form>
+		}
+	}
+}

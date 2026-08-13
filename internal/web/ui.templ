@@ -1,0 +1,28 @@
+package web
+
+// Card and Field are the two truly reusable structural wrappers (spacing/borders are easy to get
+// inconsistent by hand). Buttons/inputs/badges are plain HTML with the .btn/.input/.badge
+// utility classes from static/css/app.css directly in each page's markup — simple templates, no
+// component layer mirroring every HTML element.
+
+templ Card() {
+	<div class="card">
+		{ children... }
+	</div>
+}
+
+templ Field(label string, hint string) {
+	<div class="field">
+		<label>{ label }</label>
+		{ children... }
+		if hint != "" {
+			<span class="hint">{ hint }</span>
+		}
+	</div>
+}
+
+templ Alert(tone string) {
+	<p class={ "alert", templ.KV("alert-error", tone == "error"), templ.KV("alert-success", tone == "success") }>
+		{ children... }
+	</p>
+}
