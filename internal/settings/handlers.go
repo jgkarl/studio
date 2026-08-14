@@ -23,10 +23,10 @@ type Service struct {
 	Auth *auth.Service
 }
 
-// Mount registers every settings route on mux — classifiers + tags here, users in module 12.
-// Everything requires a signed-in user (RequireUser, not RequireAdmin — the nav only shows a
-// Settings link to admins, but conservators can still reach these routes directly, same as the
-// original app; only Users management is admin-gated).
+// Mount registers every settings route on mux. Classifiers and tags require a signed-in user
+// (RequireUser, not RequireAdmin — the nav only shows a Settings link to admins, but
+// conservators can still reach these routes directly, same as the original app); Users
+// management is RequireAdmin-gated since it can grant admin access to any account.
 func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /settings", svc.Auth.RequireUser(svc.handleIndex))
 
@@ -42,6 +42,9 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("POST /settings/tags/{id}/rename", svc.Auth.RequireUser(svc.handleTagRename))
 	mux.HandleFunc("POST /settings/tags/{id}/reorder", svc.Auth.RequireUser(svc.handleTagReorder))
 	mux.HandleFunc("POST /settings/tags/{id}/delete", svc.Auth.RequireUser(svc.handleTagDelete))
+
+	mux.HandleFunc("GET /settings/users", svc.Auth.RequireAdmin(svc.handleUsersIndex))
+	mux.HandleFunc("POST /settings/users/{id}/role", svc.Auth.RequireAdmin(svc.handleUpdateUserRole))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
