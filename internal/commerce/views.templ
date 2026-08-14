@@ -1,0 +1,419 @@
+package commerce
+
+import (
+	"strconv"
+
+	"studio/internal/clients"
+	"studio/internal/settings"
+	"studio/internal/web"
+)
+
+// --- Quotes ------------------------------------------------------------------------------------
+
+templ QuotesListPage(c web.Chrome, rows []QuoteListRow) {
+	@web.AppLayout("Quotes", c, quotesListBody(rows))
+}
+
+templ quotesListBody(rows []QuoteListRow) {
+	@web.PageHeader("Quotes", "", newQuoteLink())
+	@web.Card() {
+		if len(rows) == 0 {
+			<p class="empty-state">No quotes yet.</p>
+		}
+		<ul class="entity-list">
+			for _, row := range rows {
+				<li class="entity-list-row">
+					<div>
+						<a href={ templ.URL("/clients/quotes/" + row.ID) } class="entity-list-name">
+							{ row.ClientName } — { strconv.FormatFloat(row.TotalEstimate, 'f', 2, 64) }
+						</a>
+						<div class="page-subtitle">
+							{ row.CreatedAt.Format("2006-01-02") }
+							if row.OrderID.Valid {
+								· became order { row.OrderNumber.String }
+							}
+						</div>
+					</div>
+					<span class={ "badge", quoteStatusClass(row.Status) }>{ row.Status }</span>
+				</li>
+			}
+		</ul>
+	}
+}
+
+func quoteStatusClass(status string) string {
+	switch status {
+	case "accepted":
+		return "badge-green"
+	case "declined":
+		return "badge-red"
+	default:
+		return ""
+	}
+}
+
+templ newQuoteLink() {
+	<a class="btn btn-primary" href="/clients/quotes/new">New quote</a>
+}
+
+templ NewQuotePage(c web.Chrome, allClients []clients.Client, preselectedClientID string, suggested []LineItem) {
+	@web.AppLayout("New quote", c, newQuoteBody(allClients, preselectedClientID, suggested))
+}
+
+templ newQuoteBody(allClients []clients.Client, preselectedClientID string, suggested []LineItem) {
+	@web.PageHeader("New quote", "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action="/clients/quotes" class="form-grid">
+			@web.Field("Client", "leave unset to create one from an email below") {
+				<select class="input" name="clientId">
+					<option value="">— New client from email —</option>
+					for _, cl := range allClients {
+						<option value={ cl.ID } selected?={ cl.ID == preselectedClientID }>{ cl.Name }</option>
+					}
+				</select>
+			}
+			<div class="form-row-2">
+				@web.Field("New client email", "only used if no client selected above") {
+					<input class="input" type="email" name="email" placeholder="jane@example.com"/>
+				}
+				@web.Field("New client name", "") {
+					<input class="input" name="name" placeholder="Jane Doe"/>
+				}
+			</div>
+			@web.Field("Valid until", "") {
+				<input class="input" type="date" name="validUntil"/>
+			}
+			@lineItemsFormRows(suggested)
+			<button type="submit" class="btn btn-primary">Create quote</button>
+		</form>
+	}
+}
+
+templ lineItemsFormRows(suggested []LineItem) {
+	<div>
+		<p class="form-section-title">Line items</p>
+		<div class="line-items-grid">
+			<span class="page-subtitle">Description</span>
+			<span class="page-subtitle">Hours</span>
+			<span class="page-subtitle">Rate</span>
+			<span class="page-subtitle">Amount</span>
+			for i := 0; i < 6; i++ {
+				<input class="input" name={ "item_description_" + strconv.Itoa(i) } value={ lineItemField(suggested, i, "description") } placeholder="e.g. Surface cleaning &amp; consolidation"/>
+				<input class="input" type="number" step="0.25" name={ "item_hours_" + strconv.Itoa(i) } value={ lineItemField(suggested, i, "hours") }/>
+				<input class="input" type="number" name={ "item_rate_" + strconv.Itoa(i) } value={ lineItemField(suggested, i, "rate") }/>
+				<input class="input" type="number" name={ "item_amount_" + strconv.Itoa(i) } value={ lineItemField(suggested, i, "amount") } placeholder="auto"/>
+			}
+		</div>
+		<p class="page-subtitle" style="margin-top: 0.375rem;">Leave amount blank to auto-calculate from hours × rate.</p>
+	</div>
+}
+
+func lineItemField(items []LineItem, i int, field string) string {
+	if i >= len(items) {
+		return ""
+	}
+	item := items[i]
+	switch field {
+	case "description":
+		return item.Description
+	case "hours":
+		if item.EstimatedHours == 0 {
+			return ""
+		}
+		return strconv.FormatFloat(item.EstimatedHours, 'f', -1, 64)
+	case "rate":
+		if item.Rate == 0 {
+			return ""
+		}
+		return strconv.FormatFloat(item.Rate, 'f', -1, 64)
+	case "amount":
+		if item.Amount == 0 {
+			return ""
+		}
+		return strconv.FormatFloat(item.Amount, 'f', 2, 64)
+	}
+	return ""
+}
+
+templ QuoteDetailPage(c web.Chrome, quote Quote, client *clients.Client, order *Order, statusLabel string) {
+	@web.AppLayout(quoteTitle(client), c, quoteDetailBody(quote, client, order, statusLabel))
+}
+
+templ quoteDetailBody(quote Quote, client *clients.Client, order *Order, statusLabel string) {
+	@web.PageHeader(quoteTitle(client), quoteSubtitle(quote, statusLabel), quoteViewClientLink(client))
+	@web.Card() {
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Description</th>
+						<th style="text-align: right;">Hours</th>
+						<th style="text-align: right;">Rate</th>
+						<th style="text-align: right;">Amount</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, item := range quote.LineItems {
+						<tr>
+							<td>{ item.Description }</td>
+							<td style="text-align: right;">{ optionalNumber(item.EstimatedHours) }</td>
+							<td style="text-align: right;">{ optionalNumber(item.Rate) }</td>
+							<td style="text-align: right;">{ strconv.FormatFloat(item.Amount, 'f', 2, 64) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<div class="row-actions" style="justify-content: flex-end; margin-top: 0.75rem; font-weight: 600;">
+			Total estimate: { strconv.FormatFloat(quote.TotalEstimate, 'f', 2, 64) }
+		</div>
+
+		<div class="row-actions form-section" style="margin-top: 1rem;">
+			if order != nil {
+				<span class="badge badge-green">Accepted</span>
+				<a href={ templ.URL("/clients/orders/" + order.ID) } style="text-decoration: underline;">View order { order.OrderNumber }</a>
+			} else {
+				<form method="post" action={ templ.URL("/clients/quotes/" + quote.ID + "/accept") }>
+					<button type="submit" class="btn btn-primary">Accept — create order</button>
+				</form>
+				<form method="post" action={ templ.URL("/clients/quotes/" + quote.ID + "/status") }>
+					<input type="hidden" name="status" value="sent"/>
+					<button type="submit" class="btn btn-secondary">Mark as sent</button>
+				</form>
+				<form method="post" action={ templ.URL("/clients/quotes/" + quote.ID + "/status") }>
+					<input type="hidden" name="status" value="declined"/>
+					<button type="submit" class="btn btn-danger">Decline</button>
+				</form>
+			}
+		</div>
+	}
+}
+
+func quoteTitle(client *clients.Client) string {
+	if client != nil {
+		return "Quote for " + client.Name
+	}
+	return "Quote"
+}
+
+func quoteSubtitle(quote Quote, statusLabel string) string {
+	s := "Status: " + statusLabel
+	if quote.ValidUntil.Valid {
+		s += " · valid until " + quote.ValidUntil.Time.Format("2006-01-02")
+	}
+	return s
+}
+
+templ quoteViewClientLink(client *clients.Client) {
+	if client != nil {
+		<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>View client</a>
+	}
+}
+
+func optionalNumber(f float64) string {
+	if f == 0 {
+		return "—"
+	}
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// --- Orders (kanban) -----------------------------------------------------------------------
+
+templ OrdersKanbanPage(c web.Chrome, orders []OrderListRow, statuses []settings.Classifier) {
+	@web.AppLayout("Orders", c, ordersKanbanBody(orders, statuses))
+}
+
+templ ordersKanbanBody(orders []OrderListRow, statuses []settings.Classifier) {
+	@web.PageHeader("Orders", "Drag a card to change its status.", templ.NopComponent)
+	<div class="kanban-board" id="kanban-board">
+		for _, status := range statuses {
+			<div class="kanban-column" data-status={ status.Code }>
+				<div class="kanban-column-header">
+					<h3>{ status.Title }</h3>
+					<span class="page-subtitle">{ strconv.Itoa(countByStatus(orders, status.Code)) }</span>
+				</div>
+				<div class="kanban-column-body" data-status={ status.Code }>
+					for _, o := range orders {
+						if o.Status == status.Code {
+							@kanbanCard(o)
+						}
+					}
+				</div>
+			</div>
+		}
+	</div>
+	<script src="/static/js/kanban.js" defer></script>
+}
+
+templ kanbanCard(o OrderListRow) {
+	<div class="kanban-card" draggable="true" data-order-id={ o.ID }>
+		<a href={ templ.URL("/clients/orders/" + o.ID) }>{ o.OrderNumber }</a>
+		<div class="page-subtitle">{ o.ClientName }</div>
+		<div class="page-subtitle">{ strconv.Itoa(o.ProjectCount) } workflow(s)</div>
+	</div>
+}
+
+func countByStatus(orders []OrderListRow, status string) int {
+	n := 0
+	for _, o := range orders {
+		if o.Status == status {
+			n++
+		}
+	}
+	return n
+}
+
+// --- Order detail --------------------------------------------------------------------------
+
+templ OrderDetailPage(c web.Chrome, order Order, client *clients.Client, quote *Quote, projects []ProjectOnOrder,
+	invoices []Invoice, unattached []UnattachedProject, orderStatusLabels map[string]string,
+	invoiceStatuses []settings.Classifier, suggestedItems []LineItem, suggestedTotal float64) {
+	@web.AppLayout(order.OrderNumber, c, orderDetailBody(order, client, quote, projects, invoices, unattached, orderStatusLabels, invoiceStatuses, suggestedItems, suggestedTotal))
+}
+
+templ orderDetailBody(order Order, client *clients.Client, quote *Quote, projects []ProjectOnOrder,
+	invoices []Invoice, unattached []UnattachedProject, orderStatusLabels map[string]string,
+	invoiceStatuses []settings.Classifier, suggestedItems []LineItem, suggestedTotal float64) {
+	@web.PageHeader(order.OrderNumber, orderSubtitle(client, order, orderStatusLabels), orderActions(client))
+	<div class="detail-grid">
+		<div class="detail-main">
+			@web.Card() {
+				<h2 class="dashboard-heading">Workflows on this order</h2>
+				if len(projects) == 0 {
+					<p class="empty-state">No workflows attached yet.</p>
+				}
+				<ul class="entity-list">
+					for _, p := range projects {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/workflows/" + p.ID) }>{ p.Title }</a>
+							<span class="page-subtitle">
+								if p.AssetTitle.Valid {
+									{ p.AssetTitle.String }
+								} else {
+									{ p.AssetReferenceCode }
+								}
+								· { p.Stage }
+							</span>
+						</li>
+					}
+				</ul>
+				if len(unattached) > 0 {
+					<form method="post" action={ templ.URL("/clients/orders/" + order.ID + "/attach-project") } class="inline-edit-form form-section">
+						@web.Field("Attach existing workflow", "") {
+							<select class="input" name="projectId" required>
+								<option value="" disabled selected>Select…</option>
+								for _, p := range unattached {
+									<option value={ p.ID }>{ p.Title } — { unattachedAssetName(p) }</option>
+								}
+							</select>
+						}
+						<button type="submit" class="btn btn-secondary">Attach</button>
+					</form>
+				}
+			}
+
+			@web.Card() {
+				<h2 class="dashboard-heading">Invoices</h2>
+				if len(invoices) == 0 {
+					<p class="empty-state">No invoices yet.</p>
+				}
+				<ul class="entity-list">
+					for _, inv := range invoices {
+						<li class="entity-list-row">
+							<div>
+								<span style="font-weight: 500;">{ inv.Currency } { strconv.FormatFloat(inv.Total, 'f', 2, 64) }</span>
+								<span class="page-subtitle">{ inv.CreatedAt.Format("2006-01-02") }</span>
+							</div>
+							<div class="row-actions">
+								<span class={ "badge", invoiceStatusClass(inv.Status) }>{ invoiceStatusTitle(invoiceStatuses, inv.Status) }</span>
+								<form method="post" action={ templ.URL("/clients/orders/" + order.ID + "/invoices/" + inv.ID + "/status") } class="row-actions">
+									<select class="input" name="status" style="width: auto;">
+										<option value="" disabled selected>Set status…</option>
+										for _, s := range invoiceStatuses {
+											<option value={ s.Code }>{ s.Title }</option>
+										}
+									</select>
+									<button type="submit" class="btn btn-secondary">Update</button>
+								</form>
+							</div>
+						</li>
+					}
+				</ul>
+				<details class="form-section">
+					<summary style="cursor: pointer; font-size: 0.875rem; font-weight: 500;">
+						Create invoice
+						if suggestedTotal > 0 {
+							<span class="page-subtitle">(suggested total: { strconv.FormatFloat(suggestedTotal, 'f', 2, 64) })</span>
+						}
+					</summary>
+					<form method="post" action={ templ.URL("/clients/orders/" + order.ID + "/invoices") } class="form-grid" style="margin-top: 0.75rem;">
+						@lineItemsFormRows(suggestedItems)
+						<button type="submit" class="btn btn-secondary">Create invoice</button>
+					</form>
+				</details>
+			}
+		</div>
+
+		<div>
+			if quote != nil {
+				@web.Card() {
+					<h2 class="dashboard-heading">Originating quote</h2>
+					<a href={ templ.URL("/clients/quotes/" + quote.ID) } style="text-decoration: underline;">
+						Quote — { strconv.FormatFloat(quote.TotalEstimate, 'f', 2, 64) } →
+					</a>
+				}
+			}
+			if order.Notes.Valid && order.Notes.String != "" {
+				@web.Card() {
+					<h2 class="dashboard-heading">Notes</h2>
+					<p class="detail-paragraph">{ order.Notes.String }</p>
+				}
+			}
+		</div>
+	</div>
+}
+
+func unattachedAssetName(p UnattachedProject) string {
+	if p.AssetTitle.Valid && p.AssetTitle.String != "" {
+		return p.AssetTitle.String
+	}
+	return p.AssetReferenceCode
+}
+
+func orderSubtitle(client *clients.Client, order Order, labels map[string]string) string {
+	name := ""
+	if client != nil {
+		name = client.Name
+	}
+	label := order.Status
+	if l, ok := labels[order.Status]; ok {
+		label = l
+	}
+	return "Client: " + name + " · " + label
+}
+
+templ orderActions(client *clients.Client) {
+	if client != nil {
+		<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>View client</a>
+	}
+}
+
+func invoiceStatusClass(status string) string {
+	switch status {
+	case "paid":
+		return "badge-green"
+	case "overdue":
+		return "badge-red"
+	default:
+		return ""
+	}
+}
+
+func invoiceStatusTitle(statuses []settings.Classifier, code string) string {
+	for _, s := range statuses {
+		if s.Code == code {
+			return s.Title
+		}
+	}
+	return code
+}

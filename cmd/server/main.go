@@ -11,6 +11,7 @@ import (
 	"studio/internal/assets"
 	"studio/internal/auth"
 	"studio/internal/clients"
+	"studio/internal/commerce"
 	"studio/internal/config"
 	"studio/internal/dashboard"
 	"studio/internal/db"
@@ -79,6 +80,7 @@ func main() {
 	assets.Mount(mux, &assets.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	media.Mount(mux, &media.HandlerService{Service: mediaSvc, Auth: authSvc})
 	workflows.Mount(mux, &workflows.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
+	commerce.Mount(mux, &commerce.Service{Pool: pool, Auth: authSvc})
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)
