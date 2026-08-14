@@ -1033,3 +1033,16 @@ h1 {
   touch-action: none;
   cursor: crosshair;
 }
+
+/* --- Workflows stage trail ------------------------------------------------------------------ */
+
+.stage-trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.stage-arrow {
+  color: var(--text-faint);
+}

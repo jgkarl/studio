@@ -2,7 +2,6 @@ package assets
 
 import (
 	"database/sql"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -108,29 +107,6 @@ func formInput(r *http.Request) Input {
 	}
 }
 
-// formPhotos reads every non-empty file from a multipart <input type="file" name="photos"
-// multiple> into media.UploadedFile values, ready for Service.Media.UploadAllAndAttach.
-func formPhotos(r *http.Request) []*media.UploadedFile {
-	if r.MultipartForm == nil {
-		return nil
-	}
-	var out []*media.UploadedFile
-	for _, fh := range r.MultipartForm.File["photos"] {
-		f, err := fh.Open()
-		if err != nil {
-			continue
-		}
-		data, err := io.ReadAll(f)
-		f.Close()
-		if err != nil || len(data) == 0 {
-			continue
-		}
-		mimeType := fh.Header.Get("Content-Type")
-		out = append(out, &media.UploadedFile{MimeType: mimeType, Data: data})
-	}
-	return out
-}
-
 func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
@@ -167,7 +143,7 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if _, err := svc.Media.UploadAllAndAttach(ctx, formPhotos(r), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
+		if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -288,7 +264,7 @@ func (svc *Service) handleRecordState(w http.ResponseWriter, r *http.Request, us
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if _, err := svc.Media.UploadAllAndAttach(ctx, formPhotos(r), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
+	if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
