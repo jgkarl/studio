@@ -19,6 +19,7 @@ import (
 	"studio/internal/mail"
 	"studio/internal/media"
 	"studio/internal/reporter"
+	"studio/internal/seed"
 	"studio/internal/session"
 	"studio/internal/settings"
 	"studio/internal/web"
@@ -43,6 +44,13 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 	log.Println("database ready, migrations applied")
+
+	if err := seed.SeedAllClassifiers(ctx, pool); err != nil {
+		log.Fatalf("seeding classifiers: %v", err)
+	}
+	if err := seed.BootstrapAdmin(ctx, pool, cfg.BootstrapAdminName, cfg.BootstrapAdminEmail); err != nil {
+		log.Fatalf("bootstrapping admin: %v", err)
+	}
 
 	media.InitImageProcessing()
 	defer media.ShutdownImageProcessing()

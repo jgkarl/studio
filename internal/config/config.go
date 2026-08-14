@@ -12,6 +12,9 @@ type Config struct {
 	AllowDevLogin   bool
 	MediaStorageDir string
 
+	BootstrapAdminName  string
+	BootstrapAdminEmail string
+
 	SMTPHost string
 	SMTPPort string
 	SMTPUser string
@@ -27,11 +30,15 @@ func Load() *Config {
 		AppURL:          os.Getenv("APP_URL"),
 		AllowDevLogin:   os.Getenv("ALLOW_DEV_LOGIN") == "true",
 		MediaStorageDir: getenv("MEDIA_STORAGE_DIR", "./data/media-storage"),
-		SMTPHost:        os.Getenv("SMTP_HOST"),
-		SMTPPort:        getenv("SMTP_PORT", "587"),
-		SMTPUser:        os.Getenv("SMTP_USER"),
-		SMTPPass:        os.Getenv("SMTP_PASS"),
-		SMTPFrom:        getenv("SMTP_FROM", "studio@localhost"),
+
+		BootstrapAdminName:  os.Getenv("BOOTSTRAP_ADMIN_NAME"),
+		BootstrapAdminEmail: os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+
+		SMTPHost: os.Getenv("SMTP_HOST"),
+		SMTPPort: getenv("SMTP_PORT", "587"),
+		SMTPUser: os.Getenv("SMTP_USER"),
+		SMTPPass: os.Getenv("SMTP_PASS"),
+		SMTPFrom: getenv("SMTP_FROM", "studio@localhost"),
 	}
 }
 
