@@ -17,6 +17,7 @@ import (
 	"studio/internal/db"
 	"studio/internal/mail"
 	"studio/internal/media"
+	"studio/internal/reporter"
 	"studio/internal/session"
 	"studio/internal/settings"
 	"studio/internal/web"
@@ -81,6 +82,7 @@ func main() {
 	media.Mount(mux, &media.HandlerService{Service: mediaSvc, Auth: authSvc})
 	workflows.Mount(mux, &workflows.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	commerce.Mount(mux, &commerce.Service{Pool: pool, Auth: authSvc})
+	reporter.Mount(mux, &reporter.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

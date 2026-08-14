@@ -1128,3 +1128,99 @@ h1 {
 .kanban-card a:hover {
   text-decoration: underline;
 }
+
+/* --- Reporter (TipTap) ------------------------------------------------------------------------ */
+
+.report-editor-root {
+  margin-bottom: 1.5rem;
+}
+
+.report-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: var(--bg);
+  padding: 0.5rem;
+}
+
+.report-editor-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.report-editor-btn.is-active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.report-editor-save {
+  margin-left: auto;
+}
+
+.report-editor-content {
+  border: 1px solid var(--border);
+  border-radius: 0 0 0.5rem 0.5rem;
+  background: var(--surface);
+  padding: 1rem 1.25rem;
+  min-height: 12rem;
+}
+
+.report-editor-root[data-readonly] .report-editor-content {
+  border-radius: 0.5rem;
+}
+
+.report-editor-content .ProseMirror {
+  outline: none;
+}
+
+.report-editor-content .ProseMirror > * + * {
+  margin-top: 0.75em;
+}
+
+.report-editor-content .ProseMirror h1 { font-size: 1.5rem; font-weight: 600; }
+.report-editor-content .ProseMirror h2 { font-size: 1.25rem; font-weight: 600; }
+.report-editor-content .ProseMirror h3 { font-size: 1.0625rem; font-weight: 600; }
+
+.report-editor-content .ProseMirror ul,
+.report-editor-content .ProseMirror ol {
+  padding-left: 1.5rem;
+}
+
+.report-editor-content .ProseMirror blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.75rem;
+  color: var(--text-muted);
+}
+
+.report-editor-content .ProseMirror pre {
+  background: var(--bg);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+.report-editor-content .ProseMirror code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+}
+
+.report-editor-content .ProseMirror img {
+  max-width: 100%;
+  border-radius: 0.375rem;
+}
+
+.report-editor-content .ProseMirror a {
+  color: var(--blue-text);
+  text-decoration: underline;
+}
+
+.report-editor-content .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border);
+}

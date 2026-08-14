@@ -1,0 +1,144 @@
+package reporter
+
+import "studio/internal/media"
+import "studio/internal/web"
+
+templ ListPage(c web.Chrome, rows []ListRow) {
+	@web.AppLayout("Reporter", c, listBody(rows))
+}
+
+templ listBody(rows []ListRow) {
+	@web.PageHeader("Reporter", "Conservation write-ups.", newReportLink())
+	@web.Card() {
+		if len(rows) == 0 {
+			<p class="empty-state">No reports yet.</p>
+		}
+		<ul class="entity-list">
+			for _, row := range rows {
+				<li class="entity-list-row">
+					<div>
+						<a href={ templ.URL("/reporter/" + row.ID) } class="entity-list-name">{ row.Title }</a>
+						<div class="page-subtitle">
+							if row.AssetTitle.Valid {
+								{ row.AssetTitle.String }
+							} else {
+								{ row.AssetReferenceCode }
+							}
+							if row.AuthorName.Valid {
+								· { row.AuthorName.String }
+							}
+						</div>
+					</div>
+					if row.Status == "final" {
+						<span class="badge badge-green">Final</span>
+					} else {
+						<span class="badge badge-amber">Draft</span>
+					}
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ newReportLink() {
+	<a class="btn btn-primary" href="/reporter/new">New report</a>
+}
+
+templ NewPage(c web.Chrome, assets []AssetOption, projects []ProjectOption, preselectedAssetID, preselectedProjectID string) {
+	@web.AppLayout("New report", c, newBody(assets, projects, preselectedAssetID, preselectedProjectID))
+}
+
+templ newBody(assets []AssetOption, projects []ProjectOption, preselectedAssetID, preselectedProjectID string) {
+	@web.PageHeader("New report", "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action="/reporter" class="form-grid">
+			@web.Field("Asset", "") {
+				<select class="input" name="assetId" required>
+					<option value="" disabled selected?={ preselectedAssetID == "" }>Select an asset…</option>
+					for _, a := range assets {
+						<option value={ a.ID } selected?={ a.ID == preselectedAssetID }>{ assetOptionLabel(a) }</option>
+					}
+				</select>
+			}
+			@web.Field("Workflow", "pre-fills a suggested outline from its Notebook data") {
+				<select class="input" name="projectId">
+					<option value="" selected?={ preselectedProjectID == "" }>No workflow — blank report</option>
+					for _, p := range projects {
+						<option value={ p.ID } selected?={ p.ID == preselectedProjectID }>{ p.Title }</option>
+					}
+				</select>
+			}
+			@web.Field("Title", "") {
+				<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
+			}
+			<button type="submit" class="btn btn-primary">Create report</button>
+		</form>
+	}
+}
+
+func assetOptionLabel(a AssetOption) string {
+	name := a.ReferenceCode
+	if a.Title.Valid && a.Title.String != "" {
+		name = a.Title.String
+	}
+	return name + " — " + a.ClientName
+}
+
+templ DetailPage(c web.Chrome, report Report, attachments []media.ReferenceWithMedia) {
+	@web.AppLayout(report.Title, c, detailBody(report, attachments))
+}
+
+templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
+	@web.PageHeader(report.Title, "", templ.NopComponent)
+	<div class="row-actions" style="margin-bottom: 1rem;">
+		if report.Status == "final" {
+			<span class="badge badge-green">Final</span>
+			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/status") }>
+				<input type="hidden" name="status" value="draft"/>
+				<button type="submit" class="btn btn-secondary">Revert to draft</button>
+			</form>
+		} else {
+			<span class="badge badge-amber">Draft</span>
+			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/status") }>
+				<input type="hidden" name="status" value="final"/>
+				<button type="submit" class="btn btn-secondary">Mark final</button>
+			</form>
+		}
+	</div>
+
+	@reportEditor(report)
+
+	@web.Card() {
+		<h2 class="dashboard-heading">Attachments <span class="page-subtitle">(images/video, not inline in the text)</span></h2>
+		@media.MediaGrid(attachments)
+		if report.Status != "final" {
+			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/attachments") } enctype="multipart/form-data" class="row-actions form-section">
+				<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+				<button type="submit" class="btn btn-secondary">Upload</button>
+			</form>
+		}
+	}
+}
+
+templ reportEditor(report Report) {
+	<div
+		id="report-editor"
+		class="report-editor-root"
+		data-report-id={ report.ID }
+		data-readonly?={ report.Status == "final" }
+		data-content={ report.Content }
+	>
+		<div id="report-editor-toolbar" class="report-editor-toolbar"></div>
+		<div id="report-editor-content" class="report-editor-content"></div>
+	</div>
+	<script type="importmap">
+		{
+			"imports": {
+				"@tiptap/core": "https://esm.sh/@tiptap/core@3.28.0",
+				"@tiptap/starter-kit": "https://esm.sh/@tiptap/starter-kit@3.28.0",
+				"@tiptap/extension-image": "https://esm.sh/@tiptap/extension-image@3.28.0"
+			}
+		}
+	</script>
+	<script type="module" src="/static/js/report-editor.js"></script>
+}
