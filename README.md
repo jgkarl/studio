@@ -2,8 +2,9 @@
 
 Go/templ/SQLite rewrite of the [Studio conservation-studio management app](../studio) — a
 ground-up port from the original Next.js/TypeScript/React version, built module by module. See
-that repo's `docs/features.md` for what the finished app does; this repo is being brought up to
-parity with it one module at a time (see git log / commit history for progress).
+that repo's `docs/features.md` for what the app does; see `docs/tech-stack.md` here for how this
+rewrite is actually built, and `docs/setup.md` for a more detailed local-dev walkthrough than the
+quick version below.
 
 Same philosophy as the original: no ORM, hand-written SQL and row types, no web framework, plain
 templ templates, JS only where a page genuinely needs client-side interactivity (vendored
@@ -39,8 +40,11 @@ docker compose up --build   # or: podman-compose up --build
 ```
 
 Either way, migrations in `db/migrations/*.sql` are applied automatically on startup (tracked in
-a `schema_migrations` table — no separate migrate step to remember), and the SQLite file is
-created at `DB_PATH` (default `./data/studio.db`) if it doesn't exist yet.
+a `schema_migrations` table — no separate migrate step to remember), the SQLite file is created
+at `DB_PATH` (default `./data/studio.db`) if it doesn't exist yet, and the structural Classifier
+reference data every `<select>` in the app reads from is seeded automatically too (idempotent —
+safe on every restart). Set `BOOTSTRAP_ADMIN_NAME`/`BOOTSTRAP_ADMIN_EMAIL` in `.env` to also get a
+first admin account with no manual database work — see `docs/setup.md`.
 
 `make dev` runs `templ generate --watch` alongside the server for live template reload during
 development.
@@ -55,13 +59,30 @@ installed). Deploying is `git clone`, `apt install libvips42`, and a systemd uni
 ## Tests
 
 ```bash
-make test        # go test ./...
-cd e2e && npm install && npx playwright test   # end-to-end, once e2e/ exists (module 14)
+make test                                       # go test ./...
+cd e2e && npm install && npm test               # end-to-end (needs a server running — see e2e/README.md)
 ```
 
 ## Layout
 
 See the module list in git history / commit messages for build order. Each top-level package
 under `internal/` is one self-contained module (auth, clients, assets, workflows, media, commerce,
-reporter, export, settings) with its own routes, templ views, and SQL — `internal/db` and
-`internal/web` are the only shared infrastructure every module builds on.
+reporter, export, settings, seed) with its own routes, templ views, and SQL — `internal/db` and
+`internal/web` are the only shared infrastructure every module builds on, and `internal/testutil`
+is test-only support (a real migrated SQLite database per test, no mocks).
+
+## Known, disclosed differences from the original app
+
+A few spots where this rewrite made a different call than the original TypeScript app, on
+purpose — see `docs/tech-stack.md` for the reasoning behind each:
+
+- **TipTap** (the Reporter module's rich text editor) loads live from the esm.sh CDN via an
+  import map rather than being vendored offline — it has no single flat browser bundle the way
+  OpenSeadragon does, and this project deliberately has no JS bundler to produce one.
+- **IIIF `quality=bitonal`** is approximated as grayscale — govips has no direct 1-bit threshold
+  operation the way `sharp` does. Nothing in this app's own UI requests bitonal.
+- **No fictional demo-data seed.** Structural reference data (Classifiers) seeds automatically;
+  the original's `db/seed.ts` demo clients/assets/workflows does not have a Go equivalent — every
+  entity it would create is reachable through the app's own forms instead.
+- **Debian, not Ubuntu**, is the one supported build/deploy target — see `docs/tech-stack.md`'s
+  govips section for why.

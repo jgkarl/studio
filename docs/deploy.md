@@ -56,6 +56,14 @@ relying on the committed `dist/server`, which is built for Debian 12.
    (leaving `SMTP_HOST` blank just logs email bodies to the systemd journal instead of sending
    them — fine for a first smoke test, not for real use).
 
+   To get a first account on a brand new database, also set `BOOTSTRAP_ADMIN_NAME` and
+   `BOOTSTRAP_ADMIN_EMAIL` — the app creates that one admin user on its first boot (see
+   `.env.example`). Sign in via the dev-login picker at `/login` once `ALLOW_DEV_LOGIN=true`
+   temporarily allows it, then use Settings -> Users to promote a real registered account and
+   turn `ALLOW_DEV_LOGIN` back off. Every Classifier the app's forms depend on (asset types,
+   materials, condition states, order/quote/invoice statuses, ...) is seeded automatically on
+   every boot too — nothing to run by hand for either of these.
+
 6. **Install and start the systemd service:**
    ```bash
    sudo cp deploy/studio.service /etc/systemd/system/studio.service
