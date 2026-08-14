@@ -91,6 +91,7 @@ templ DetailPage(c web.Chrome, report Report, attachments []media.ReferenceWithM
 templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 	@web.PageHeader(report.Title, "", templ.NopComponent)
 	<div class="row-actions" style="margin-bottom: 1rem;">
+		@web.ExportLinks("report", report.ID)
 		if report.Status == "final" {
 			<span class="badge badge-green">Final</span>
 			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/status") }>

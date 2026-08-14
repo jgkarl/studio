@@ -274,7 +274,7 @@ templ OrderDetailPage(c web.Chrome, order Order, client *clients.Client, quote *
 templ orderDetailBody(order Order, client *clients.Client, quote *Quote, projects []ProjectOnOrder,
 	invoices []Invoice, unattached []UnattachedProject, orderStatusLabels map[string]string,
 	invoiceStatuses []settings.Classifier, suggestedItems []LineItem, suggestedTotal float64) {
-	@web.PageHeader(order.OrderNumber, orderSubtitle(client, order, orderStatusLabels), orderActions(client))
+	@web.PageHeader(order.OrderNumber, orderSubtitle(client, order, orderStatusLabels), orderActions(client, order))
 	<div class="detail-grid">
 		<div class="detail-main">
 			@web.Card() {
@@ -392,10 +392,11 @@ func orderSubtitle(client *clients.Client, order Order, labels map[string]string
 	return "Client: " + name + " · " + label
 }
 
-templ orderActions(client *clients.Client) {
+templ orderActions(client *clients.Client, order Order) {
 	if client != nil {
 		<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>View client</a>
 	}
+	@web.ExportLinks("order", order.ID)
 }
 
 func invoiceStatusClass(status string) string {

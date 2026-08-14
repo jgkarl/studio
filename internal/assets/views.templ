@@ -377,6 +377,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 
 templ assetActions(asset Asset) {
 	<a class="btn btn-secondary" href={ templ.URL("/workflows/new?assetId=" + asset.ID) }>Start workflow</a>
+	@web.ExportLinks("asset", asset.ID)
 }
 
 templ detailField(label, value string) {

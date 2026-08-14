@@ -27,6 +27,14 @@ templ Alert(tone string) {
 	</p>
 }
 
+// ExportLinks renders the "Export HTML" / "Export PDF" action pair for a detail page — exportType
+// is one of "asset", "project", "order", "report" (internal/export.Type), matching the
+// /api/export/{type}/{id} route.
+templ ExportLinks(exportType, id string) {
+	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=html") }>Export HTML</a>
+	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=pdf") }>Export PDF</a>
+}
+
 // PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page
 // uses. actions is a slot for buttons/links — pass templ.NopComponent when there are none.
 templ PageHeader(title, subtitle string, actions templ.Component) {

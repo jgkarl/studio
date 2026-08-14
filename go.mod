@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/a-h/templ v0.3.1020
 	github.com/davidbyttow/govips/v2 v2.18.0
+	github.com/go-pdf/fpdf v0.9.0
 	golang.org/x/crypto v0.55.0
 	modernc.org/sqlite v1.56.0
 )

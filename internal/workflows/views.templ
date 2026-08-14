@@ -195,6 +195,7 @@ templ detailActions(project Project, asset *assets.Asset) {
 	if asset != nil {
 		<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) }>View asset</a>
 	}
+	@web.ExportLinks("project", project.ID)
 }
 
 func detailSubtitle(asset *assets.Asset, client *clients.Client) string {
