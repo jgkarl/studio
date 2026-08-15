@@ -53,7 +53,10 @@ func quoteStatusClass(status string) string {
 }
 
 templ newQuoteLink() {
-	<a class="btn btn-primary" href="/clients/quotes/new">New quote</a>
+	<a class="btn btn-primary" href="/clients/quotes/new">
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		New quote
+	</a>
 }
 
 templ NewQuotePage(c web.Chrome, allClients []clients.Client, preselectedClientID string, suggested []LineItem) {
@@ -84,7 +87,10 @@ templ newQuoteBody(allClients []clients.Client, preselectedClientID string, sugg
 				<input class="input" type="date" name="validUntil"/>
 			}
 			@lineItemsFormRows(suggested)
-			<button type="submit" class="btn btn-primary">Create quote</button>
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Create quote
+			</button>
 		</form>
 	}
 }
@@ -174,15 +180,24 @@ templ quoteDetailBody(quote Quote, client *clients.Client, order *Order, statusL
 				<a href={ templ.URL("/clients/orders/" + order.ID) } style="text-decoration: underline;">View order { order.OrderNumber }</a>
 			} else {
 				<form method="post" action={ templ.URL("/clients/quotes/" + quote.ID + "/accept") }>
-					<button type="submit" class="btn btn-primary">Accept — create order</button>
+					<button type="submit" class="btn btn-primary">
+						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+						Accept order
+					</button>
 				</form>
 				<form method="post" action={ templ.URL("/clients/quotes/" + quote.ID + "/status") }>
 					<input type="hidden" name="status" value="sent"/>
-					<button type="submit" class="btn btn-secondary">Mark as sent</button>
+					<button type="submit" class="btn btn-secondary">
+						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+						Mark sent
+					</button>
 				</form>
 				<form method="post" action={ templ.URL("/clients/quotes/" + quote.ID + "/status") }>
 					<input type="hidden" name="status" value="declined"/>
-					<button type="submit" class="btn btn-danger">Decline</button>
+					<button type="submit" class="btn btn-danger">
+						<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+						Decline
+					</button>
 				</form>
 			}
 		</div>
@@ -206,7 +221,10 @@ func quoteSubtitle(quote Quote, statusLabel string) string {
 
 templ quoteViewClientLink(client *clients.Client) {
 	if client != nil {
-		<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>View client</a>
+		<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>
+			<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+			View client
+		</a>
 	}
 }
 
@@ -285,15 +303,17 @@ templ orderDetailBody(order Order, client *clients.Client, quote *Quote, project
 				<ul class="entity-list">
 					for _, p := range projects {
 						<li class="entity-list-row">
-							<a href={ templ.URL("/workflows/" + p.ID) }>{ p.Title }</a>
-							<span class="page-subtitle">
-								if p.AssetTitle.Valid {
-									{ p.AssetTitle.String }
-								} else {
-									{ p.AssetReferenceCode }
-								}
-								· { p.Stage }
-							</span>
+							<div>
+								<a href={ templ.URL("/workflows/" + p.ID) } class="entity-list-name">{ p.Title }</a>
+								<div class="page-subtitle">
+									if p.AssetTitle.Valid {
+										{ p.AssetTitle.String }
+									} else {
+										{ p.AssetReferenceCode }
+									}
+								</div>
+							</div>
+							@web.OpenBadge(p.CompletedAt.Valid)
 						</li>
 					}
 				</ul>
@@ -307,7 +327,10 @@ templ orderDetailBody(order Order, client *clients.Client, quote *Quote, project
 								}
 							</select>
 						}
-						<button type="submit" class="btn btn-secondary">Attach</button>
+						<button type="submit" class="btn btn-secondary">
+						<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+						Attach
+					</button>
 					</form>
 				}
 			}
@@ -333,7 +356,10 @@ templ orderDetailBody(order Order, client *clients.Client, quote *Quote, project
 											<option value={ s.Code }>{ s.Title }</option>
 										}
 									</select>
-									<button type="submit" class="btn btn-secondary">Update</button>
+									<button type="submit" class="btn btn-secondary">
+									<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+									Update
+								</button>
 								</form>
 							</div>
 						</li>
@@ -348,7 +374,10 @@ templ orderDetailBody(order Order, client *clients.Client, quote *Quote, project
 					</summary>
 					<form method="post" action={ templ.URL("/clients/orders/" + order.ID + "/invoices") } class="form-grid" style="margin-top: 0.75rem;">
 						@lineItemsFormRows(suggestedItems)
-						<button type="submit" class="btn btn-secondary">Create invoice</button>
+						<button type="submit" class="btn btn-secondary">
+						<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+						Create invoice
+					</button>
 					</form>
 				</details>
 			}
@@ -394,7 +423,10 @@ func orderSubtitle(client *clients.Client, order Order, labels map[string]string
 
 templ orderActions(client *clients.Client, order Order) {
 	if client != nil {
-		<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>View client</a>
+		<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>
+			<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+			View client
+		</a>
 	}
 	@web.ExportLinks("order", order.ID)
 }

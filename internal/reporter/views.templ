@@ -41,7 +41,10 @@ templ listBody(rows []ListRow) {
 }
 
 templ newReportLink() {
-	<a class="btn btn-primary" href="/reporter/new">New report</a>
+	<a class="btn btn-primary" href="/reporter/new">
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		New report
+	</a>
 }
 
 templ NewPage(c web.Chrome, assets []AssetOption, projects []ProjectOption, preselectedAssetID, preselectedProjectID string) {
@@ -71,7 +74,10 @@ templ newBody(assets []AssetOption, projects []ProjectOption, preselectedAssetID
 			@web.Field("Title", "") {
 				<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
 			}
-			<button type="submit" class="btn btn-primary">Create report</button>
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Create report
+			</button>
 		</form>
 	}
 }
@@ -96,13 +102,19 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 			<span class="badge badge-green">Final</span>
 			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/status") }>
 				<input type="hidden" name="status" value="draft"/>
-				<button type="submit" class="btn btn-secondary">Revert to draft</button>
+				<button type="submit" class="btn btn-secondary">
+					<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+					Revert draft
+				</button>
 			</form>
 		} else {
 			<span class="badge badge-amber">Draft</span>
 			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/status") }>
 				<input type="hidden" name="status" value="final"/>
-				<button type="submit" class="btn btn-secondary">Mark final</button>
+				<button type="submit" class="btn btn-secondary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+					Mark final
+				</button>
 			</form>
 		}
 	</div>
@@ -115,7 +127,10 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 		if report.Status != "final" {
 			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/attachments") } enctype="multipart/form-data" class="row-actions form-section">
 				<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-				<button type="submit" class="btn btn-secondary">Upload</button>
+				<button type="submit" class="btn btn-secondary">
+					<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+					Upload
+				</button>
 			</form>
 		}
 	}

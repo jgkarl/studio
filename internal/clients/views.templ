@@ -2,6 +2,7 @@ package clients
 
 import (
 	"strconv"
+	"strings"
 
 	"studio/internal/settings"
 	"studio/internal/web"
@@ -19,22 +20,26 @@ templ listBody(rows []ListRow, typeLabels map[string]string) {
 		}
 		<ul class="entity-list">
 			for _, row := range rows {
-				<li class="entity-list-row">
-					<div>
-						<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-name">{ row.Name }</a>
-						<div class="page-subtitle">
-							if row.Email.Valid {
-								{ row.Email.String }
-							} else {
-								no email on file
-							}
+				<li>
+					<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-row">
+						<span class="avatar-chip">{ clientInitials(row.Name) }</span>
+						<div>
+							<span class="entity-list-name">{ row.Name }</span>
+							<div class="page-subtitle">
+								if row.Email.Valid {
+									{ row.Email.String }
+								} else {
+									no email on file
+								}
+							</div>
 						</div>
-					</div>
-					<div class="row-actions">
-						<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
-						<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
-						<span class="page-subtitle">{ strconv.Itoa(row.OrderCount) } orders</span>
-					</div>
+						<div class="row-actions">
+							<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
+							<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
+							<span class="page-subtitle">{ strconv.Itoa(row.OrderCount) } orders</span>
+						</div>
+						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+					</a>
 				</li>
 			}
 		</ul>
@@ -48,8 +53,25 @@ func labelFor(m map[string]string, code string) string {
 	return code
 }
 
+// clientInitials renders up to the first two words of a client name as uppercase letters, for
+// the entity-list avatar chip.
+func clientInitials(name string) string {
+	fields := strings.Fields(name)
+	out := ""
+	for i, f := range fields {
+		if i >= 2 {
+			break
+		}
+		out += strings.ToUpper(f[:1])
+	}
+	return out
+}
+
 templ newClientLink() {
-	<a class="btn btn-primary" href="/clients/new">New client</a>
+	<a class="btn btn-primary" href="/clients/new">
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		New client
+	</a>
 }
 
 templ NewPage(c web.Chrome, clientTypes, contactMethods []settings.Classifier) {
@@ -121,7 +143,10 @@ templ newBody(clientTypes, contactMethods []settings.Classifier) {
 			@web.Field("Notes", "") {
 				<textarea class="input" name="notes" rows="3"></textarea>
 			}
-			<button type="submit" class="btn btn-primary">Create client</button>
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Create
+			</button>
 		</form>
 	}
 }
@@ -131,154 +156,181 @@ templ DetailPage(c web.Chrome, client Client, typeLabel string, assets []AssetSu
 }
 
 templ detailBody(client Client, typeLabel string, assets []AssetSummary, quotes []QuoteSummary, orders []OrderSummary, clientTypes, contactMethods []settings.Classifier, tagAssignments []settings.TagAssignment) {
-	@web.PageHeader(client.Name, detailSubtitle(client, typeLabel), templ.NopComponent)
-	<div class="detail-grid">
-		<div class="detail-main">
-			@web.Card() {
-				<div class="card-header-row">
-					<h2 class="dashboard-heading">Assets</h2>
-					<a class="btn btn-secondary" href={ templ.URL("/assets/new?clientId=" + client.ID) }>Add asset</a>
-				</div>
-				if len(assets) == 0 {
-					<p class="empty-state">No assets yet.</p>
-				}
-				<ul class="entity-list">
-					for _, a := range assets {
-						<li class="entity-list-row">
-							<a href={ templ.URL("/assets/" + a.ID) }>
-								if a.Title.Valid {
-									{ a.Title.String }
-								} else {
-									{ a.ReferenceCode }
-								}
-							</a>
-							<span class="page-subtitle">{ a.ReferenceCode }</span>
-						</li>
-					}
-				</ul>
-			}
-
-			@web.Card() {
-				<div class="card-header-row">
-					<h2 class="dashboard-heading">Quotes</h2>
-					<a class="btn btn-secondary" href={ templ.URL("/clients/quotes/new?clientId=" + client.ID) }>New quote</a>
-				</div>
-				if len(quotes) == 0 {
-					<p class="empty-state">No quotes yet.</p>
-				}
-				<ul class="entity-list">
-					for _, q := range quotes {
-						<li class="entity-list-row">
-							<a href={ templ.URL("/clients/quotes/" + q.ID) }>Quote — { strconv.FormatFloat(q.TotalEstimate, 'f', 2, 64) }</a>
-							<span class={ "badge", templ.KV("badge-green", q.Status == "accepted") }>{ q.Status }</span>
-						</li>
-					}
-				</ul>
-			}
-
-			@web.Card() {
-				<h2 class="dashboard-heading">Tags</h2>
-				if len(tagAssignments) > 0 {
-					<div class="tag-pills">
-						for _, a := range tagAssignments {
-							<span class="tag-pill">
-								#{ a.Tag.Name }
-								<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags/" + a.AssignmentID + "/delete") } data-confirm={ "Remove tag \"" + a.Tag.Name + "\"?" }>
-									<button type="submit" class="tag-pill-remove" aria-label="Remove tag">×</button>
-								</form>
-							</span>
-						}
-					</div>
-				}
-				<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags") } class="inline-edit-form">
-					@web.Field("Tag name", "") {
-						<input class="input" name="name" required placeholder="e.g. vip"/>
-					}
-					<button type="submit" class="btn btn-secondary">Add tag</button>
-				</form>
-			}
-
-			@web.Card() {
-				<h2 class="dashboard-heading">Orders</h2>
-				if len(orders) == 0 {
-					<p class="empty-state">No orders yet.</p>
-				}
-				<ul class="entity-list">
-					for _, o := range orders {
-						<li class="entity-list-row">
-							<div>
-								<a href={ templ.URL("/clients/orders/" + o.ID) }>{ o.OrderNumber }</a>
-								<div class="page-subtitle">{ strconv.Itoa(o.InvoiceCount) } invoice(s)</div>
-							</div>
-							<span class="badge badge-blue">{ o.Status }</span>
-						</li>
-					}
-				</ul>
-			}
+	@web.PageHeader(client.Name, detailSubtitle(client, typeLabel), clientActions(client))
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Assets</h2>
+			<a class="btn btn-secondary" href={ templ.URL("/assets/new?clientId=" + client.ID) }>
+				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+				Add asset
+			</a>
 		</div>
-
-		<div>
-			@web.Card() {
-				<h2 class="dashboard-heading">Profile</h2>
-				<form method="post" action={ templ.URL("/clients/" + client.ID + "/update") } class="form-grid">
-					@web.Field("Type", "") {
-						<select class="input" name="type">
-							for _, ct := range clientTypes {
-								<option value={ ct.Code } selected?={ ct.Code == client.Type }>{ ct.Title }</option>
-							}
-						</select>
-					}
-					@web.Field("Name", "") {
-						<input class="input" name="name" value={ client.Name } required/>
-					}
-					@web.Field("Organization", "") {
-						<input class="input" name="organizationName" value={ client.OrganizationName.String }/>
-					}
-					@web.Field("Contact person", "") {
-						<input class="input" name="contactPerson" value={ client.ContactPerson.String }/>
-					}
-					@web.Field("Email", "") {
-						<input class="input" type="email" name="email" value={ client.Email.String }/>
-					}
-					@web.Field("Phone", "") {
-						<input class="input" name="phone" value={ client.Phone.String }/>
-					}
-					@web.Field("Preferred contact method", "") {
-						<select class="input" name="preferredContactMethod">
-							<option value="">—</option>
-							for _, m := range contactMethods {
-								<option value={ m.Code } selected?={ m.Code == client.PreferredContactMethod.String }>{ m.Title }</option>
-							}
-						</select>
-					}
-					@web.Field("Address", "") {
-						<textarea class="input" name="address" rows="2">{ client.Address.String }</textarea>
-					}
-					<div class="form-row-2">
-						@web.Field("City", "") {
-							<input class="input" name="city" value={ client.City.String }/>
+		if len(assets) == 0 {
+			<p class="empty-state">No assets yet.</p>
+		}
+		<ul class="entity-list">
+			for _, a := range assets {
+				<li class="entity-list-row">
+					<a href={ templ.URL("/assets/" + a.ID) }>
+						if a.Title.Valid {
+							{ a.Title.String }
+						} else {
+							{ a.ReferenceCode }
 						}
-						@web.Field("Postal code", "") {
-							<input class="input" name="postalCode" value={ client.PostalCode.String }/>
-						}
-					</div>
-					@web.Field("Country", "") {
-						<input class="input" name="country" value={ client.Country.String }/>
-					}
-					@web.Field("Tax ID", "") {
-						<input class="input" name="taxId" value={ client.TaxID.String }/>
-					}
-					@web.Field("Referral source", "") {
-						<input class="input" name="referralSource" value={ client.ReferralSource.String }/>
-					}
-					@web.Field("Notes", "") {
-						<textarea class="input" name="notes" rows="4">{ client.Notes.String }</textarea>
-					}
-					<button type="submit" class="btn btn-secondary">Save profile</button>
-				</form>
+					</a>
+					<span class="page-subtitle">{ a.ReferenceCode }</span>
+				</li>
 			}
+		</ul>
+	}
+
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Quotes</h2>
+			<a class="btn btn-secondary" href={ templ.URL("/clients/quotes/new?clientId=" + client.ID) }>
+				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+				New quote
+			</a>
 		</div>
-	</div>
+		if len(quotes) == 0 {
+			<p class="empty-state">No quotes yet.</p>
+		}
+		<ul class="entity-list">
+			for _, q := range quotes {
+				<li class="entity-list-row">
+					<a href={ templ.URL("/clients/quotes/" + q.ID) }>Quote — { strconv.FormatFloat(q.TotalEstimate, 'f', 2, 64) }</a>
+					<span class={ "badge", templ.KV("badge-green", q.Status == "accepted") }>{ q.Status }</span>
+				</li>
+			}
+		</ul>
+	}
+
+	@web.Card() {
+		<h2 class="dashboard-heading">Tags</h2>
+		if len(tagAssignments) > 0 {
+			<div class="tag-pills">
+				for _, a := range tagAssignments {
+					<span class="tag-pill">
+						#{ a.Tag.Name }
+						<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags/" + a.AssignmentID + "/delete") } data-confirm={ "Remove tag \"" + a.Tag.Name + "\"?" }>
+							<button type="submit" class="tag-pill-remove" aria-label="Remove tag">
+								<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
+							</button>
+						</form>
+					</span>
+				}
+			</div>
+		}
+		<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags") } class="inline-edit-form">
+			@web.Field("Tag name", "") {
+				<input class="input" name="name" required placeholder="e.g. vip"/>
+			}
+			<button type="submit" class="btn btn-secondary">
+				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+				Add tag
+			</button>
+		</form>
+	}
+
+	@web.Card() {
+		<h2 class="dashboard-heading">Orders</h2>
+		if len(orders) == 0 {
+			<p class="empty-state">No orders yet.</p>
+		}
+		<ul class="entity-list">
+			for _, o := range orders {
+				<li class="entity-list-row">
+					<div>
+						<a href={ templ.URL("/clients/orders/" + o.ID) }>{ o.OrderNumber }</a>
+						<div class="page-subtitle">{ strconv.Itoa(o.InvoiceCount) } invoice(s)</div>
+					</div>
+					<span class="badge badge-blue">{ o.Status }</span>
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ clientActions(client Client) {
+	<a class="btn btn-secondary" href={ templ.URL("/clients/edit/" + client.ID) }>
+		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		Edit
+	</a>
+}
+
+templ EditPage(c web.Chrome, client Client, clientTypes, contactMethods []settings.Classifier) {
+	@web.AppLayout("Edit "+client.Name, c, editBody(client, clientTypes, contactMethods))
+}
+
+templ editBody(client Client, clientTypes, contactMethods []settings.Classifier) {
+	@web.PageHeader("Edit "+client.Name, "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action={ templ.URL("/clients/" + client.ID + "/update") } class="form-grid">
+			@web.Field("Type", "") {
+				<select class="input" name="type">
+					for _, ct := range clientTypes {
+						<option value={ ct.Code } selected?={ ct.Code == client.Type }>{ ct.Title }</option>
+					}
+				</select>
+			}
+			@web.Field("Name", "") {
+				<input class="input" name="name" value={ client.Name } required/>
+			}
+			@web.Field("Organization", "") {
+				<input class="input" name="organizationName" value={ client.OrganizationName.String }/>
+			}
+			@web.Field("Contact person", "") {
+				<input class="input" name="contactPerson" value={ client.ContactPerson.String }/>
+			}
+			@web.Field("Email", "") {
+				<input class="input" type="email" name="email" value={ client.Email.String }/>
+			}
+			@web.Field("Phone", "") {
+				<input class="input" name="phone" value={ client.Phone.String }/>
+			}
+			@web.Field("Preferred contact method", "") {
+				<select class="input" name="preferredContactMethod">
+					<option value="">—</option>
+					for _, m := range contactMethods {
+						<option value={ m.Code } selected?={ m.Code == client.PreferredContactMethod.String }>{ m.Title }</option>
+					}
+				</select>
+			}
+			@web.Field("Address", "") {
+				<textarea class="input" name="address" rows="2">{ client.Address.String }</textarea>
+			}
+			<div class="form-row-2">
+				@web.Field("City", "") {
+					<input class="input" name="city" value={ client.City.String }/>
+				}
+				@web.Field("Postal code", "") {
+					<input class="input" name="postalCode" value={ client.PostalCode.String }/>
+				}
+			</div>
+			@web.Field("Country", "") {
+				<input class="input" name="country" value={ client.Country.String }/>
+			}
+			@web.Field("Tax ID", "") {
+				<input class="input" name="taxId" value={ client.TaxID.String }/>
+			}
+			@web.Field("Referral source", "") {
+				<input class="input" name="referralSource" value={ client.ReferralSource.String }/>
+			}
+			@web.Field("Notes", "") {
+				<textarea class="input" name="notes" rows="4">{ client.Notes.String }</textarea>
+			}
+			<div class="form-actions">
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Save
+				</button>
+				<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>
+					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					Cancel
+				</a>
+			</div>
+		</form>
+	}
 }
 
 func detailSubtitle(client Client, typeLabel string) string {

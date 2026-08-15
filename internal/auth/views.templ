@@ -21,7 +21,10 @@ templ loginForm(errorCode, noticeCode string) {
 			@web.Field("Password", "") {
 				<input class="input" type="password" name="password" required autocomplete="current-password"/>
 			}
-			<button type="submit" class="btn btn-primary btn-block">Sign in</button>
+			<button type="submit" class="btn btn-primary btn-block">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Sign in
+			</button>
 		</form>
 		<div class="auth-links">
 			<a href="/register">Create an account</a>
@@ -82,7 +85,10 @@ templ registerBody() {
 			@web.Field("Confirm password", "") {
 				<input class="input" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password"/>
 			}
-			<button type="submit" class="btn btn-primary btn-block">Create account</button>
+			<button type="submit" class="btn btn-primary btn-block">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Create account
+			</button>
 		</form>
 		<p class="below">Your account needs email confirmation, then admin approval, before you can sign in.</p>
 	}
@@ -116,7 +122,10 @@ templ forgotPasswordBody() {
 			@web.Field("Email", "") {
 				<input class="input" type="email" name="email" required autocomplete="email"/>
 			}
-			<button type="submit" class="btn btn-primary btn-block">Send reset link</button>
+			<button type="submit" class="btn btn-primary btn-block">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Send link
+			</button>
 		</form>
 	}
 }
@@ -142,7 +151,10 @@ templ resetPasswordBody(token, errorCode string) {
 				@web.Field("Confirm new password", "") {
 					<input class="input" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password"/>
 				}
-				<button type="submit" class="btn btn-primary btn-block">Update password</button>
+				<button type="submit" class="btn btn-primary btn-block">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Update password
+				</button>
 			</form>
 		} else {
 			<p>
@@ -174,7 +186,10 @@ templ verifyEmailBody(verifiedUser *User) {
 				@web.Field("Email", "") {
 					<input class="input" type="email" name="email" required autocomplete="email"/>
 				}
-				<button type="submit" class="btn btn-secondary btn-block">Resend verification email</button>
+				<button type="submit" class="btn btn-secondary btn-block">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+					Resend email
+				</button>
 			</form>
 		}
 	}

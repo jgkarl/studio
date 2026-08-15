@@ -30,7 +30,7 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("POST /workflows", svc.Auth.RequireUser(svc.handleCreate))
 	mux.HandleFunc("GET /workflows/{id}", svc.Auth.RequireUser(svc.handleDetail))
 	mux.HandleFunc("POST /workflows/{id}/activities", svc.Auth.RequireUser(svc.handleLogActivity))
-	mux.HandleFunc("POST /workflows/{id}/advance", svc.Auth.RequireUser(svc.handleAdvanceStage))
+	mux.HandleFunc("POST /workflows/{id}/complete", svc.Auth.RequireUser(svc.handleComplete))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -229,38 +229,9 @@ func (svc *Service) handleLogActivity(w http.ResponseWriter, r *http.Request, us
 	http.Redirect(w, r, "/workflows/"+projectID, http.StatusSeeOther)
 }
 
-func (svc *Service) handleAdvanceStage(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	ctx := r.Context()
+func (svc *Service) handleComplete(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	id := r.PathValue("id")
-	nextStage := Stage(r.FormValue("nextStage"))
-
-	project, err := GetByID(ctx, svc.Pool, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if project == nil {
-		http.NotFound(w, r)
-		return
-	}
-	allowed := StageTransitions[project.Stage]
-	ok := false
-	for _, s := range allowed {
-		if s == nextStage {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		http.Error(w, "Cannot move from \""+string(project.Stage)+"\" to \""+string(nextStage)+"\".", http.StatusBadRequest)
-		return
-	}
-
-	if err := AdvanceStage(ctx, svc.Pool, id, nextStage); err != nil {
+	if err := CompleteProject(r.Context(), svc.Pool, id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

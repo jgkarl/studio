@@ -31,8 +31,25 @@ templ Alert(tone string) {
 // is one of "asset", "project", "order", "report" (internal/export.Type), matching the
 // /api/export/{type}/{id} route.
 templ ExportLinks(exportType, id string) {
-	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=html") }>Export HTML</a>
-	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=pdf") }>Export PDF</a>
+	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=html") }>
+		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+		Export HTML
+	</a>
+	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=pdf") }>
+		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+		Export PDF
+	</a>
+}
+
+// OpenBadge renders the small tone badge used everywhere a Project's open/closed status shows up
+// (Asset/Order detail workflow lists, Workflows list/detail) - "Open" while completedAt is unset,
+// "Completed" once it's been marked done.
+templ OpenBadge(completed bool) {
+	if completed {
+		<span class="badge badge-green">Completed</span>
+	} else {
+		<span class="badge badge-amber">Open</span>
+	}
 }
 
 // PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page

@@ -26,14 +26,20 @@ func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Asset, error)
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
-	err := rows.Scan(&r.ID, &r.Title, &r.ReferenceCode, &r.AssetTypeTitle, &r.ClientName, &r.CurrentStateCondition, &r.ProjectCount)
+	err := rows.Scan(&r.ID, &r.Title, &r.ReferenceCode, &r.AssetTypeTitle, &r.ClientName, &r.CurrentStateCondition,
+		&r.ProjectCount, &r.ThumbnailMediaID)
 	return r, err
 }
 
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 	return studiodb.Query(ctx, q, `
 		SELECT a.id, a.title, a.referenceCode, at.title, c.name, cs.condition,
-		       (SELECT COUNT(*) FROM Project p WHERE p.assetId = a.id) AS projectCount
+		       (SELECT COUNT(*) FROM Project p WHERE p.assetId = a.id) AS projectCount,
+		       (SELECT mr.mediaId FROM MediaReference mr
+		          JOIN AssetState ast ON ast.id = mr.referencingId AND mr.referencingType = 'AssetState'
+		          JOIN Media m ON m.id = mr.mediaId AND m.kind = 'image'
+		          WHERE ast.assetId = a.id
+		          ORDER BY mr.createdAt DESC, mr.sortOrder ASC LIMIT 1) AS thumbnailMediaId
 		FROM Asset a
 		JOIN Classifier at ON at.id = a.assetTypeId
 		JOIN Client c ON c.id = a.clientId
@@ -183,12 +189,12 @@ func ptrToAny(s *string) any {
 
 func scanProjectSummary(rows *sql.Rows) (ProjectSummary, error) {
 	var p ProjectSummary
-	err := rows.Scan(&p.ID, &p.Title, &p.Stage, &p.OrderNumber)
+	err := rows.Scan(&p.ID, &p.Title, &p.CompletedAt, &p.OrderNumber)
 	return p, err
 }
 
 func ListProjectsForAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]ProjectSummary, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT p.id, p.title, p.stage, o.orderNumber FROM Project p LEFT JOIN "Order" o ON o.id = p.orderId
+		SELECT p.id, p.title, p.completedAt, o.orderNumber FROM Project p LEFT JOIN "Order" o ON o.id = p.orderId
 		WHERE p.assetId = ? ORDER BY p.createdAt DESC`, scanProjectSummary, assetID)
 }

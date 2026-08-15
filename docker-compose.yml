@@ -13,7 +13,7 @@ services:
       dockerfile: Dockerfile
     image: localhost/studio-go:latest
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
       AUTH_SECRET: "${AUTH_SECRET:-dev-only-insecure-secret-change-me}"
       ALLOW_DEV_LOGIN: "${ALLOW_DEV_LOGIN:-true}"

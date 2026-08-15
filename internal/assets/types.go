@@ -47,6 +47,7 @@ type ListRow struct {
 	ClientName            string
 	CurrentStateCondition sql.NullString
 	ProjectCount          int
+	ThumbnailMediaID      sql.NullString
 }
 
 type Material struct {
@@ -66,6 +67,6 @@ type State struct {
 type ProjectSummary struct {
 	ID          string
 	Title       string
-	Stage       string
+	CompletedAt sql.NullTime
 	OrderNumber sql.NullString
 }

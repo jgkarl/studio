@@ -35,6 +35,18 @@ func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 		ORDER BY r.updatedAt DESC`, scanListRow)
 }
 
+// ListByAsset returns every report for one asset, newest first - used by the asset detail page's
+// Reports tab. Mirrors List() with an assetId filter.
+func ListByAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]ListRow, error) {
+	return studiodb.Query(ctx, q, `
+		SELECT r.id, r.title, r.status, a.title, a.referenceCode, u.name
+		FROM Report r
+		JOIN Asset a ON a.id = r.assetId
+		LEFT JOIN User u ON u.id = r.authorId
+		WHERE r.assetId = ?
+		ORDER BY r.updatedAt DESC`, scanListRow, assetID)
+}
+
 func scanAssetOption(rows *sql.Rows) (AssetOption, error) {
 	var a AssetOption
 	err := rows.Scan(&a.ID, &a.Title, &a.ReferenceCode, &a.ClientName)

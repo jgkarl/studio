@@ -11,7 +11,7 @@ templ Page(c web.Chrome, clientCount, assetCount int, activeProjects []activePro
 }
 
 templ pageBody(c web.Chrome, clientCount, assetCount int, activeProjects []activeProject, openOrders []openOrder, draftReports int, orderStatusLabels map[string]string) {
-	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, templ.NopComponent)
+	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, newIntakeLink())
 	<div class="stat-grid">
 		@statCard(strconv.Itoa(clientCount), c.Dict.Dashboard.Clients, "/clients")
 		@statCard(strconv.Itoa(assetCount), c.Dict.Dashboard.Assets, "/assets")
@@ -34,7 +34,6 @@ templ pageBody(c web.Chrome, clientCount, assetCount int, activeProjects []activ
 							} else {
 								{ p.AssetReferenceCode }
 							}
-							· { p.Stage }
 						</div>
 					</li>
 				}
@@ -61,6 +60,13 @@ templ pageBody(c web.Chrome, clientCount, assetCount int, activeProjects []activ
 			</ul>
 		}
 	</div>
+}
+
+templ newIntakeLink() {
+	<a class="btn btn-primary" href="/assets/new">
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		New intake
+	</a>
 }
 
 templ statCard(value, label, href string) {

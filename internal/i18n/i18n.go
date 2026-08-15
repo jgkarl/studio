@@ -50,7 +50,7 @@ type DashboardDict struct {
 type CommonDict struct {
 	SwitchToEnglish, SwitchToEstonian     string
 	SwitchToLightTheme, SwitchToDarkTheme string
-	SignOut                               string
+	SignOut, Menu                         string
 }
 
 type Dictionary struct {
@@ -74,7 +74,7 @@ var dictionaries = map[Locale]Dictionary{
 		Common: CommonDict{
 			SwitchToEnglish: "Switch to English", SwitchToEstonian: "Vaheta eesti keelele",
 			SwitchToLightTheme: "Lülitu heledale teemale", SwitchToDarkTheme: "Lülitu tumedale teemale",
-			SignOut: "Logi välja",
+			SignOut: "Logi välja", Menu: "Menüü",
 		},
 	},
 	LocaleEN: {
@@ -91,7 +91,7 @@ var dictionaries = map[Locale]Dictionary{
 		Common: CommonDict{
 			SwitchToEnglish: "Switch to English", SwitchToEstonian: "Switch to Estonian",
 			SwitchToLightTheme: "Switch to light theme", SwitchToDarkTheme: "Switch to dark theme",
-			SignOut: "Sign out",
+			SignOut: "Sign out", Menu: "Menu",
 		},
 	},
 }

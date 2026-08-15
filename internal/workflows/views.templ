@@ -39,11 +39,7 @@ templ listBody(rows []ListRow) {
 							}
 						</div>
 					</div>
-					if row.Stage == StageHandoverDone {
-						<span class="badge badge-green">{ StageLabels[row.Stage] }</span>
-					} else {
-						<span class="badge badge-amber">{ StageLabels[row.Stage] }</span>
-					}
+					@web.OpenBadge(row.CompletedAt.Valid)
 				</li>
 			}
 		</ul>
@@ -51,7 +47,10 @@ templ listBody(rows []ListRow) {
 }
 
 templ newWorkflowLink() {
-	<a class="btn btn-primary" href="/workflows/new">New workflow</a>
+	<a class="btn btn-primary" href="/workflows/new">
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		New workflow
+	</a>
 }
 
 templ NewPage(c web.Chrome, options []AssetOption, preselectedAssetID string) {
@@ -73,7 +72,10 @@ templ newBody(options []AssetOption, preselectedAssetID string) {
 			@web.Field("Title", "e.g. \"Cleaning and varnish removal\"") {
 				<input class="input" name="title" required/>
 			}
-			<button type="submit" class="btn btn-primary">Create workflow</button>
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Create
+			</button>
 		</form>
 	}
 }
@@ -94,108 +96,100 @@ templ DetailPage(c web.Chrome, project Project, asset *assets.Asset, client *cli
 templ detailBody(project Project, asset *assets.Asset, client *clients.Client, activities []Activity,
 	activityMedia map[string][]media.ReferenceWithMedia, activityTypes, conditions []settings.Classifier) {
 	@web.PageHeader(project.Title, detailSubtitle(asset, client), detailActions(project, asset))
+
 	@web.Card() {
-		<div class="stage-trail">
-			for i, s := range Stages {
-				<span class={ "badge", stageBadgeClass(s, project.Stage) }>{ StageLabels[s] }</span>
-				if i < len(Stages)-1 {
-					<span class="stage-arrow">→</span>
-				}
-			}
-		</div>
-		if next := StageTransitions[project.Stage]; len(next) > 0 {
-			<form method="post" action={ templ.URL("/workflows/" + project.ID + "/advance") } class="row-actions" style="margin-top: 1rem;">
-				<span class="page-subtitle">Advance to:</span>
-				for _, s := range next {
-					<button type="submit" name="nextStage" value={ string(s) } class="btn btn-secondary">{ StageLabels[s] }</button>
-				}
-			</form>
-		} else {
-			<p class="page-subtitle" style="margin-top: 1rem; color: var(--green-text);">Workflow complete.</p>
-		}
-		if !project.OrderID.Valid && client != nil {
-			<p class="page-subtitle" style="margin-top: 0.75rem;">
-				Not yet attached to an order for this client —
-				<a href={ templ.URL("/clients/quotes/new?clientId=" + client.ID) } style="text-decoration: underline;">start a quote</a>.
-			</p>
-		}
-	}
-
-	<div class="detail-grid">
-		<div class="detail-main">
-			@web.Card() {
-				<h2 class="dashboard-heading">Notebook <span class="page-subtitle">(newest first)</span></h2>
-				if len(activities) == 0 {
-					<p class="empty-state">No activity logged yet.</p>
-				}
-				<ul class="condition-list">
-					for _, a := range activities {
-						<li class="condition-item">
-							<div class="row-actions">
-								<span class="badge">{ a.ActivityTypeTitle }</span>
-								<span class="page-subtitle">
-									{ a.StartedAt.Format("2006-01-02 15:04") } · { a.UserName }
-									if a.DurationMinutes.Valid {
-										· { strconv.FormatInt(a.DurationMinutes.Int64, 10) } min
-									}
-								</span>
-							</div>
-							<p class="detail-paragraph">{ a.Description }</p>
-							@media.MediaGrid(activityMedia[a.ID])
-						</li>
-					}
-				</ul>
+		<div class="row-actions" style="margin-bottom: 1rem;">
+			@web.OpenBadge(project.CompletedAt.Valid)
+			if !project.OrderID.Valid && client != nil {
+				<span class="page-subtitle">
+					Not yet attached to an order —
+					<a href={ templ.URL("/clients/quotes/new?clientId=" + client.ID) } style="text-decoration: underline;">start a quote</a>.
+				</span>
 			}
 		</div>
 
-		<div>
-			@web.Card() {
-				<h2 class="dashboard-heading">Log activity</h2>
-				<form method="post" action={ templ.URL("/workflows/" + project.ID + "/activities") } enctype="multipart/form-data" class="form-grid">
-					@web.Field("Type", "") {
-						<select class="input" name="activityTypeId" required>
-							<option value="" disabled selected>Select…</option>
-							for _, at := range activityTypes {
-								<option value={ at.ID }>{ at.Title }</option>
+		<h2 class="dashboard-heading">Notebook <span class="page-subtitle">(newest first)</span></h2>
+		if len(activities) == 0 {
+			<p class="empty-state">No activity logged yet.</p>
+		}
+		<ul class="condition-list">
+			for _, a := range activities {
+				<li class="condition-item">
+					<div class="row-actions">
+						<span class="badge">{ a.ActivityTypeTitle }</span>
+						<span class="page-subtitle">
+							{ a.StartedAt.Format("2006-01-02 15:04") } · { a.UserName }
+							if a.DurationMinutes.Valid {
+								· { strconv.FormatInt(a.DurationMinutes.Int64, 10) } min
 							}
-						</select>
-					}
-					@web.Field("Notes", "") {
-						<textarea class="input" name="description" rows="3" required></textarea>
-					}
-					<div class="form-row-2">
-						@web.Field("Started", "") {
-							<input class="input" type="datetime-local" name="startedAt"/>
-						}
-						@web.Field("Duration, minutes", "") {
-							<input class="input" type="number" name="durationMinutes" min="0"/>
-						}
+						</span>
 					</div>
-					@web.Field("Materials used", "free text, optional") {
-						<input class="input" name="materialsUsed" placeholder="e.g. 20ml solvent, cotton swabs"/>
-					}
-					@web.Field("Fixates condition as", "only used if this activity type is a state-fixation type") {
-						<select class="input" name="condition">
-							for _, cond := range conditions {
-								<option value={ cond.Code }>{ cond.Title }</option>
-							}
-						</select>
-					}
-					@web.Field("Photos", "On a phone this opens your camera directly.") {
-						<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-					}
-					<button type="submit" class="btn btn-primary">Log activity</button>
-				</form>
+					<p class="detail-paragraph">{ a.Description }</p>
+					@media.MediaGrid(activityMedia[a.ID])
+				</li>
 			}
-		</div>
-	</div>
+		</ul>
+
+		<details class="form-section">
+			<summary class="form-section-title" style="cursor: pointer;">+ Log activity</summary>
+			<form method="post" action={ templ.URL("/workflows/" + project.ID + "/activities") } enctype="multipart/form-data" class="form-grid" style="margin-top: 1rem;">
+				@web.Field("Type", "") {
+					<select class="input" name="activityTypeId" required>
+						<option value="" disabled selected>Select…</option>
+						for _, at := range activityTypes {
+							<option value={ at.ID }>{ at.Title }</option>
+						}
+					</select>
+				}
+				@web.Field("Notes", "") {
+					<textarea class="input" name="description" rows="3" required></textarea>
+				}
+				<div class="form-row-2">
+					@web.Field("Started", "") {
+						<input class="input" type="datetime-local" name="startedAt"/>
+					}
+					@web.Field("Time it took, minutes", "") {
+						<input class="input" type="number" name="durationMinutes" min="0"/>
+					}
+				</div>
+				@web.Field("Materials used", "free text, optional") {
+					<input class="input" name="materialsUsed" placeholder="e.g. 20ml solvent, cotton swabs"/>
+				}
+				@web.Field("Fixates condition as", "only used if this activity type is a state-fixation type") {
+					<select class="input" name="condition">
+						for _, cond := range conditions {
+							<option value={ cond.Code }>{ cond.Title }</option>
+						}
+					</select>
+				}
+				@web.Field("Photos", "On a phone this opens your camera directly.") {
+					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+				}
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Log entry
+				</button>
+			</form>
+		</details>
+	}
 }
 
 templ detailActions(project Project, asset *assets.Asset) {
 	if asset != nil {
-		<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) }>View asset</a>
+		<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) }>
+			<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+			View asset
+		</a>
 	}
 	@web.ExportLinks("project", project.ID)
+	if !project.CompletedAt.Valid {
+		<form method="post" action={ templ.URL("/workflows/" + project.ID + "/complete") }>
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Mark complete
+			</button>
+		</form>
+	}
 }
 
 func detailSubtitle(asset *assets.Asset, client *clients.Client) string {
@@ -208,14 +202,4 @@ func detailSubtitle(asset *assets.Asset, client *clients.Client) string {
 		clientName = client.Name
 	}
 	return assetName + " · owner: " + clientName
-}
-
-func stageBadgeClass(s, current Stage) string {
-	if s == current {
-		return "badge-blue"
-	}
-	if s == StageHandoverDone && current == StageHandoverDone {
-		return "badge-green"
-	}
-	return ""
 }

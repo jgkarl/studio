@@ -22,6 +22,10 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /clients/new", svc.Auth.RequireUser(svc.handleNewForm))
 	mux.HandleFunc("POST /clients", svc.Auth.RequireUser(svc.handleCreate))
 	mux.HandleFunc("GET /clients/{id}", svc.Auth.RequireUser(svc.handleDetail))
+	// /clients/edit/{id}, not /clients/{id}/edit - the latter is ambiguous with commerce's
+	// /clients/quotes/{id} and /clients/orders/{id} under Go 1.22's ServeMux (same segment
+	// count, wildcard in a different position - it refuses to register and panics at startup).
+	mux.HandleFunc("GET /clients/edit/{id}", svc.Auth.RequireUser(svc.handleEditForm))
 	mux.HandleFunc("POST /clients/{id}/update", svc.Auth.RequireUser(svc.handleUpdate))
 	mux.HandleFunc("POST /clients/{id}/tags", svc.Auth.RequireUser(svc.handleAddTag))
 	mux.HandleFunc("POST /clients/{id}/tags/{assignmentId}/delete", svc.Auth.RequireUser(svc.handleRemoveTag))
@@ -156,6 +160,30 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 	}
 
 	writeHTML(w, r, DetailPage(chromeFor(r, user, "/clients"), *client, typeLabel, assets, quotes, orders, clientTypes, contactMethods, tagAssignments))
+}
+
+func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	ctx := r.Context()
+	client, err := GetByID(ctx, svc.Pool, r.PathValue("id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if client == nil {
+		http.NotFound(w, r)
+		return
+	}
+	clientTypes, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierClientType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	contactMethods, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierContactMethod)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, EditPage(chromeFor(r, user, "/clients"), *client, clientTypes, contactMethods))
 }
 
 func (svc *Service) handleUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {

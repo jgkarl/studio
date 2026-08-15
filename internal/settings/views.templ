@@ -31,7 +31,10 @@ templ settingsCard(title, hint, href string) {
 				<div class="settings-card-title">{ title }</div>
 				<div class="page-subtitle">{ hint }</div>
 			</div>
-			<a class="btn btn-secondary" href={ templ.URL(href) }>Manage</a>
+			<a class="btn btn-secondary" href={ templ.URL(href) }>
+				<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+				Manage
+			</a>
 		</div>
 	}
 }
@@ -41,7 +44,7 @@ templ ClassifiersIndexPage(c web.Chrome, counts map[ClassifierType]int) {
 }
 
 templ classifiersIndexBody(counts map[ClassifierType]int) {
-	@web.PageHeader("Classifiers", "One screen manages every pick-from-a-list field in the app.", backLink("/settings", "Back to settings"))
+	@web.PageHeader("Classifiers", "One screen manages every pick-from-a-list field in the app.", backLink("/settings", "Back"))
 	<div class="settings-grid">
 		for _, t := range ClassifierTypes {
 			@settingsCard(ClassifierTypeLabels[t], fmt.Sprintf("%d options", counts[t]), "/settings/classifiers/"+string(t))
@@ -50,7 +53,10 @@ templ classifiersIndexBody(counts map[ClassifierType]int) {
 }
 
 templ backLink(href, label string) {
-	<a class="btn btn-ghost" href={ templ.URL(href) }>{ label }</a>
+	<a class="btn btn-ghost" href={ templ.URL(href) }>
+		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
+		{ label }
+	</a>
 }
 
 templ ClassifierTypePage(c web.Chrome, t ClassifierType, rows []Classifier, editID string) {
@@ -115,9 +121,15 @@ templ classifierRow(t ClassifierType, row Classifier, isFirst, isLast bool) {
 		</td>
 		<td>
 			<div class="row-actions">
-				<a class="btn btn-ghost" href={ templ.URL("/settings/classifiers/" + string(t) + "?edit=" + row.ID) }>Edit</a>
+				<a class="btn btn-ghost" href={ templ.URL("/settings/classifiers/" + string(t) + "?edit=" + row.ID) }>
+					<img src="/static/icons/edit.svg" width="12" height="12" alt="" class="icon"/>
+					Edit
+				</a>
 				<form method="post" action={ templ.URL("/settings/classifiers/" + string(t) + "/" + row.ID + "/delete") } data-confirm={ "Delete \"" + row.Title + "\"?" }>
-					<button type="submit" class="btn btn-ghost">Delete</button>
+					<button type="submit" class="btn btn-ghost">
+						<img src="/static/icons/close.svg" width="12" height="12" alt="" class="icon"/>
+						Delete
+					</button>
 				</form>
 			</div>
 		</td>
@@ -129,13 +141,17 @@ templ moveButtons(action string, isFirst, isLast bool) {
 		if !isFirst {
 			<form method="post" action={ templ.URL(action) }>
 				<input type="hidden" name="direction" value="up"/>
-				<button type="submit" class="btn btn-ghost" aria-label="Move up">↑</button>
+				<button type="submit" class="btn btn-ghost" aria-label="Move up">
+					<img src="/static/icons/chevron-right.svg" width="12" height="12" alt="" class="icon" style="transform: rotate(-90deg);"/>
+				</button>
 			</form>
 		}
 		if !isLast {
 			<form method="post" action={ templ.URL(action) }>
 				<input type="hidden" name="direction" value="down"/>
-				<button type="submit" class="btn btn-ghost" aria-label="Move down">↓</button>
+				<button type="submit" class="btn btn-ghost" aria-label="Move down">
+					<img src="/static/icons/chevron-right.svg" width="12" height="12" alt="" class="icon" style="transform: rotate(90deg);"/>
+				</button>
 			</form>
 		}
 	</div>
@@ -165,8 +181,14 @@ templ classifierEditRow(t ClassifierType, row Classifier) {
 					<textarea class="input mono" name="data" rows="2">{ row.Data.String }</textarea>
 				}
 				<div class="row-actions">
-					<button type="submit" class="btn btn-secondary">Save</button>
-					<a class="btn btn-ghost" href={ templ.URL("/settings/classifiers/" + string(t)) }>Cancel</a>
+					<button type="submit" class="btn btn-secondary">
+						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+						Save
+					</button>
+					<a class="btn btn-ghost" href={ templ.URL("/settings/classifiers/" + string(t)) }>
+						<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+						Cancel
+					</a>
 				</div>
 			</form>
 		</td>
@@ -194,7 +216,10 @@ templ classifierAddRow(t ClassifierType, nextSequence int) {
 				@web.Field("Extra data (JSON)", `optional, e.g. {"defaultRate": 60}`) {
 					<textarea class="input mono" name="data" rows="1"></textarea>
 				}
-				<button type="submit" class="btn btn-primary">Add option</button>
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Add option
+				</button>
 			</form>
 		</td>
 	</tr>
@@ -265,9 +290,15 @@ templ tagRow(tag TagUsage, isFirst, isLast bool) {
 		</td>
 		<td>
 			<div class="row-actions">
-				<a class="btn btn-ghost" href={ templ.URL("/settings/tags?edit=" + tag.ID) }>Edit</a>
+				<a class="btn btn-ghost" href={ templ.URL("/settings/tags?edit=" + tag.ID) }>
+					<img src="/static/icons/edit.svg" width="12" height="12" alt="" class="icon"/>
+					Edit
+				</a>
 				<form method="post" action={ templ.URL("/settings/tags/" + tag.ID + "/delete") } data-confirm={ deleteConfirmText(tag) }>
-					<button type="submit" class="btn btn-ghost">Delete</button>
+					<button type="submit" class="btn btn-ghost">
+						<img src="/static/icons/close.svg" width="12" height="12" alt="" class="icon"/>
+						Delete
+					</button>
 				</form>
 			</div>
 		</td>
@@ -294,8 +325,14 @@ templ tagEditRow(tag TagUsage) {
 					}
 				</div>
 				<div class="row-actions">
-					<button type="submit" class="btn btn-secondary">Save</button>
-					<a class="btn btn-ghost" href="/settings/tags">Cancel</a>
+					<button type="submit" class="btn btn-secondary">
+						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+						Save
+					</button>
+					<a class="btn btn-ghost" href="/settings/tags">
+						<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+						Cancel
+					</a>
 				</div>
 			</form>
 		</td>
@@ -314,7 +351,10 @@ templ tagAddRow() {
 						<input class="input" name="category" placeholder="e.g. priority"/>
 					}
 				</div>
-				<button type="submit" class="btn btn-primary">Add tag</button>
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Add tag
+				</button>
 			</form>
 		</td>
 	</tr>

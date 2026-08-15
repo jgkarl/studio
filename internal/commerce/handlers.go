@@ -282,6 +282,19 @@ func (svc *Service) handleUpdateOrderStatus(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Invalid status.", http.StatusBadRequest)
 		return
 	}
+	if status == "completed" {
+		projects, err := ListProjectsOnOrder(ctx, svc.Pool, id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, p := range projects {
+			if !p.CompletedAt.Valid {
+				http.Error(w, "Cannot complete: this order still has an open workflow.", http.StatusBadRequest)
+				return
+			}
+		}
+	}
 	if err := UpdateOrderStatus(ctx, svc.Pool, id, status); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

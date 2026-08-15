@@ -9,53 +9,14 @@ import (
 	"time"
 )
 
-type Stage string
-
-const (
-	StageIngest             Stage = "ingest"
-	StageDescribe           Stage = "describe"
-	StageFixateCurrentState Stage = "fixate_current_state"
-	StageTreatment          Stage = "treatment"
-	StageWaiting            Stage = "waiting"
-	StageFixateNewState     Stage = "fixate_new_state"
-	StageHandoverDone       Stage = "handover_done"
-)
-
-// Stages is the fixed display order every stage-badge trail renders in.
-var Stages = []Stage{
-	StageIngest, StageDescribe, StageFixateCurrentState, StageTreatment,
-	StageWaiting, StageFixateNewState, StageHandoverDone,
-}
-
-var StageLabels = map[Stage]string{
-	StageIngest:             "Ingest",
-	StageDescribe:           "Describe / Assess",
-	StageFixateCurrentState: "Fixate Current State",
-	StageTreatment:          "Treatment",
-	StageWaiting:            "Waiting / Drying",
-	StageFixateNewState:     "Fixate New State",
-	StageHandoverDone:       "Handover / Done",
-}
-
-// StageTransitions are the allowed forward moves. "treatment" and "waiting" can repeat
-// (self-loop) before moving on — this is a transition graph (real workflow logic), not a flat
-// pickable option list, so it's kept as code rather than a Classifier.
-var StageTransitions = map[Stage][]Stage{
-	StageIngest:             {StageDescribe},
-	StageDescribe:           {StageFixateCurrentState},
-	StageFixateCurrentState: {StageTreatment},
-	StageTreatment:          {StageTreatment, StageWaiting, StageFixateNewState},
-	StageWaiting:            {StageTreatment, StageWaiting, StageFixateNewState},
-	StageFixateNewState:     {StageHandoverDone},
-	StageHandoverDone:       {},
-}
-
+// A Project is a single unit of conservation work on an Asset. It has no granular workflow
+// stage — just a Notebook (Activity log, see below) and a simple open/completed status driven by
+// CompletedAt (set once, via CompleteProject — see queries.go).
 type Project struct {
 	ID               string
 	OrderID          sql.NullString
 	AssetID          string
 	Title            string
-	Stage            Stage
 	AssignedToUserID sql.NullString
 	StartedAt        sql.NullTime
 	CompletedAt      sql.NullTime
@@ -66,7 +27,7 @@ type Project struct {
 type ListRow struct {
 	ID                 string
 	Title              string
-	Stage              Stage
+	CompletedAt        sql.NullTime
 	AssetTitle         sql.NullString
 	AssetReferenceCode string
 	ClientName         string

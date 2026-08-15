@@ -147,13 +147,13 @@ func UpdateOrderStatus(ctx context.Context, q studiodb.Querier, id, status strin
 
 func scanProjectOnOrder(rows *sql.Rows) (ProjectOnOrder, error) {
 	var p ProjectOnOrder
-	err := rows.Scan(&p.ID, &p.Title, &p.Stage, &p.AssetTitle, &p.AssetReferenceCode)
+	err := rows.Scan(&p.ID, &p.Title, &p.CompletedAt, &p.AssetTitle, &p.AssetReferenceCode)
 	return p, err
 }
 
 func ListProjectsOnOrder(ctx context.Context, q studiodb.Querier, orderID string) ([]ProjectOnOrder, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT p.id, p.title, p.stage, a.title, a.referenceCode
+		SELECT p.id, p.title, p.completedAt, a.title, a.referenceCode
 		FROM Project p JOIN Asset a ON a.id = p.assetId WHERE p.orderId = ?`, scanProjectOnOrder, orderID)
 }
 

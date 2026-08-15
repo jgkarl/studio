@@ -8,11 +8,11 @@ import (
 	studiodb "studio/internal/db"
 )
 
-const projectColumns = "id, orderId, assetId, title, stage, assignedToUserId, startedAt, completedAt, createdAt, updatedAt"
+const projectColumns = "id, orderId, assetId, title, assignedToUserId, startedAt, completedAt, createdAt, updatedAt"
 
 func scanProject(rows *sql.Rows) (Project, error) {
 	var p Project
-	err := rows.Scan(&p.ID, &p.OrderID, &p.AssetID, &p.Title, &p.Stage, &p.AssignedToUserID,
+	err := rows.Scan(&p.ID, &p.OrderID, &p.AssetID, &p.Title, &p.AssignedToUserID,
 		&p.StartedAt, &p.CompletedAt, &p.CreatedAt, &p.UpdatedAt)
 	return p, err
 }
@@ -23,18 +23,20 @@ func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Project, erro
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
-	err := rows.Scan(&r.ID, &r.Title, &r.Stage, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName, &r.OrderNumber)
+	err := rows.Scan(&r.ID, &r.Title, &r.CompletedAt, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName, &r.OrderNumber)
 	return r, err
 }
 
+// List orders open workflows first (completedAt IS NULL sorts before non-NULL), newest-updated
+// within each group.
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT p.id, p.title, p.stage, a.title, a.referenceCode, c.name, o.orderNumber
+		SELECT p.id, p.title, p.completedAt, a.title, a.referenceCode, c.name, o.orderNumber
 		FROM Project p
 		JOIN Asset a ON a.id = p.assetId
 		JOIN Client c ON c.id = a.clientId
 		LEFT JOIN "Order" o ON o.id = p.orderId
-		ORDER BY p.updatedAt DESC`, scanListRow)
+		ORDER BY (p.completedAt IS NOT NULL), p.updatedAt DESC`, scanListRow)
 }
 
 func scanAssetOption(rows *sql.Rows) (AssetOption, error) {
@@ -60,16 +62,12 @@ func Create(ctx context.Context, q studiodb.Querier, assetID, title string) (str
 	return id, err
 }
 
-// AdvanceStage moves a Project to nextStage — caller must have already validated the transition
-// against StageTransitions. completedAt is set the first time a Project reaches handover_done.
-func AdvanceStage(ctx context.Context, q studiodb.Querier, id string, nextStage Stage) error {
-	var completedAt any
-	if nextStage == StageHandoverDone {
-		completedAt = time.Now()
-	}
+// CompleteProject marks a Project done - idempotent, only ever sets completedAt once.
+func CompleteProject(ctx context.Context, q studiodb.Querier, id string) error {
+	now := time.Now()
 	_, err := studiodb.Execute(ctx, q,
-		"UPDATE Project SET stage = ?, completedAt = COALESCE(?, completedAt), updatedAt = ? WHERE id = ?",
-		nextStage, completedAt, time.Now(), id)
+		"UPDATE Project SET completedAt = COALESCE(completedAt, ?), updatedAt = ? WHERE id = ?",
+		now, now, id)
 	return err
 }
 

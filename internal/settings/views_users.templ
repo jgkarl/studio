@@ -55,7 +55,10 @@ templ usersBody(users []auth.User) {
 											<option value={ string(role) } selected?={ role == u.Role }>{ string(role) }</option>
 										}
 									</select>
-									<button type="submit" class="btn btn-secondary">Save</button>
+									<button type="submit" class="btn btn-secondary">
+										<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+										Save
+									</button>
 								</form>
 							</td>
 						</tr>
@@ -68,5 +71,8 @@ templ usersBody(users []auth.User) {
 
 
 templ backToSettingsLink() {
-	<a class="btn btn-ghost" href="/settings">Back to settings</a>
+	<a class="btn btn-ghost" href="/settings">
+		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
+		Back
+	</a>
 }

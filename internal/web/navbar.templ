@@ -1,62 +1,152 @@
 package web
 
-import "studio/internal/theme"
+import (
+	"strings"
+
+	"studio/internal/i18n"
+	"studio/internal/theme"
+)
 
 type navItem struct {
-	href, label string
+	href, label, icon string
 }
 
 func navItems(c Chrome) []navItem {
 	items := []navItem{
-		{"/", c.Dict.Nav.Dashboard},
-		{"/clients", c.Dict.Nav.Clients},
-		{"/assets", c.Dict.Nav.Assets},
-		{"/workflows", c.Dict.Nav.Workflows},
-		{"/clients/orders", c.Dict.Nav.Orders},
-		{"/reporter", c.Dict.Nav.Reporter},
-		{"/album", c.Dict.Nav.Album},
+		{"/", c.Dict.Nav.Dashboard, "home"},
+		{"/clients", c.Dict.Nav.Clients, "people"},
+		{"/assets", c.Dict.Nav.Assets, "folder"},
+		{"/workflows", c.Dict.Nav.Workflows, "history"},
+		{"/clients/orders", c.Dict.Nav.Orders, ""},
+		{"/reporter", c.Dict.Nav.Reporter, "description"},
+		{"/album", c.Dict.Nav.Album, "image"},
 	}
 	if c.ShowSettings {
-		items = append(items, navItem{"/settings", c.Dict.Nav.Settings})
+		items = append(items, navItem{"/settings", c.Dict.Nav.Settings, ""})
 	}
 	return items
 }
 
+func iconSrc(name string) string {
+	return "/static/icons/" + name + ".svg"
+}
+
+// initials renders up to the first two words of a name as uppercase letters, for the small
+// avatar-chip circles in the navbar/drawer (and reused by other modules' list rows).
+func initials(name string) string {
+	fields := strings.Fields(name)
+	out := ""
+	for i, f := range fields {
+		if i >= 2 {
+			break
+		}
+		out += strings.ToUpper(f[:1])
+	}
+	return out
+}
+
 templ Navbar(c Chrome) {
+	<input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox"/>
 	<header class="navbar">
-		<input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox"/>
-		<div class="navbar-row">
-			<a href="/" class="navbar-brand">Studio</a>
-			<label for="nav-toggle" class="nav-toggle-btn" aria-label="Menu">☰</label>
+		<a href="/" class="navbar-brand">
+			@logoMark()
+			<span class="navbar-brand-text">
+				<span class="navbar-brand-name">Studio</span>
+				<span class="navbar-brand-tagline">conservation management</span>
+			</span>
+		</a>
+		<nav class="navbar-links">
+			for _, item := range navItems(c) {
+				<a href={ templ.URL(item.href) } class={ "navbar-link", templ.KV("navbar-link-active", item.href == c.Active) }>
+					if item.icon != "" {
+						<img src={ iconSrc(item.icon) } width="16" height="16" alt="" class="icon"/>
+					}
+					{ item.label }
+				</a>
+			}
+		</nav>
+		<div class="navbar-controls">
+			<form method="post" action="/locale/toggle">
+				<button type="submit" class="navbar-pill-btn" title={ localeToggleTitle(c) }>{ localeCode(c) }</button>
+			</form>
+			<form method="post" action="/theme/toggle">
+				<button type="submit" class="navbar-icon-btn" title={ themeToggleTitle(c) }>
+					@themeGlyph(c)
+				</button>
+			</form>
+			<span class="navbar-user">
+				<span class="avatar-chip avatar-chip-sm avatar-chip-user">{ initials(c.UserName) }</span>
+				<span>
+					{ c.UserName }<br/>
+					<span class="navbar-user-role">{ c.UserRole }</span>
+				</span>
+			</span>
+			<form method="post" action="/logout">
+				<button type="submit" class="navbar-icon-btn" title={ c.Dict.Common.SignOut } aria-label={ c.Dict.Common.SignOut }>
+					<img src={ iconSrc("logout") } width="16" height="16" alt="" class="icon"/>
+				</button>
+			</form>
 		</div>
-		<div class="navbar-menu">
-			<nav class="navbar-links">
-				for _, item := range navItems(c) {
-					<a href={ templ.URL(item.href) } class={ "navbar-link", templ.KV("navbar-link-active", item.href == c.Active) }>
-						{ item.label }
-					</a>
-				}
-			</nav>
-			<div class="navbar-controls">
-				<span class="navbar-user">{ c.UserName } <span class="page-subtitle">({ c.UserRole })</span></span>
-				<form method="post" action="/locale/toggle">
-					<button type="submit" class="btn btn-ghost" title={ localeToggleTitle(c) }>🌐</button>
-				</form>
-				<form method="post" action="/theme/toggle">
-					<button type="submit" class="btn btn-ghost" title={ themeToggleTitle(c) }>
-						if c.Theme == theme.Dark {
-							☀
-						} else {
-							🌙
-						}
-					</button>
-				</form>
-				<form method="post" action="/logout">
-					<button type="submit" class="btn btn-ghost">{ c.Dict.Common.SignOut }</button>
-				</form>
-			</div>
-		</div>
+		<label for="nav-toggle" class="nav-toggle-btn" aria-label="Menu">
+			<img src={ iconSrc("menu") } width="22" height="22" alt="" class="icon"/>
+		</label>
 	</header>
+	<label for="nav-toggle" class="nav-drawer-backdrop" aria-hidden="true"></label>
+	<aside class="nav-drawer">
+		<div class="nav-drawer-header">
+			<span class="nav-drawer-title">{ c.Dict.Common.Menu }</span>
+			<label for="nav-toggle" class="nav-drawer-close" aria-label="Close menu">
+				<img src={ iconSrc("close") } width="20" height="20" alt="" class="icon"/>
+			</label>
+		</div>
+		<nav class="nav-drawer-links">
+			for _, item := range navItems(c) {
+				<a href={ templ.URL(item.href) } class={ "nav-drawer-link", templ.KV("nav-drawer-link-active", item.href == c.Active) }>
+					if item.icon != "" {
+						<img src={ iconSrc(item.icon) } width="18" height="18" alt="" class="icon"/>
+					}
+					{ item.label }
+				</a>
+			}
+		</nav>
+		<div class="nav-drawer-controls">
+			<form method="post" action="/locale/toggle" style="flex:1;">
+				<button type="submit" class="navbar-pill-btn" style="width:100%;">{ localeCode(c) }</button>
+			</form>
+			<form method="post" action="/theme/toggle" style="flex:1;">
+				<button type="submit" class="navbar-icon-btn" style="width:100%;">
+					@themeGlyph(c)
+				</button>
+			</form>
+		</div>
+		<div class="nav-drawer-footer">
+			<span class="avatar-chip avatar-chip-sm avatar-chip-user">{ initials(c.UserName) }</span>
+			<span style="font-size:13px;line-height:1.3;">
+				{ c.UserName }<br/>
+				<span class="navbar-user-role">{ c.UserRole }</span>
+			</span>
+			<form method="post" action="/logout">
+				<button type="submit" class="btn btn-ghost" title={ c.Dict.Common.SignOut } aria-label={ c.Dict.Common.SignOut }>
+					<img src={ iconSrc("logout") } width="18" height="18" alt="" class="icon"/>
+				</button>
+			</form>
+		</div>
+	</aside>
+}
+
+templ logoMark() {
+	<svg width="30" height="30" viewBox="0 0 24 24" style="flex-shrink:0;">
+		<path d="M3 9.3C3 4.7 7 2 12 2s9 2.7 9 7.3c0 6.4 -6.8 11.2 -8.6 12.4a0.9 0.9 0 0 1 -0.8 0C9.8 20.5 3 15.7 3 9.3Z" fill="var(--gray-900)"></path>
+		<path d="M12 20.4V5.2M12 5.2L6.3 17.6M12 5.2l5.7 12.4M12 8.2L4.4 14.6M12 8.2l7.6 6.4M12 11.4L3.4 16.9M12 11.4l8.6 5.5" stroke="#EEA42E" stroke-width="0.85" fill="none" stroke-linecap="round"></path>
+	</svg>
+}
+
+templ themeGlyph(c Chrome) {
+	if c.Theme == theme.Dark {
+		☀
+	} else {
+		☾
+	}
 }
 
 func localeToggleTitle(c Chrome) string {
@@ -64,6 +154,15 @@ func localeToggleTitle(c Chrome) string {
 		return c.Dict.Common.SwitchToEstonian
 	}
 	return c.Dict.Common.SwitchToEnglish
+}
+
+// localeCode is the short code of the locale a click on the pill switches *to* (mirrors the
+// mock's t.langCode) - e.g. shows "ET" while reading English, "EN" while reading Estonian.
+func localeCode(c Chrome) string {
+	if c.Locale == i18n.LocaleEN {
+		return "ET"
+	}
+	return "EN"
 }
 
 func themeToggleTitle(c Chrome) string {

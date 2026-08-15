@@ -11,6 +11,7 @@ import (
 	"studio/internal/auth"
 	"studio/internal/clients"
 	"studio/internal/media"
+	"studio/internal/reporter"
 	"studio/internal/settings"
 	"studio/internal/web"
 )
@@ -26,6 +27,7 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /assets/new", svc.Auth.RequireUser(svc.handleNewForm))
 	mux.HandleFunc("POST /assets", svc.Auth.RequireUser(svc.handleCreate))
 	mux.HandleFunc("GET /assets/{id}", svc.Auth.RequireUser(svc.handleDetail))
+	mux.HandleFunc("GET /assets/{id}/edit", svc.Auth.RequireUser(svc.handleEditForm))
 	mux.HandleFunc("POST /assets/{id}/update", svc.Auth.RequireUser(svc.handleUpdate))
 	mux.HandleFunc("POST /assets/{id}/states", svc.Auth.RequireUser(svc.handleRecordState))
 	mux.HandleFunc("POST /assets/{id}/materials", svc.Auth.RequireUser(svc.handleAddMaterial))
@@ -230,8 +232,27 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		stateMedia[st.ID] = refs
 	}
 
+	reports, err := reporter.ListByAsset(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, materials, available, states,
-		projects, tagAssignments, conditions, conditionByCode, stateMedia))
+		projects, tagAssignments, conditions, conditionByCode, stateMedia, reports))
+}
+
+func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	asset, err := GetByID(r.Context(), svc.Pool, r.PathValue("id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if asset == nil {
+		http.NotFound(w, r)
+		return
+	}
+	writeHTML(w, r, EditPage(chromeFor(r, user, "/assets"), *asset))
 }
 
 func (svc *Service) handleUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {

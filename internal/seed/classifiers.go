@@ -169,11 +169,8 @@ func SeedAllClassifiers(ctx context.Context, q studiodb.Querier) error {
 		}},
 		{"order_status", []classifierRow{
 			{Code: "inquiry", Title: "Inquiry"},
-			{Code: "waiting_dropoff", Title: "Waiting Drop-off"},
+			{Code: "in_queue", Title: "In Queue"},
 			{Code: "in_progress", Title: "In Progress"},
-			{Code: "waiting_on_client", Title: "Waiting on Client"},
-			{Code: "waiting_payment", Title: "Waiting Payment"},
-			{Code: "ready_for_pickup", Title: "Ready for Pickup"},
 			{Code: "completed", Title: "Completed"},
 			{Code: "archived", Title: "Archived"},
 		}},

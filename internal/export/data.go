@@ -19,6 +19,13 @@ type Service struct {
 	Media *media.Service
 }
 
+func projectStatusLabel(completedAt sql.NullTime) string {
+	if completedAt.Valid {
+		return "Completed"
+	}
+	return "Open"
+}
+
 func reversed[T any](in []T) []T {
 	out := make([]T, len(in))
 	for i, v := range in {
@@ -111,7 +118,7 @@ func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, er
 	if len(projects) > 0 {
 		var paragraphs []string
 		for _, p := range projects {
-			paragraphs = append(paragraphs, fmt.Sprintf("%s — stage: %s", p.Title, p.Stage))
+			paragraphs = append(paragraphs, fmt.Sprintf("%s — status: %s", p.Title, projectStatusLabel(p.CompletedAt)))
 		}
 		sections = append(sections, Section{Heading: "Workflows", Paragraphs: paragraphs})
 	}
@@ -147,7 +154,7 @@ func (svc *Service) GetProjectExportData(ctx context.Context, id string) (*Doc, 
 		Paragraphs: []string{
 			"Asset: " + asset.DisplayName(),
 			"Owner: " + clientName,
-			"Stage: " + string(project.Stage),
+			"Status: " + projectStatusLabel(project.CompletedAt),
 		},
 	}}
 
@@ -195,7 +202,7 @@ func (svc *Service) GetOrderExportData(ctx context.Context, id string) (*Doc, er
 		if p.AssetTitle.Valid && p.AssetTitle.String != "" {
 			assetName = p.AssetTitle.String
 		}
-		projectLines = append(projectLines, fmt.Sprintf("%s (%s) — %s", p.Title, assetName, p.Stage))
+		projectLines = append(projectLines, fmt.Sprintf("%s (%s) — %s", p.Title, assetName, projectStatusLabel(p.CompletedAt)))
 	}
 
 	sections := []Section{

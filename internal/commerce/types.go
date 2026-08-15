@@ -72,7 +72,7 @@ type Invoice struct {
 type ProjectOnOrder struct {
 	ID                 string
 	Title              string
-	Stage              string
+	CompletedAt        sql.NullTime
 	AssetTitle         sql.NullString
 	AssetReferenceCode string
 }
