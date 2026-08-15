@@ -1,0 +1,13 @@
+.git
+.github
+data
+media-storage
+tmp
+*.log
+.env
+bin
+e2e/node_modules
+e2e/test-results
+e2e/playwright-report
+dist
+docs
