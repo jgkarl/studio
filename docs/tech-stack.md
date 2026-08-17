@@ -27,6 +27,21 @@ needs it.
   (`internal/web/layout.templ`) — this project's one hard layout rule, chosen so no module has to
   make its own width decision.
 
+## CSS: one hand-written stylesheet, standard breakpoints
+
+- `static/css/app.css`, plain CSS custom properties for the color/spacing system, no
+  preprocessor, no utility framework. Every `@media` query in the file uses exactly one of three
+  `min-width` breakpoints — `640px` (sm), `768px` (md), `1024px` (lg) — mobile-first
+  (base rules target the smallest viewport, breakpoints add columns as space allows). No other
+  breakpoint value should be introduced without a specific reason; if a grid needs an
+  intermediate step (e.g. the 5-column Projects kanban and the 5-card dashboard stat grid both
+  step 2/3/5 columns across sm/md/lg), stack multiple rules on the same three values rather than
+  picking a one-off width.
+- `e2e/tests/responsive.spec.js` screenshots the two widest grids (dashboard stat cards, Projects
+  kanban) at each breakpoint plus a below-640 mobile width and a well-above-1024 desktop width,
+  asserting the DOM node count stays correct at every size — a permanent regression check, not
+  just a one-off visual pass.
+
 ## Database: SQLite, via a raw driver — no ORM
 
 - **No ORM.** `internal/db` wraps [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite) —

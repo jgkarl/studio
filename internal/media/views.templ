@@ -7,11 +7,11 @@ import (
 )
 
 templ AlbumPage(c web.Chrome, items []AlbumItem) {
-	@web.AppLayout("Album", c, albumBody(items))
+	@web.AppLayout("Media", c, albumBody(items))
 }
 
 templ albumBody(items []AlbumItem) {
-	@web.PageHeader("Album", "Every photo, video, and document uploaded anywhere in the app.", templ.NopComponent)
+	@web.PageHeader("Media", "Every photo, video, and document uploaded anywhere in the app.", templ.NopComponent)
 	<div id="album-root" class="album-root">
 		<div class="album-controls">
 			<input type="text" id="album-search" class="input album-search" placeholder="Search…"/>
@@ -23,7 +23,7 @@ templ albumBody(items []AlbumItem) {
 			</div>
 			<label class="checkbox-field album-group-toggle">
 				<input type="checkbox" id="album-group-toggle"/>
-				Group by workflow
+				Group by project
 			</label>
 			<span class="badge" id="album-count">{ strconv.Itoa(len(items)) } items</span>
 		</div>
@@ -84,7 +84,7 @@ func projectGroupTitle(item AlbumItem) string {
 	if item.ProjectTitle.Valid {
 		return item.ProjectTitle.String
 	}
-	return "No workflow"
+	return "No project"
 }
 
 func albumSearchHaystack(item AlbumItem) string {
@@ -197,9 +197,9 @@ func mediaViewSubtitle(m Media, uploadedByName string) string {
 	return "Uploaded by " + uploadedByName + " · " + m.CreatedAt.Format("2006-01-02 15:04") + " · " + strconv.FormatInt(m.SizeBytes/1024, 10) + " KB"
 }
 
-// MediaGrid renders every media reference for one entity (Asset/AssetState/Activity/Report) - a
-// small grid of thumbnails linking to the deep-zoom viewer (images) or the raw file (video).
-// Reusable from every future module's detail page (Workflows, Reporter, ...).
+// MediaGrid renders every media reference for one entity (Asset/AssetState/Activity/Report/
+// Treatment) - a small grid of thumbnails linking to the lightbox viewer (images) or the raw
+// file (video). Reused from every module's detail page (Assets, Projects, Reports, Treatments).
 templ MediaGrid(refs []ReferenceWithMedia) {
 	if len(refs) > 0 {
 		<div class="media-grid">

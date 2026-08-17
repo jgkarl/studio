@@ -6,11 +6,11 @@ import (
 	"studio/internal/web"
 )
 
-templ ListPage(c web.Chrome, rows []ListRow) {
-	@web.AppLayout("Treatments", c, listBody(rows))
+templ ListPage(c web.Chrome, rows []ListRow, methodLabels map[string]string) {
+	@web.AppLayout("Treatments", c, listBody(rows, methodLabels))
 }
 
-templ listBody(rows []ListRow) {
+templ listBody(rows []ListRow, methodLabels map[string]string) {
 	@web.PageHeader("Treatments", "Conservation work performed, per object.", newTreatmentLink())
 	@web.Card() {
 		if len(rows) == 0 {
@@ -32,7 +32,7 @@ templ listBody(rows []ListRow) {
 							</div>
 						</div>
 						<div class="row-actions">
-							<span class="badge">{ row.Method }</span>
+							<span class="badge">{ methodLabel(methodLabels, row.Method) }</span>
 							<span class="page-subtitle">{ row.PerformedAt.Format("2006-01-02") }</span>
 						</div>
 					</a>

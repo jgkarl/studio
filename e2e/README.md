@@ -38,3 +38,10 @@ Tests run serially in a single shared browser context (real login cookie carried
 one person's browser tab) and each depends on state the previous one created, so a fresh database
 is required for a clean run — a stale `A-0001` reference code from a prior run will fail asset
 creation with a UNIQUE constraint error.
+
+`tests/responsive.spec.js` is a separate, self-contained suite (creates its own client/asset/
+projects, doesn't depend on `smoke.spec.js` having run first) that screenshots the Dashboard stat
+grid and Projects kanban board — the two widest responsive grids in the app — at each of
+`static/css/app.css`'s standard breakpoints (a below-640 mobile width, 640/768/1024, and a wide
+desktop past 1024), asserting the right number of cards/columns render at every size. Screenshots
+land in `docs/screenshots/breakpoint-*.png`.

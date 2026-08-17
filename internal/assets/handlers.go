@@ -199,9 +199,14 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	treatmentMethodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, states,
-		projects, conditions, conditionByCode, stateMedia, reports, assetTreatments))
+		projects, conditions, conditionByCode, stateMedia, reports, assetTreatments, treatmentMethodLabels))
 }
 
 func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {

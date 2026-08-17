@@ -37,12 +37,18 @@ func chromeFor(r *http.Request, user *auth.User, active string) web.Chrome {
 }
 
 func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	rows, err := List(r.Context(), svc.Pool)
+	ctx := r.Context()
+	rows, err := List(ctx, svc.Pool)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, ListPage(chromeFor(r, user, "/treatments"), rows))
+	methodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, ListPage(chromeFor(r, user, "/treatments"), rows, methodLabels))
 }
 
 func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *auth.User) {

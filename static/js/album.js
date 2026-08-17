@@ -39,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .filter((c) => c.style.display !== "none")
       .forEach((c) => {
         const key = c.dataset.projectId || "__none__";
-        const title = c.dataset.projectTitle || "No workflow";
+        const title = c.dataset.projectTitle || "No project";
         if (!groups.has(key)) groups.set(key, { title, cards: [] });
         groups.get(key).cards.push(c);
       });

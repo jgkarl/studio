@@ -109,7 +109,7 @@ templ classifierGroupCard(group ClassifierGroup) {
 		</div>
 		<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type)) } class="inline-edit-form">
 			@web.Field("Add option", "") {
-				<input class="input" name="title" required placeholder="e.g. Structural repair"/>
+				<input class="input" name="title" required placeholder="New option name"/>
 			}
 			<button type="submit" class="btn btn-secondary">
 				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>

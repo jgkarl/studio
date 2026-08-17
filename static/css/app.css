@@ -352,36 +352,6 @@ html[data-theme="dark"] .card {
   color: var(--green-text);
 }
 
-.settings-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-
-@media (min-width: 640px) {
-  .settings-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 960px) {
-  .settings-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.settings-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.settings-card-title {
-  font-weight: 500;
-}
-
 .table-wrap {
   overflow-x: auto;
 }
@@ -759,6 +729,8 @@ html[data-theme="dark"] .navbar-icon-btn {
 
 /* --- Dashboard ------------------------------------------------------------------------------ */
 
+/* Mobile-first: 2 columns by default (5 stat cards wrap 2/2/1), 3 at the md breakpoint (3/2,
+   more balanced than a 4-wide grid ever was for 5 items), 5 — one row, no wrapping — at lg. */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -767,9 +739,15 @@ html[data-theme="dark"] .navbar-icon-btn {
   margin-bottom: 2rem;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .stat-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .stat-grid {
+    grid-template-columns: repeat(5, 1fr);
   }
 }
 
@@ -819,7 +797,7 @@ html[data-theme="dark"] .stat-card {
   align-items: start;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
   .report-layout {
     grid-template-columns: 2fr 1fr;
   }
@@ -972,23 +950,6 @@ html[data-theme="dark"] .stat-card {
 
 /* --- Detail pages (Client/Asset/etc.) ------------------------------------------------------ */
 
-.detail-grid {
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-
-@media (min-width: 900px) {
-  .detail-grid {
-    grid-template-columns: 2fr 1fr;
-  }
-}
-
-.detail-main .card + .card {
-  margin-top: 1rem;
-}
-
 .tag-pills {
   display: flex;
   flex-wrap: wrap;
@@ -1057,7 +1018,7 @@ html[data-theme="dark"] .stat-card {
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 560px) {
+@media (min-width: 640px) {
   .form-row-2 {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1363,7 +1324,7 @@ html[data-theme="dark"] .stat-card {
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
   .media-grid {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -1450,9 +1411,11 @@ html[data-theme="dark"] .stat-card {
 
 /* Full-bleed 5-column board (Orders) - breaks out of .container's 1200px max-width to use the
    full viewport instead of horizontal-scrolling fixed-width columns. */
+/* Mobile-first: 1 column by default, 2 at sm (a phone in landscape or a small tablet), 3 at md
+   (tablet portrait — 5 stages wrap 3/2), 5 — one row — at lg and up, where there's finally room. */
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: 1fr;
   align-items: start;
   gap: 1rem;
   width: 100vw;
@@ -1465,15 +1428,21 @@ html[data-theme="dark"] .stat-card {
   box-sizing: border-box;
 }
 
-@media (max-width: 900px) {
+@media (min-width: 640px) {
   .kanban-board {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 560px) {
+@media (min-width: 768px) {
   .kanban-board {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .kanban-board {
+    grid-template-columns: repeat(5, 1fr);
   }
 }
 
