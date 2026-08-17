@@ -38,8 +38,6 @@ func (svc *Service) handleExport(w http.ResponseWriter, r *http.Request, _ *auth
 		doc, err = svc.GetAssetExportData(r.Context(), id)
 	case TypeProject:
 		doc, err = svc.GetProjectExportData(r.Context(), id)
-	case TypeOrder:
-		doc, err = svc.GetOrderExportData(r.Context(), id)
 	case TypeReport:
 		doc, err = svc.GetReportExportData(r.Context(), id)
 	}

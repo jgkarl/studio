@@ -1,5 +1,5 @@
 // Package export builds a flattened, format-agnostic document (Doc) from any of the app's
-// exportable model types (Asset, Project/Workflow, Order, Report) and renders it as either a
+// exportable model types (Asset, Project, Report) and renders it as either a
 // self-contained HTML page (images inlined as base64) or a PDF.
 package export
 
@@ -30,13 +30,12 @@ type Type string
 const (
 	TypeAsset   Type = "asset"
 	TypeProject Type = "project"
-	TypeOrder   Type = "order"
 	TypeReport  Type = "report"
 )
 
 func IsValidType(t string) bool {
 	switch Type(t) {
-	case TypeAsset, TypeProject, TypeOrder, TypeReport:
+	case TypeAsset, TypeProject, TypeReport:
 		return true
 	default:
 		return false

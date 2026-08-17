@@ -68,14 +68,15 @@ See `.env.example` for the full annotated list. The essentials:
 Every boot (native or Docker, dev or production — see `cmd/server/main.go`, right after
 migrations):
 
-- Every Classifier type the app's `<select>` options read from (asset types, materials, condition
-  states, activity types, order/quote/invoice statuses, client types, contact methods) — 115 rows
-  total, idempotent (`INSERT OR IGNORE`), safe to run on every start.
+- Every Classifier type the app's `<select>` options read from (asset types, condition states,
+  activity types [historical — the Activity Notebook they fed is retired], project stages,
+  priority, treatment methods, client types, contact methods), idempotent (`INSERT OR IGNORE`),
+  safe to run on every start.
 - One admin `User`, only if `BOOTSTRAP_ADMIN_NAME`/`BOOTSTRAP_ADMIN_EMAIL` are set and no `User`
   with that email exists yet.
 
 There is deliberately no fictional-demo-data seed (the original TypeScript app's `db/seed.ts` —
-several clients/assets/workflows/reports for exercising every screen immediately). That's dev-only
+several clients/assets/projects/reports for exercising every screen immediately). That's dev-only
 convenience content, not something either local dev or a production deploy strictly needs — every
 entity it would create is reachable through the app's own CRUD forms, which is how `e2e/tests/
 smoke.spec.js` populates a fresh database for its own run.

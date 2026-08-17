@@ -37,14 +37,14 @@ func SetLocale(w http.ResponseWriter, l Locale) {
 }
 
 type NavDict struct {
-	Dashboard, Clients, Assets, Workflows, Orders, Reporter, Album, Settings string
+	Dashboard, Clients, Assets, Treatments, Projects, Reports, Media, Settings string
 }
 
 type DashboardDict struct {
-	Title, Subtitle                                string
-	Clients, Assets, ActiveWorkflows, DraftReports string
-	ActiveWorkflowsHeading, NothingInProgress      string
-	OpenOrdersHeading, NoOpenOrders                string
+	Title, Subtitle                                           string
+	Clients, Assets, Treatments, ActiveProjects, DraftReports string
+	ActiveProjectsHeading, NothingInProgress                  string
+	DraftReportsHeading, NoDraftReports                       string
 }
 
 type CommonDict struct {
@@ -62,14 +62,14 @@ type Dictionary struct {
 var dictionaries = map[Locale]Dictionary{
 	LocaleET: {
 		Nav: NavDict{
-			Dashboard: "Töölaud", Clients: "Kliendid", Assets: "Esemed", Workflows: "Töövood",
-			Orders: "Tellimused", Reporter: "Aruanded", Album: "Album", Settings: "Seaded",
+			Dashboard: "Töölaud", Clients: "Kliendid", Assets: "Esemed", Treatments: "Töötlused", Projects: "Projektid",
+			Reports: "Aruanded", Media: "Meedia", Settings: "Seaded",
 		},
 		Dashboard: DashboardDict{
 			Title: "Töölaud", Subtitle: "Ülevaade käimasolevast tööst.",
-			Clients: "Kliendid", Assets: "Esemed", ActiveWorkflows: "Aktiivsed töövood", DraftReports: "Mustandaruanded",
-			ActiveWorkflowsHeading: "Aktiivsed töövood", NothingInProgress: "Hetkel pole käimasolevaid töid.",
-			OpenOrdersHeading: "Avatud tellimused", NoOpenOrders: "Avatud tellimusi pole.",
+			Clients: "Kliendid", Assets: "Esemed", Treatments: "Töötlused", ActiveProjects: "Aktiivsed projektid", DraftReports: "Mustandaruanded",
+			ActiveProjectsHeading: "Aktiivsed projektid", NothingInProgress: "Hetkel pole käimasolevaid töid.",
+			DraftReportsHeading: "Mustandaruanded", NoDraftReports: "Mustandaruandeid pole.",
 		},
 		Common: CommonDict{
 			SwitchToEnglish: "Switch to English", SwitchToEstonian: "Vaheta eesti keelele",
@@ -79,14 +79,14 @@ var dictionaries = map[Locale]Dictionary{
 	},
 	LocaleEN: {
 		Nav: NavDict{
-			Dashboard: "Dashboard", Clients: "Clients", Assets: "Assets", Workflows: "Workflows",
-			Orders: "Orders", Reporter: "Reporter", Album: "Album", Settings: "Settings",
+			Dashboard: "Dashboard", Clients: "Clients", Assets: "Assets", Treatments: "Treatments", Projects: "Projects",
+			Reports: "Reports", Media: "Media", Settings: "Settings",
 		},
 		Dashboard: DashboardDict{
 			Title: "Dashboard", Subtitle: "An overview of work in progress.",
-			Clients: "Clients", Assets: "Assets", ActiveWorkflows: "Active workflows", DraftReports: "Draft reports",
-			ActiveWorkflowsHeading: "Active workflows", NothingInProgress: "Nothing in progress right now.",
-			OpenOrdersHeading: "Open orders", NoOpenOrders: "No open orders.",
+			Clients: "Clients", Assets: "Assets", Treatments: "Treatments", ActiveProjects: "Active projects", DraftReports: "Draft reports",
+			ActiveProjectsHeading: "Active projects", NothingInProgress: "Nothing in progress right now.",
+			DraftReportsHeading: "Draft reports", NoDraftReports: "No draft reports.",
 		},
 		Common: CommonDict{
 			SwitchToEnglish: "Switch to English", SwitchToEstonian: "Switch to Estonian",

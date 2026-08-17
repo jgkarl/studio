@@ -17,7 +17,7 @@ func (svc *Service) imageTag(ctx context.Context, img Image) string {
 	b64 := base64.StdEncoding.EncodeToString(file.Data)
 	return fmt.Sprintf(`<div style="margin:8px 0;">
     <img src="data:%s;base64,%s" alt="%s" style="max-width:100%%;border-radius:6px;display:block;" />
-    <a href="/album/view/%s" target="_blank" rel="noreferrer" style="font-size:0.8rem;color:#78716c;">🔍 View full resolution</a>
+    <a href="/media/view/%s" target="_blank" rel="noreferrer" style="font-size:0.8rem;color:#78716c;">🔍 View full resolution</a>
   </div>`, file.MimeType, b64, html.EscapeString(img.Caption), img.MediaID)
 }
 

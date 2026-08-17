@@ -28,7 +28,7 @@ templ Alert(tone string) {
 }
 
 // ExportLinks renders the "Export HTML" / "Export PDF" action pair for a detail page — exportType
-// is one of "asset", "project", "order", "report" (internal/export.Type), matching the
+// is one of "asset", "project", "report" (internal/export.Type), matching the
 // /api/export/{type}/{id} route.
 templ ExportLinks(exportType, id string) {
 	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=html") }>
@@ -42,7 +42,7 @@ templ ExportLinks(exportType, id string) {
 }
 
 // OpenBadge renders the small tone badge used everywhere a Project's open/closed status shows up
-// (Asset/Order detail workflow lists, Workflows list/detail) - "Open" while completedAt is unset,
+// (Asset detail workflow lists, Workflows list/detail) - "Open" while completedAt is unset,
 // "Completed" once it's been marked done.
 templ OpenBadge(completed bool) {
 	if completed {

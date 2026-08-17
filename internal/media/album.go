@@ -44,9 +44,8 @@ type refRow struct {
 }
 
 // GetAllMediaWithContext resolves MediaReference's polymorphic target (Activity/AssetState/
-// Report/Asset) down to a concrete Asset/Project/Client via a few batched queries and in-memory
-// joins - same approach as internal/settings' Tag usage aggregation, for the same reason
-// (polymorphic association, no single JOINable FK).
+// Report/Asset/Treatment) down to a concrete Asset/Project/Client via a few batched queries and
+// in-memory joins - there's no single JOINable FK for a polymorphic association like this.
 func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumItem, error) {
 	scanMediaU := func(rows *sql.Rows) (mediaWithUploader, error) {
 		var m mediaWithUploader
@@ -80,7 +79,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 		}
 	}
 
-	var assetStateIDs, activityIDs, reportIDs []string
+	var assetStateIDs, activityIDs, reportIDs, treatmentIDs []string
 	for _, r := range refs {
 		switch r.ReferencingType {
 		case RefAssetState:
@@ -89,6 +88,8 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 			activityIDs = append(activityIDs, r.ReferencingID)
 		case RefReport:
 			reportIDs = append(reportIDs, r.ReferencingID)
+		case RefTreatment:
+			treatmentIDs = append(treatmentIDs, r.ReferencingID)
 		}
 	}
 
@@ -128,6 +129,16 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 	if err != nil {
 		return nil, err
 	}
+	type treatmentRow struct{ ID, AssetID string }
+	treatments, err := queryByIDs(ctx, q, "SELECT id, assetId FROM Treatment", "id", treatmentIDs,
+		func(rows *sql.Rows) (treatmentRow, error) {
+			var t treatmentRow
+			err := rows.Scan(&t.ID, &t.AssetID)
+			return t, err
+		})
+	if err != nil {
+		return nil, err
+	}
 
 	assetStateByID := map[string]assetStateRow{}
 	for _, s := range assetStates {
@@ -140,6 +151,10 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 	reportByID := map[string]reportRow{}
 	for _, r := range reports {
 		reportByID[r.ID] = r
+	}
+	treatmentByID := map[string]treatmentRow{}
+	for _, t := range treatments {
+		treatmentByID[t.ID] = t
 	}
 
 	projectIDSet := map[string]bool{}
@@ -197,6 +212,9 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 	for _, p := range projects {
 		assetIDSet[p.AssetID] = true
 	}
+	for _, t := range treatments {
+		assetIDSet[t.AssetID] = true
+	}
 	var allAssetIDs []string
 	for id := range assetIDSet {
 		allAssetIDs = append(allAssetIDs, id)
@@ -242,6 +260,10 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 				if rep, ok := reportByID[ref.ReferencingID]; ok {
 					aID = rep.AssetID
 					pID = rep.ProjectID.String
+				}
+			case RefTreatment:
+				if t, ok := treatmentByID[ref.ReferencingID]; ok {
+					aID = t.AssetID
 				}
 			}
 		}

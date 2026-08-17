@@ -38,8 +38,8 @@ func TestSeedAllClassifiers(t *testing.T) {
 	// Every classifier type the app's forms depend on must have at least one option, or those
 	// <select> elements render broken/empty — this is the whole point of seeding.
 	types := []string{
-		"client_type", "contact_method", "asset_type", "material", "condition_state",
-		"activity_type", "order_status", "quote_status", "invoice_status",
+		"client_type", "contact_method", "asset_type", "condition_state",
+		"activity_type", "project_stage", "priority", "treatment_method",
 	}
 	for _, typ := range types {
 		n := countRows(t, pool, "SELECT COUNT(*) AS n FROM Classifier WHERE type = ?", typ)

@@ -21,10 +21,6 @@ func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Media, error)
 	return studiodb.QueryOne(ctx, q, "SELECT "+mediaColumns+" FROM Media WHERE id = ?", scanMedia, id)
 }
 
-func ListEditsOf(ctx context.Context, q studiodb.Querier, mediaID string) ([]Media, error) {
-	return studiodb.Query(ctx, q, "SELECT "+mediaColumns+" FROM Media WHERE editedFromId = ?", scanMedia, mediaID)
-}
-
 const referenceColumns = "id, mediaId, referencingType, referencingId, role, sortOrder, createdAt"
 
 func scanReference(rows *sql.Rows) (Reference, error) {

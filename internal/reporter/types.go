@@ -1,11 +1,8 @@
-// Package reporter is the Reporter module: composes the final conservation write-up. The rich
-// text editor is TipTap (vendored per the "vendor libraries with a real framework-agnostic
-// build" decision) - loaded live via an ESM CDN (esm.sh) through a plain <script type=
-// "importmap">, not bundled or downloaded into static/vendor/ like OpenSeadragon. TipTap's own
-// npm packages aren't a single flat browser bundle the way OpenSeadragon's UMD build is -
-// getting one without a real JS bundler (which this project deliberately has none of) isn't
-// practical, so this is the honest middle ground: the genuine TipTap library, zero build step,
-// at the cost of a runtime dependency on esm.sh being reachable. See static/js/report-editor.js.
+// Package reporter is the Reports module: composes the final conservation write-up as five plain
+// structured sections (Summary, Condition findings, Treatment performed, Materials used,
+// Recommendations) plus a customize-layout sidebar (layout style + per-section show/hide,
+// including the cover). The old TipTap rich-text editor is retired — Content still exists on
+// Report (old data, never lost) but new reports don't write to it.
 package reporter
 
 import (
@@ -18,9 +15,24 @@ type Report struct {
 	ProjectID sql.NullString
 	AssetID   string
 	Title     string
-	Content   string // raw TipTap JSON doc, opaque - never decoded server-side except by the outline builder that constructs it
+	Content   string // raw TipTap JSON doc from before the structured-sections rework — opaque, unused by new reports
 	Status    string
 	AuthorID  sql.NullString
+
+	Summary             sql.NullString
+	ConditionFindings   sql.NullString
+	TreatmentPerformed  sql.NullString
+	MaterialsUsed       sql.NullString
+	Recommendations     sql.NullString
+	CoverMediaID        sql.NullString
+	LayoutStyle         string
+	ShowCover           bool
+	ShowSummary         bool
+	ShowCondition       bool
+	ShowTreatment       bool
+	ShowMaterials       bool
+	ShowRecommendations bool
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -44,4 +56,25 @@ type AssetOption struct {
 type ProjectOption struct {
 	ID    string
 	Title string
+}
+
+// SectionsInput is the five structured-section textareas, saved together as one form post.
+type SectionsInput struct {
+	Summary            string
+	ConditionFindings  string
+	TreatmentPerformed string
+	MaterialsUsed      string
+	Recommendations    string
+}
+
+// LayoutInput is the "Customize layout" sidebar: layout style plus per-section visibility.
+type LayoutInput struct {
+	LayoutStyle         string
+	CoverMediaID        string
+	ShowCover           bool
+	ShowSummary         bool
+	ShowCondition       bool
+	ShowTreatment       bool
+	ShowMaterials       bool
+	ShowRecommendations bool
 }

@@ -1,7 +1,7 @@
-// Package media is the Media/Album module: local-disk file storage, upload with a web-sized
-// thumbnail variant (govips), a from-scratch IIIF Image API (region/size/rotation/quality) for
-// the deep-zoom viewer, and the Album gallery (every Media row, annotated with which
-// Asset/Project/Client it belongs to via the polymorphic MediaReference table).
+// Package media is the Media module: local-disk file storage, upload with a web-sized thumbnail
+// variant (govips), a lightbox viewer (rotate + brightness/contrast CSS filters, no server round
+// trip), and the media grid (every Media row, annotated with which Asset/Project/Client it
+// belongs to via the polymorphic MediaReference table).
 package media
 
 import (
@@ -69,6 +69,7 @@ const (
 	RefAssetState ReferencingType = "AssetState"
 	RefReport     ReferencingType = "Report"
 	RefAsset      ReferencingType = "Asset"
+	RefTreatment  ReferencingType = "Treatment"
 )
 
 type Reference struct {

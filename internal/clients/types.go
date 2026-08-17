@@ -1,8 +1,6 @@
-// Package clients is the Client module: profile CRUD plus the polymorphic Tag assignment UI.
-// Assets/Quotes/Orders sections on the detail page query those tables directly (same as the
-// original app's page.tsx, which never imported an assets/commerce domain module either) -
-// their own modules (6, 9) will add the write side; until then those links 404, which is an
-// expected, temporary property of building module by module rather than all at once.
+// Package clients is the Client module: profile CRUD. The Assets section on the detail page
+// queries that table directly (same as the original app's page.tsx, which never imported an
+// assets domain module either).
 package clients
 
 import (
@@ -36,24 +34,10 @@ type ListRow struct {
 	Email      sql.NullString
 	Type       string
 	AssetCount int
-	OrderCount int
 }
 
 type AssetSummary struct {
 	ID            string
 	Title         sql.NullString
 	ReferenceCode string
-}
-
-type QuoteSummary struct {
-	ID            string
-	Status        string
-	TotalEstimate float64
-}
-
-type OrderSummary struct {
-	ID           string
-	OrderNumber  string
-	Status       string
-	InvoiceCount int
 }

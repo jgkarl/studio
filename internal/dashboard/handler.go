@@ -1,7 +1,7 @@
-// Package dashboard is the landing page after sign-in: counts, active workflows, open orders.
-// Queries are inline here (not routed through the Assets/Workflows/Commerce domain packages
-// those modules will add later) - same structure as the original app's dashboard page, which
-// only ever imported the Classifiers label-map helper and otherwise queried directly.
+// Package dashboard is the landing page after sign-in: counts, active workflows, draft reports.
+// Queries are inline here (not routed through the Assets/Workflows domain packages those modules
+// will add later) - same structure as the original app's dashboard page, which only ever imported
+// the Classifiers label-map helper and otherwise queried directly.
 package dashboard
 
 import (
@@ -10,7 +10,6 @@ import (
 
 	"studio/internal/auth"
 	studiodb "studio/internal/db"
-	"studio/internal/settings"
 	"studio/internal/web"
 )
 
@@ -35,14 +34,16 @@ func scanActiveProject(rows *sql.Rows) (activeProject, error) {
 	return p, err
 }
 
-type openOrder struct {
-	ID, OrderNumber, Status, ClientName string
+type draftReport struct {
+	ID, Title, AssetTitle, AssetReferenceCode string
 }
 
-func scanOpenOrder(rows *sql.Rows) (openOrder, error) {
-	var o openOrder
-	err := rows.Scan(&o.ID, &o.OrderNumber, &o.Status, &o.ClientName)
-	return o, err
+func scanDraftReport(rows *sql.Rows) (draftReport, error) {
+	var rep draftReport
+	var assetTitle sql.NullString
+	err := rows.Scan(&rep.ID, &rep.Title, &assetTitle, &rep.AssetReferenceCode)
+	rep.AssetTitle = assetTitle.String
+	return rep, err
 }
 
 func scanCount(rows *sql.Rows) (int, error) {
@@ -64,33 +65,33 @@ func (svc *Service) handleIndex(w http.ResponseWriter, r *http.Request, user *au
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	treatmentCount, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Treatment", scanCount)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	activeProjects, err := studiodb.Query(ctx, svc.Pool,
 		`SELECT p.id, p.title, a.title, a.referenceCode FROM Project p JOIN Asset a ON a.id = p.assetId
-		 WHERE p.completedAt IS NULL ORDER BY p.updatedAt DESC LIMIT 6`, scanActiveProject)
+		 WHERE p.stage != 'completed' ORDER BY p.updatedAt DESC LIMIT 6`, scanActiveProject)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	openOrders, err := studiodb.Query(ctx, svc.Pool, `
-		SELECT o.id, o.orderNumber, o.status, c.name FROM "Order" o JOIN Client c ON c.id = o.clientId
-		WHERE o.status NOT IN ('completed', 'archived') ORDER BY o.updatedAt DESC LIMIT 6`, scanOpenOrder)
+	draftReportRows, err := studiodb.Query(ctx, svc.Pool, `
+		SELECT r.id, r.title, a.title, a.referenceCode FROM Report r JOIN Asset a ON a.id = r.assetId
+		WHERE r.status = 'draft' ORDER BY r.updatedAt DESC LIMIT 6`, scanDraftReport)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	draftReports, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Report WHERE status = ?", scanCount, "draft")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	orderStatusLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierOrderStatus)
+	draftReportCount, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Report WHERE status = ?", scanCount, "draft")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	chrome := web.BuildChrome(r, user.Name, string(user.Role), user.HasRole(auth.RoleAdmin), "/")
-	page := Page(chrome, deref(clientCount), deref(assetCount), activeProjects, openOrders, deref(draftReports), orderStatusLabels)
+	page := Page(chrome, deref(clientCount), deref(assetCount), deref(treatmentCount), activeProjects, draftReportRows, deref(draftReportCount))
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = page.Render(ctx, w)

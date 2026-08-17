@@ -9,6 +9,7 @@ import (
 	"studio/internal/media"
 	"studio/internal/reporter"
 	"studio/internal/settings"
+	"studio/internal/treatments"
 	"studio/internal/web"
 )
 
@@ -81,11 +82,11 @@ templ newAssetLink() {
 	</a>
 }
 
-templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes, materials []settings.Classifier, preselectedClientID string) {
-	@web.AppLayout("New asset", c, newBody(allClients, assetTypes, materials, preselectedClientID))
+templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string) {
+	@web.AppLayout("New asset", c, newBody(allClients, assetTypes, preselectedClientID))
 }
 
-templ newBody(allClients []clients.Client, assetTypes, materials []settings.Classifier, preselectedClientID string) {
+templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string) {
 	@web.PageHeader("New asset", "", templ.NopComponent)
 	@web.Card() {
 		<form method="post" action="/assets" enctype="multipart/form-data" class="form-grid">
@@ -161,19 +162,6 @@ templ newBody(allClients []clients.Client, assetTypes, materials []settings.Clas
 			@web.Field("Location in studio", "") {
 				<input class="input" name="locationInStudio" placeholder="e.g. Shelf B3, Wet Room"/>
 			}
-			@web.Field("Materials", "") {
-				<div class="checkbox-grid">
-					for _, m := range materials {
-						<label class="checkbox-field">
-							<input type="checkbox" name="materialIds" value={ m.ID }/>
-							{ m.Title }
-						</label>
-					}
-				</div>
-			}
-			@web.Field("Tags", "comma-separated") {
-				<input class="input" name="tags" placeholder="oil painting, urgent, restoration"/>
-			}
 			<div class="form-section">
 				<p class="form-section-title">Intake condition</p>
 				@web.Field("Notes", "") {
@@ -188,17 +176,17 @@ templ newBody(allClients []clients.Client, assetTypes, materials []settings.Clas
 	}
 }
 
-templ DetailPage(c web.Chrome, asset Asset, client *clients.Client, assetType *settings.Classifier, materials []Material,
-	availableMaterials []settings.Classifier, states []State, projects []ProjectSummary, tagAssignments []settings.TagAssignment,
+templ DetailPage(c web.Chrome, asset Asset, client *clients.Client, assetType *settings.Classifier,
+	states []State, projects []ProjectSummary,
 	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia,
-	reports []reporter.ListRow) {
-	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, materials, availableMaterials, states, projects, tagAssignments, conditions, conditionByCode, stateMedia, reports))
+	reports []reporter.ListRow, assetTreatments []treatments.ListRow) {
+	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, states, projects, conditions, conditionByCode, stateMedia, reports, assetTreatments))
 }
 
-templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classifier, materials []Material,
-	availableMaterials []settings.Classifier, states []State, projects []ProjectSummary, tagAssignments []settings.TagAssignment,
+templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classifier,
+	states []State, projects []ProjectSummary,
 	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia,
-	reports []reporter.ListRow) {
+	reports []reporter.ListRow, assetTreatments []treatments.ListRow) {
 	@web.PageHeader(asset.DisplayName(), assetSubtitle(asset, client, assetType), assetActions(asset))
 
 	@web.Card() {
@@ -222,74 +210,6 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 			<p class="detail-paragraph"><strong>Provenance:</strong> { asset.Provenance.String }</p>
 		}
 
-		<div class="subsection">
-			<h3 class="subsection-heading">Materials</h3>
-			if len(materials) > 0 {
-				<div class="tag-pills">
-					for _, m := range materials {
-						<span class="tag-pill tag-pill-neutral">
-							{ m.Title }
-							if m.Role.Valid {
-								<span class="page-subtitle">({ m.Role.String })</span>
-							}
-							<form method="post" action={ templ.URL("/assets/" + asset.ID + "/materials/" + m.ID + "/delete") } data-confirm={ "Remove material \"" + m.Title + "\"?" }>
-								<button type="submit" class="tag-pill-remove" aria-label="Remove material">
-									<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
-								</button>
-							</form>
-						</span>
-					}
-				</div>
-			}
-			if len(availableMaterials) > 0 {
-				<form method="post" action={ templ.URL("/assets/" + asset.ID + "/materials") } class="inline-edit-form">
-					<div class="inline-edit-grid">
-						@web.Field("Material", "") {
-							<select class="input" name="materialId" required>
-								<option value="" disabled selected>Select…</option>
-								for _, m := range availableMaterials {
-									<option value={ m.ID }>{ m.Title }</option>
-								}
-							</select>
-						}
-						@web.Field("Role", "optional, e.g. support/frame") {
-							<input class="input" name="role"/>
-						}
-					</div>
-					<button type="submit" class="btn btn-secondary">
-						<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-						Add material
-					</button>
-				</form>
-			}
-		</div>
-
-		<div class="subsection">
-			<h3 class="subsection-heading">Tags</h3>
-			if len(tagAssignments) > 0 {
-				<div class="tag-pills">
-					for _, a := range tagAssignments {
-						<span class="tag-pill">
-							#{ a.Tag.Name }
-							<form method="post" action={ templ.URL("/assets/" + asset.ID + "/tags/" + a.AssignmentID + "/delete") } data-confirm={ "Remove tag \"" + a.Tag.Name + "\"?" }>
-								<button type="submit" class="tag-pill-remove" aria-label="Remove tag">
-									<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
-								</button>
-							</form>
-						</span>
-					}
-				</div>
-			}
-			<form method="post" action={ templ.URL("/assets/" + asset.ID + "/tags") } class="inline-edit-form">
-				@web.Field("Tag name", "") {
-					<input class="input" name="name" required placeholder="e.g. urgent"/>
-				}
-				<button type="submit" class="btn btn-secondary">
-					<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-					Add tag
-				</button>
-			</form>
-		</div>
 	}
 
 	@web.Card() {
@@ -341,6 +261,30 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 	}
 
 	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Treatments</h2>
+			<a class="btn btn-secondary" href={ templ.URL("/treatments/new?assetId=" + asset.ID) }>
+				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+				Log treatment
+			</a>
+		</div>
+		if len(assetTreatments) == 0 {
+			<p class="empty-state">No treatments logged yet.</p>
+		}
+		<ul class="entity-list">
+			for _, t := range assetTreatments {
+				<li class="entity-list-row">
+					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
+					<div class="row-actions">
+						<span class="badge">{ t.Method }</span>
+						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+					</div>
+				</li>
+			}
+		</ul>
+	}
+
+	@web.Card() {
 		<h2 class="dashboard-heading">Reports</h2>
 		if len(reports) == 0 {
 			<p class="empty-state">No reports yet for this object.</p>
@@ -348,7 +292,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 		<ul class="entity-list">
 			for _, rep := range reports {
 				<li class="entity-list-row">
-					<a href={ templ.URL("/reporter/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
+					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
 					<span class="badge">{ rep.Status }</span>
 				</li>
 			}
@@ -373,24 +317,17 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 	}
 
 	@web.Card() {
-		<h2 class="dashboard-heading">Workflows on this asset</h2>
+		<h2 class="dashboard-heading">Projects on this asset</h2>
 		if len(projects) == 0 {
-			<p class="empty-state">No workflows yet.</p>
+			<p class="empty-state">No projects yet.</p>
 		}
 		<ul class="entity-list">
 			for _, p := range projects {
 				<li class="entity-list-row">
 					<div>
-						<a href={ templ.URL("/workflows/" + p.ID) } class="entity-list-name">{ p.Title }</a>
-						<div class="page-subtitle">
-							if p.OrderNumber.Valid {
-								order { p.OrderNumber.String }
-							} else {
-								no order yet
-							}
-						</div>
+						<a href={ templ.URL("/projects/" + p.ID) } class="entity-list-name">{ p.Title }</a>
 					</div>
-					@web.OpenBadge(p.CompletedAt.Valid)
+					@web.OpenBadge(p.Stage == "completed")
 				</li>
 			}
 		</ul>
@@ -487,9 +424,9 @@ templ assetActions(asset Asset) {
 		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
 		Edit
 	</a>
-	<a class="btn btn-secondary" href={ templ.URL("/workflows/new?assetId=" + asset.ID) }>
+	<a class="btn btn-secondary" href={ templ.URL("/projects/new?assetId=" + asset.ID) }>
 		<img src="/static/icons/history.svg" width="14" height="14" alt="" class="icon"/>
-		Start workflow
+		Start project
 	</a>
 	@web.ExportLinks("asset", asset.ID)
 }

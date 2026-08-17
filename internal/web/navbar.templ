@@ -16,10 +16,10 @@ func navItems(c Chrome) []navItem {
 		{"/", c.Dict.Nav.Dashboard, "home"},
 		{"/clients", c.Dict.Nav.Clients, "people"},
 		{"/assets", c.Dict.Nav.Assets, "folder"},
-		{"/workflows", c.Dict.Nav.Workflows, "history"},
-		{"/clients/orders", c.Dict.Nav.Orders, ""},
-		{"/reporter", c.Dict.Nav.Reporter, "description"},
-		{"/album", c.Dict.Nav.Album, "image"},
+		{"/treatments", c.Dict.Nav.Treatments, "check-circle"},
+		{"/projects", c.Dict.Nav.Projects, "history"},
+		{"/reports", c.Dict.Nav.Reports, "description"},
+		{"/media", c.Dict.Nav.Media, "image"},
 	}
 	if c.ShowSettings {
 		items = append(items, navItem{"/settings", c.Dict.Nav.Settings, ""})

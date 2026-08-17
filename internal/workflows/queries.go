@@ -8,11 +8,11 @@ import (
 	studiodb "studio/internal/db"
 )
 
-const projectColumns = "id, orderId, assetId, title, assignedToUserId, startedAt, completedAt, createdAt, updatedAt"
+const projectColumns = "id, assetId, title, stage, priority, targetReviewDate, assignedToUserId, startedAt, completedAt, createdAt, updatedAt"
 
 func scanProject(rows *sql.Rows) (Project, error) {
 	var p Project
-	err := rows.Scan(&p.ID, &p.OrderID, &p.AssetID, &p.Title, &p.AssignedToUserID,
+	err := rows.Scan(&p.ID, &p.AssetID, &p.Title, &p.Stage, &p.Priority, &p.TargetReviewDate, &p.AssignedToUserID,
 		&p.StartedAt, &p.CompletedAt, &p.CreatedAt, &p.UpdatedAt)
 	return p, err
 }
@@ -23,20 +23,19 @@ func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Project, erro
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
-	err := rows.Scan(&r.ID, &r.Title, &r.CompletedAt, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName, &r.OrderNumber)
+	err := rows.Scan(&r.ID, &r.Title, &r.Stage, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName)
 	return r, err
 }
 
-// List orders open workflows first (completedAt IS NULL sorts before non-NULL), newest-updated
-// within each group.
+// List is every Project, newest-updated first — the kanban board groups these client-side by
+// Stage (see views.templ).
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT p.id, p.title, p.completedAt, a.title, a.referenceCode, c.name, o.orderNumber
+		SELECT p.id, p.title, p.stage, a.title, a.referenceCode, c.name
 		FROM Project p
 		JOIN Asset a ON a.id = p.assetId
 		JOIN Client c ON c.id = a.clientId
-		LEFT JOIN "Order" o ON o.id = p.orderId
-		ORDER BY (p.completedAt IS NOT NULL), p.updatedAt DESC`, scanListRow)
+		ORDER BY p.updatedAt DESC`, scanListRow)
 }
 
 func scanAssetOption(rows *sql.Rows) (AssetOption, error) {
@@ -62,12 +61,19 @@ func Create(ctx context.Context, q studiodb.Querier, assetID, title string) (str
 	return id, err
 }
 
-// CompleteProject marks a Project done - idempotent, only ever sets completedAt once.
-func CompleteProject(ctx context.Context, q studiodb.Querier, id string) error {
+// SetStage moves a Project to a new project_stage Classifier code — the kanban drag-and-drop
+// handler and the detail page's stage-advance control both call this. Reaching "completed" also
+// stamps completedAt once (COALESCE, never overwritten); moving off "completed" again doesn't
+// clear it — CompletedAt is a historical timestamp only, Stage is what open/closed reads.
+func SetStage(ctx context.Context, q studiodb.Querier, id, stage string) error {
 	now := time.Now()
-	_, err := studiodb.Execute(ctx, q,
-		"UPDATE Project SET completedAt = COALESCE(completedAt, ?), updatedAt = ? WHERE id = ?",
-		now, now, id)
+	if stage == "completed" {
+		_, err := studiodb.Execute(ctx, q,
+			"UPDATE Project SET stage = ?, completedAt = COALESCE(completedAt, ?), updatedAt = ? WHERE id = ?",
+			stage, now, now, id)
+		return err
+	}
+	_, err := studiodb.Execute(ctx, q, "UPDATE Project SET stage = ?, updatedAt = ? WHERE id = ?", stage, now, id)
 	return err
 }
 
@@ -77,6 +83,9 @@ func scanActivity(rows *sql.Rows) (Activity, error) {
 	return a, err
 }
 
+// ListActivities is historical Notebook data (activity logging is retired — Treatments is now
+// the sole way to record conservation work — but any rows a pre-retirement database already has
+// still render here, in the project export).
 func ListActivities(ctx context.Context, q studiodb.Querier, projectID string) ([]Activity, error) {
 	return studiodb.Query(ctx, q, `
 		SELECT a.id, a.description, a.startedAt, a.durationMinutes, c.title, u.name
@@ -84,21 +93,4 @@ func ListActivities(ctx context.Context, q studiodb.Querier, projectID string) (
 		JOIN Classifier c ON c.id = a.activityTypeId
 		JOIN User u ON u.id = a.userId
 		WHERE a.projectId = ? ORDER BY a.startedAt DESC`, scanActivity, projectID)
-}
-
-type LogActivityInput struct {
-	ActivityTypeID  string
-	UserID          string
-	Description     string
-	StartedAt       time.Time
-	DurationMinutes any // int or nil
-	MaterialsUsed   any // JSON text or nil
-}
-
-func LogActivity(ctx context.Context, q studiodb.Querier, projectID string, in LogActivityInput) (string, error) {
-	id := studiodb.NewID()
-	_, err := studiodb.Execute(ctx, q,
-		"INSERT INTO Activity (id, projectId, activityTypeId, userId, description, startedAt, durationMinutes, materialsUsed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		id, projectID, in.ActivityTypeID, in.UserID, in.Description, in.StartedAt, in.DurationMinutes, in.MaterialsUsed)
-	return id, err
 }

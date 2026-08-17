@@ -2,8 +2,6 @@ package reporter
 
 import (
 	"database/sql"
-	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 
@@ -21,14 +19,14 @@ type Service struct {
 }
 
 func Mount(mux *http.ServeMux, svc *Service) {
-	mux.HandleFunc("GET /reporter", svc.Auth.RequireUser(svc.handleList))
-	mux.HandleFunc("GET /reporter/new", svc.Auth.RequireUser(svc.handleNewForm))
-	mux.HandleFunc("POST /reporter", svc.Auth.RequireUser(svc.handleCreate))
-	mux.HandleFunc("GET /reporter/{id}", svc.Auth.RequireUser(svc.handleDetail))
-	mux.HandleFunc("POST /reporter/{id}/content", svc.Auth.RequireUser(svc.handleSaveContent))
-	mux.HandleFunc("POST /reporter/{id}/status", svc.Auth.RequireUser(svc.handleSetStatus))
-	mux.HandleFunc("POST /reporter/{id}/image", svc.Auth.RequireUser(svc.handleUploadImage))
-	mux.HandleFunc("POST /reporter/{id}/attachments", svc.Auth.RequireUser(svc.handleAddAttachments))
+	mux.HandleFunc("GET /reports", svc.Auth.RequireUser(svc.handleList))
+	mux.HandleFunc("GET /reports/new", svc.Auth.RequireUser(svc.handleNewForm))
+	mux.HandleFunc("POST /reports", svc.Auth.RequireUser(svc.handleCreate))
+	mux.HandleFunc("GET /reports/{id}", svc.Auth.RequireUser(svc.handleDetail))
+	mux.HandleFunc("POST /reports/{id}/sections", svc.Auth.RequireUser(svc.handleUpdateSections))
+	mux.HandleFunc("POST /reports/{id}/layout", svc.Auth.RequireUser(svc.handleUpdateLayout))
+	mux.HandleFunc("POST /reports/{id}/status", svc.Auth.RequireUser(svc.handleSetStatus))
+	mux.HandleFunc("POST /reports/{id}/attachments", svc.Auth.RequireUser(svc.handleAddAttachments))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -46,7 +44,7 @@ func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *aut
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, ListPage(chromeFor(r, user, "/reporter"), rows))
+	writeHTML(w, r, ListPage(chromeFor(r, user, "/reports"), rows))
 }
 
 func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -61,7 +59,7 @@ func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, NewPage(chromeFor(r, user, "/reporter"), assets, projects,
+	writeHTML(w, r, NewPage(chromeFor(r, user, "/reports"), assets, projects,
 		r.URL.Query().Get("assetId"), r.URL.Query().Get("projectId")))
 }
 
@@ -78,25 +76,21 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 		return
 	}
 	var projectID *string
-	var content string
 	if raw := r.FormValue("projectId"); raw != "" {
 		projectID = &raw
-		outline, err := BuildSuggestedOutline(ctx, svc.Pool, raw)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		content = outline
-	} else {
-		content = emptyDoc()
 	}
-
-	id, err := Create(ctx, svc.Pool, assetID, projectID, title, content, user.ID)
+	sections, err := BuildSuggestedOutline(ctx, svc.Pool, assetID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/reporter/"+id, http.StatusSeeOther)
+
+	id, err := Create(ctx, svc.Pool, assetID, projectID, title, user.ID, sections)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
 }
 
 func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -116,24 +110,53 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, DetailPage(chromeFor(r, user, "/reporter"), *report, refs))
+	writeHTML(w, r, DetailPage(chromeFor(r, user, "/reports"), *report, refs))
 }
 
-func (svc *Service) handleSaveContent(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	body, err := io.ReadAll(io.LimitReader(r.Body, 5<<20))
-	if err != nil {
-		http.Error(w, "bad body", http.StatusBadRequest)
+func (svc *Service) handleUpdateSections(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	if !json.Valid(body) {
-		http.Error(w, "Content must be valid JSON.", http.StatusBadRequest)
-		return
+	in := SectionsInput{
+		Summary:            strings.TrimSpace(r.FormValue("summary")),
+		ConditionFindings:  strings.TrimSpace(r.FormValue("conditionFindings")),
+		TreatmentPerformed: strings.TrimSpace(r.FormValue("treatmentPerformed")),
+		MaterialsUsed:      strings.TrimSpace(r.FormValue("materialsUsed")),
+		Recommendations:    strings.TrimSpace(r.FormValue("recommendations")),
 	}
-	if err := SaveContent(r.Context(), svc.Pool, r.PathValue("id"), string(body)); err != nil {
+	id := r.PathValue("id")
+	if err := UpdateSections(r.Context(), svc.Pool, id, in); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
+}
+
+func (svc *Service) handleUpdateLayout(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	in := LayoutInput{
+		LayoutStyle:         r.FormValue("layoutStyle"),
+		CoverMediaID:        r.FormValue("coverMediaId"),
+		ShowCover:           r.FormValue("showCover") == "on",
+		ShowSummary:         r.FormValue("showSummary") == "on",
+		ShowCondition:       r.FormValue("showCondition") == "on",
+		ShowTreatment:       r.FormValue("showTreatment") == "on",
+		ShowMaterials:       r.FormValue("showMaterials") == "on",
+		ShowRecommendations: r.FormValue("showRecommendations") == "on",
+	}
+	if in.LayoutStyle == "" {
+		in.LayoutStyle = "standard"
+	}
+	id := r.PathValue("id")
+	if err := UpdateLayout(r.Context(), svc.Pool, id, in); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
 }
 
 func (svc *Service) handleSetStatus(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -151,29 +174,7 @@ func (svc *Service) handleSetStatus(w http.ResponseWriter, r *http.Request, user
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/reporter/"+id, http.StatusSeeOther)
-}
-
-// handleUploadImage backs the editor toolbar's inline-image button - uploads one image and
-// returns its servable URL as JSON, for the JS side to insert into the document at the cursor.
-func (svc *Service) handleUploadImage(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	id := r.PathValue("id")
-	files := media.FilesFromForm(r, "file")
-	if len(files) == 0 {
-		http.Error(w, "No file provided.", http.StatusBadRequest)
-		return
-	}
-	m, err := svc.Media.UploadAndAttach(r.Context(), files[0], user.ID, media.RefReport, id, "report_embed")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"mediaId": m.ID, "url": "/api/media/" + m.ID})
+	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
 }
 
 func (svc *Service) handleAddAttachments(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -186,5 +187,5 @@ func (svc *Service) handleAddAttachments(w http.ResponseWriter, r *http.Request,
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/reporter/"+id, http.StatusSeeOther)
+	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
 }

@@ -13,7 +13,7 @@ templ ListPage(c web.Chrome, rows []ListRow, typeLabels map[string]string) {
 }
 
 templ listBody(rows []ListRow, typeLabels map[string]string) {
-	@web.PageHeader("Clients", "Every client, with their assets and orders at a glance.", newClientLink())
+	@web.PageHeader("Clients", "Every client, with their assets at a glance.", newClientLink())
 	@web.Card() {
 		if len(rows) == 0 {
 			<p class="empty-state">No clients yet.</p>
@@ -36,7 +36,6 @@ templ listBody(rows []ListRow, typeLabels map[string]string) {
 						<div class="row-actions">
 							<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
 							<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
-							<span class="page-subtitle">{ strconv.Itoa(row.OrderCount) } orders</span>
 						</div>
 						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
 					</a>
@@ -151,11 +150,11 @@ templ newBody(clientTypes, contactMethods []settings.Classifier) {
 	}
 }
 
-templ DetailPage(c web.Chrome, client Client, typeLabel string, assets []AssetSummary, quotes []QuoteSummary, orders []OrderSummary, clientTypes, contactMethods []settings.Classifier, tagAssignments []settings.TagAssignment) {
-	@web.AppLayout(client.Name, c, detailBody(client, typeLabel, assets, quotes, orders, clientTypes, contactMethods, tagAssignments))
+templ DetailPage(c web.Chrome, client Client, typeLabel string, assets []AssetSummary, clientTypes, contactMethods []settings.Classifier) {
+	@web.AppLayout(client.Name, c, detailBody(client, typeLabel, assets, clientTypes, contactMethods))
 }
 
-templ detailBody(client Client, typeLabel string, assets []AssetSummary, quotes []QuoteSummary, orders []OrderSummary, clientTypes, contactMethods []settings.Classifier, tagAssignments []settings.TagAssignment) {
+templ detailBody(client Client, typeLabel string, assets []AssetSummary, clientTypes, contactMethods []settings.Classifier) {
 	@web.PageHeader(client.Name, detailSubtitle(client, typeLabel), clientActions(client))
 	@web.Card() {
 		<div class="card-header-row">
@@ -179,72 +178,6 @@ templ detailBody(client Client, typeLabel string, assets []AssetSummary, quotes 
 						}
 					</a>
 					<span class="page-subtitle">{ a.ReferenceCode }</span>
-				</li>
-			}
-		</ul>
-	}
-
-	@web.Card() {
-		<div class="card-header-row">
-			<h2 class="dashboard-heading">Quotes</h2>
-			<a class="btn btn-secondary" href={ templ.URL("/clients/quotes/new?clientId=" + client.ID) }>
-				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-				New quote
-			</a>
-		</div>
-		if len(quotes) == 0 {
-			<p class="empty-state">No quotes yet.</p>
-		}
-		<ul class="entity-list">
-			for _, q := range quotes {
-				<li class="entity-list-row">
-					<a href={ templ.URL("/clients/quotes/" + q.ID) }>Quote — { strconv.FormatFloat(q.TotalEstimate, 'f', 2, 64) }</a>
-					<span class={ "badge", templ.KV("badge-green", q.Status == "accepted") }>{ q.Status }</span>
-				</li>
-			}
-		</ul>
-	}
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Tags</h2>
-		if len(tagAssignments) > 0 {
-			<div class="tag-pills">
-				for _, a := range tagAssignments {
-					<span class="tag-pill">
-						#{ a.Tag.Name }
-						<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags/" + a.AssignmentID + "/delete") } data-confirm={ "Remove tag \"" + a.Tag.Name + "\"?" }>
-							<button type="submit" class="tag-pill-remove" aria-label="Remove tag">
-								<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
-							</button>
-						</form>
-					</span>
-				}
-			</div>
-		}
-		<form method="post" action={ templ.URL("/clients/" + client.ID + "/tags") } class="inline-edit-form">
-			@web.Field("Tag name", "") {
-				<input class="input" name="name" required placeholder="e.g. vip"/>
-			}
-			<button type="submit" class="btn btn-secondary">
-				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-				Add tag
-			</button>
-		</form>
-	}
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Orders</h2>
-		if len(orders) == 0 {
-			<p class="empty-state">No orders yet.</p>
-		}
-		<ul class="entity-list">
-			for _, o := range orders {
-				<li class="entity-list-row">
-					<div>
-						<a href={ templ.URL("/clients/orders/" + o.ID) }>{ o.OrderNumber }</a>
-						<div class="page-subtitle">{ strconv.Itoa(o.InvoiceCount) } invoice(s)</div>
-					</div>
-					<span class="badge badge-blue">{ o.Status }</span>
 				</li>
 			}
 		</ul>

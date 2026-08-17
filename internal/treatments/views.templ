@@ -1,0 +1,155 @@
+package treatments
+
+import (
+	"studio/internal/media"
+	"studio/internal/settings"
+	"studio/internal/web"
+)
+
+templ ListPage(c web.Chrome, rows []ListRow) {
+	@web.AppLayout("Treatments", c, listBody(rows))
+}
+
+templ listBody(rows []ListRow) {
+	@web.PageHeader("Treatments", "Conservation work performed, per object.", newTreatmentLink())
+	@web.Card() {
+		if len(rows) == 0 {
+			<p class="empty-state">No treatments logged yet.</p>
+		}
+		<ul class="entity-list">
+			for _, row := range rows {
+				<li>
+					<a href={ templ.URL("/treatments/" + row.ID) } class="entity-list-row">
+						<div>
+							<span class="entity-list-name">{ row.Title }</span>
+							<div class="page-subtitle">
+								if row.AssetTitle.Valid {
+									{ row.AssetTitle.String }
+								} else {
+									{ row.AssetReferenceCode }
+								}
+								· owner: { row.ClientName }
+							</div>
+						</div>
+						<div class="row-actions">
+							<span class="badge">{ row.Method }</span>
+							<span class="page-subtitle">{ row.PerformedAt.Format("2006-01-02") }</span>
+						</div>
+					</a>
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ newTreatmentLink() {
+	<a class="btn btn-primary" href="/treatments/new">
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		New treatment
+	</a>
+}
+
+templ NewPage(c web.Chrome, options []AssetOption, methods []settings.Classifier, preselectedAssetID string) {
+	@web.AppLayout("New treatment", c, newBody(options, methods, preselectedAssetID))
+}
+
+templ newBody(options []AssetOption, methods []settings.Classifier, preselectedAssetID string) {
+	@web.PageHeader("New treatment", "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action="/treatments" enctype="multipart/form-data" class="form-grid">
+			@web.Field("Asset", "") {
+				<select class="input" name="assetId" required>
+					<option value="" disabled selected?={ preselectedAssetID == "" }>Select an asset…</option>
+					for _, a := range options {
+						<option value={ a.ID } selected?={ a.ID == preselectedAssetID }>{ assetOptionLabel(a) }</option>
+					}
+				</select>
+			}
+			@web.Field("Method", "") {
+				<select class="input" name="method" required>
+					<option value="" disabled selected>Select…</option>
+					for _, m := range methods {
+						<option value={ m.Code }>{ m.Title }</option>
+					}
+				</select>
+			}
+			@web.Field("Title", "e.g. \"Surface cleaning — lower right quadrant\"") {
+				<input class="input" name="title" required/>
+			}
+			@web.Field("Notes", "") {
+				<textarea class="input" name="notes" rows="4" required></textarea>
+			}
+			@web.Field("Performed at", "") {
+				<input class="input" type="datetime-local" name="performedAt"/>
+			}
+			@web.Field("Photos", "On a phone this opens your camera directly.") {
+				<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+			}
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Log treatment
+			</button>
+		</form>
+	}
+}
+
+func assetOptionLabel(a AssetOption) string {
+	name := a.ReferenceCode
+	if a.Title.Valid && a.Title.String != "" {
+		name = a.Title.String
+	}
+	return name + " — " + a.ClientName
+}
+
+templ DetailPage(c web.Chrome, treatment DetailRow, methodLabels map[string]string, performedByName string, photos []media.ReferenceWithMedia) {
+	@web.AppLayout(treatment.Title, c, detailBody(treatment, methodLabels, performedByName, photos))
+}
+
+templ detailBody(treatment DetailRow, methodLabels map[string]string, performedByName string, photos []media.ReferenceWithMedia) {
+	@web.PageHeader(treatment.Title, detailSubtitle(treatment), detailActions(treatment))
+
+	@web.Card() {
+		<dl class="detail-dl">
+			@detailField("Method", methodLabel(methodLabels, treatment.Method))
+			@detailField("Performed at", treatment.PerformedAt.Format("2006-01-02 15:04"))
+			@detailField("Performed by", performedByName)
+		</dl>
+		<p class="detail-paragraph">{ treatment.Notes }</p>
+		@media.MediaGrid(photos)
+	}
+}
+
+templ detailField(label, value string) {
+	<div>
+		<dt class="detail-dt">{ label }</dt>
+		<dd class="detail-dd">
+			if value == "" {
+				—
+			} else {
+				{ value }
+			}
+		</dd>
+	</div>
+}
+
+func methodLabel(labels map[string]string, code string) string {
+	if label, ok := labels[code]; ok {
+		return label
+	}
+	return code
+}
+
+templ detailActions(treatment DetailRow) {
+	<a class="btn btn-ghost" href={ templ.URL("/assets/" + treatment.AssetID) }>
+		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+		View asset
+	</a>
+}
+
+func detailSubtitle(treatment DetailRow) string {
+	assetName := treatment.AssetReferenceCode
+	if treatment.AssetTitle.Valid && treatment.AssetTitle.String != "" {
+		assetName = treatment.AssetTitle.String
+	}
+	return assetName + " · owner: " + treatment.ClientName
+}

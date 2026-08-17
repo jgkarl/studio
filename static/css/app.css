@@ -812,6 +812,19 @@ html[data-theme="dark"] .stat-card {
   }
 }
 
+.report-layout {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .report-layout {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
 .dashboard-heading {
   margin: 0 0 0.75rem;
   font-family: var(--font-heading);
@@ -1235,26 +1248,99 @@ html[data-theme="dark"] .stat-card {
   text-overflow: ellipsis;
 }
 
-/* --- IIIF deep-zoom viewer + video --------------------------------------------------------- */
+/* --- Media view image + lightbox + video --------------------------------------------------- */
 
-.iiif-viewer {
-  height: 45vh;
+.lightbox-trigger {
+  display: block;
   width: 100%;
-  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.lightbox-trigger img {
+  display: block;
+  max-height: 60vh;
+  width: 100%;
+  object-fit: contain;
   border-radius: 0.5rem;
   background: #1c1917;
 }
 
-@media (min-width: 640px) {
-  .iiif-viewer {
-    height: 60vh;
-  }
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.85);
 }
 
-@media (min-width: 1024px) {
-  .iiif-viewer {
-    height: 70vh;
-  }
+.lightbox-overlay:not([hidden]) {
+  display: flex;
+}
+
+.lightbox-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 90vw;
+  max-height: 90vh;
+  width: 100%;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.lightbox-image-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.lightbox-image {
+  max-width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  transition: transform 0.15s ease;
+}
+
+.lightbox-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lightbox-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.lightbox-slider-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
 }
 
 .media-view-video {

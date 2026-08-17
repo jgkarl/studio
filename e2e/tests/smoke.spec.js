@@ -1,15 +1,16 @@
 // End-to-end walk through the app's golden path, module by module, against a live server
 // (Docker container running the real Debian/libvips build — see e2e/README.md). Serial: each
-// step builds on state the previous one created (client -> asset -> workflow -> order -> report),
-// same as a real conservator's session would. Screenshots land in docs/screenshots/, numbered in
-// the order a first-time user would actually see these pages.
+// step builds on state the previous one created (client -> asset -> treatment -> project ->
+// report), same as a real conservator's session would. Screenshots land in docs/screenshots/,
+// numbered in the order a first-time user would actually see these pages.
 const { test, expect } = require("@playwright/test");
 const path = require("path");
 
 const SCREENSHOT_DIR = path.join(__dirname, "..", "..", "docs", "screenshots");
+const TEST_PHOTO = path.join(__dirname, "..", "fixtures", "test-photo.png");
 // The dev-login picker shows each user's name + role (not email — see internal/auth/views.templ's
-// devLoginList), while Settings -> Users shows the email — set both via BOOTSTRAP_ADMIN_NAME/
-// BOOTSTRAP_ADMIN_EMAIL when starting the server for this suite.
+// devLoginList), while Settings shows the email in its inlined Users table — set both via
+// BOOTSTRAP_ADMIN_NAME/BOOTSTRAP_ADMIN_EMAIL when starting the server for this suite.
 const ADMIN_NAME = process.env.E2E_ADMIN_NAME || "Ada Admin";
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "ada@studio.local";
 
@@ -19,12 +20,12 @@ async function shoot(page, name) {
 
 test.describe.configure({ mode: "serial" });
 
-let clientId, assetId, projectId, orderId, reportId;
+let clientId, assetId, treatmentId, projectId, reportId;
 
 // A single shared page/context across every test in this file (rather than each test's own
 // `page` fixture, which starts a fresh, unauthenticated context) — the whole point of this suite
 // is one continuous session through the app, logging in once and carrying that session's cookie
-// through client -> asset -> workflow -> order -> report, the way a real user's browser tab would.
+// through client -> asset -> treatment -> project -> report.
 let page;
 
 test.beforeAll(async ({ browser }) => {
@@ -48,14 +49,13 @@ test.describe("Studio golden path", () => {
     await shoot(page, "02-dashboard.png");
   });
 
-  test("Settings shows the seeded classifiers", async () => {
+  test("Settings is one flat screen with the seeded classifier groups", async () => {
     await page.goto("/settings");
-    await expect(page.getByText(/options across/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Asset Types" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Treatment Methods" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Project Stages" })).toBeVisible();
+    await expect(page.getByText("Painting", { exact: true })).toBeVisible();
     await shoot(page, "03-settings.png");
-
-    await page.goto("/settings/classifiers/asset_type");
-    await expect(page.getByRole("cell", { name: "Painting", exact: true })).toBeVisible();
-    await shoot(page, "04-settings-classifiers.png");
   });
 
   test("create a client", async () => {
@@ -64,16 +64,16 @@ test.describe("Studio golden path", () => {
     await page.fill('input[name="name"]', "Jane Collector");
     await page.fill('input[name="email"]', "jane@example.com");
     await page.fill('input[name="country"]', "DE");
-    await shoot(page, "05-client-new.png");
+    await shoot(page, "04-client-new.png");
     await page.click('form[action="/clients"] button[type="submit"]');
 
     await expect(page).toHaveURL(/\/clients\/[a-f0-9-]+$/);
     clientId = page.url().split("/clients/")[1];
     await expect(page.locator("h1")).toContainText("Jane Collector");
-    await shoot(page, "06-client-detail.png");
+    await shoot(page, "05-client-detail.png");
   });
 
-  test("create an asset with an intake condition state", async () => {
+  test("create an asset with an intake condition state and photo", async () => {
     await page.goto("/assets/new");
     await page.selectOption('select[name="clientId"]', clientId);
     await page.selectOption('select[name="assetTypeId"]', { label: "Painting" });
@@ -82,83 +82,77 @@ test.describe("Studio golden path", () => {
     await page.fill('input[name="artist"]', "J. Doe");
     await page.fill('input[name="dimensions"]', "60x80cm");
     await page.fill('textarea[name="intakeDescription"]', "Minor surface grime, otherwise stable.");
-    await shoot(page, "07-asset-new.png");
+    await page.setInputFiles('input[name="photos"]', TEST_PHOTO);
+    await shoot(page, "06-asset-new.png");
     await page.click('form[action="/assets"] button[type="submit"]');
 
     await expect(page).toHaveURL(/\/assets\/[a-f0-9-]+$/);
     assetId = page.url().split("/assets/")[1];
     await expect(page.locator("h1")).toContainText("Sunset over the Bay");
-    await shoot(page, "08-asset-detail.png");
+    await shoot(page, "07-asset-detail.png");
   });
 
-  test("start a workflow and log an activity", async () => {
-    await page.goto(`/workflows/new?assetId=${assetId}`);
-    await page.fill('input[name="title"]', "Conservation of Sunset over the Bay");
-    await page.click('form[action="/workflows"] button[type="submit"]');
+  test("log a treatment on the asset", async () => {
+    await page.goto(`/treatments/new?assetId=${assetId}`);
+    await page.selectOption('select[name="method"]', { label: "Surface cleaning" });
+    await page.fill('input[name="title"]', "Surface cleaning of top layer");
+    await page.fill('textarea[name="notes"]', "Removed surface grime with a dry sponge.");
+    await shoot(page, "08-treatment-new.png");
+    await page.click('form[action="/treatments"] button[type="submit"]');
 
-    await expect(page).toHaveURL(/\/workflows\/[a-f0-9-]+$/);
-    projectId = page.url().split("/workflows/")[1];
-    await shoot(page, "09-workflow-detail.png");
-
-    await page.selectOption('form[action$="/activities"] select[name="activityTypeId"]', {
-      label: "Surface Cleaning",
-    });
-    await page.fill('form[action$="/activities"] textarea[name="description"]', "Removed surface grime with a dry sponge.");
-    await page.fill('form[action$="/activities"] input[name="durationMinutes"]', "45");
-    await page.click('form[action$="/activities"] button[type="submit"]');
-
+    await expect(page).toHaveURL(/\/treatments\/[a-f0-9-]+$/);
+    treatmentId = page.url().split("/treatments/")[1];
     await expect(page.getByText("Removed surface grime")).toBeVisible();
-    await shoot(page, "10-workflow-activity-logged.png");
+    await shoot(page, "09-treatment-detail.png");
   });
 
-  test("quote, accept into an order, and invoice", async () => {
-    await page.goto(`/clients/quotes/new?clientId=${clientId}`);
-    await page.fill('input[name="item_description_0"]', "Cleaning and consolidation");
-    await page.fill('input[name="item_hours_0"]', "4");
-    await page.fill('input[name="item_rate_0"]', "80");
-    await shoot(page, "11-quote-new.png");
-    await page.click('form[action="/clients/quotes"] button[type="submit"]');
-    await expect(page).toHaveURL(/\/clients\/quotes\/[a-f0-9-]+$/);
-    await shoot(page, "12-quote-detail.png");
+  test("start a project and move it across the kanban board", async () => {
+    await page.goto(`/projects/new?assetId=${assetId}`);
+    await page.fill('input[name="title"]', "Conservation of Sunset over the Bay");
+    await page.click('form[action="/projects"] button[type="submit"]');
 
-    await page.click('form[action$="/accept"] button[type="submit"]');
-    await expect(page).toHaveURL(/\/clients\/orders\/[a-f0-9-]+$/);
-    orderId = page.url().split("/clients/orders/")[1];
-    await shoot(page, "13-order-detail.png");
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
+    projectId = page.url().split("/projects/")[1];
+    await shoot(page, "10-project-detail.png");
 
-    // The "Create invoice" form lives inside a collapsed <details> — open it first.
-    await page.click("details.form-section summary");
-    await page.fill('form[action$="/invoices"] input[name="item_description_0"]', "Cleaning and consolidation");
-    await page.fill('form[action$="/invoices"] input[name="item_hours_0"]', "4");
-    await page.fill('form[action$="/invoices"] input[name="item_rate_0"]', "80");
-    await page.click('form[action$="/invoices"] button[type="submit"]');
-    await expect(page.getByText(/EUR/)).toBeVisible();
-    await shoot(page, "14-order-invoiced.png");
+    await page.goto("/projects");
+    await expect(page.locator('.kanban-column[data-status="inquiry"]')).toBeVisible();
+    await shoot(page, "11-projects-kanban.png");
 
-    await page.goto("/clients/orders");
-    await shoot(page, "15-orders-kanban.png");
+    // Move the project to "working" via the detail page's stage-advance select (exercises the
+    // same POST /projects/{id}/stage the kanban board's drag-and-drop uses).
+    await page.goto(`/projects/${projectId}`);
+    await page.selectOption('form[action$="/stage"] select[name="stage"]', "working");
+    await page.click('form[action$="/stage"] button[type="submit"]');
+    await expect(page.locator("dd.detail-dd").getByText("Working")).toBeVisible();
+    await shoot(page, "12-project-stage-updated.png");
   });
 
-  test("write and finalize a conservation report", async () => {
-    await page.goto(`/reporter/new?assetId=${assetId}&projectId=${projectId}`);
+  test("write a report with structured sections and customize its layout", async () => {
+    await page.goto(`/reports/new?assetId=${assetId}&projectId=${projectId}`);
     await page.fill('input[name="title"]', "Conservation Report 2026-001");
-    await page.click('form[action="/reporter"] button[type="submit"]');
+    await page.click('form[action="/reports"] button[type="submit"]');
 
-    await expect(page).toHaveURL(/\/reporter\/[a-f0-9-]+$/);
-    reportId = page.url().split("/reporter/")[1];
+    await expect(page).toHaveURL(/\/reports\/[a-f0-9-]+$/);
+    reportId = page.url().split("/reports/")[1];
+    // The suggested outline pre-fills condition findings/treatment performed from the asset's
+    // existing AssetState/Treatment history.
+    await expect(page.locator('textarea[name="conditionFindings"]')).not.toBeEmpty();
+    await shoot(page, "13-report-detail.png");
 
-    // TipTap loads live via esm.sh's import map — give it a moment to mount before screenshotting.
-    await page.waitForSelector(".ProseMirror", { timeout: 10_000 });
-    await shoot(page, "16-report-editor.png");
+    await page.fill('textarea[name="summary"]', "Painting arrived with surface grime; cleaned and stabilized.");
+    await page.fill('textarea[name="recommendations"]', "Monitor humidity; reassess in 12 months.");
+    await page.click('form[action$="/sections"] button[type="submit"]');
+    await expect(page.locator('textarea[name="summary"]')).toHaveValue(/surface grime/);
+    await shoot(page, "14-report-sections-saved.png");
 
-    await page.click(".report-editor-content .ProseMirror");
-    await page.keyboard.type(" Reviewed and confirmed by the lead conservator.");
-    await page.click(".report-editor-save");
-    await expect(page.locator(".report-editor-save")).toHaveText(/saved/i, { timeout: 5_000 });
+    await page.selectOption('form[action$="/layout"] select[name="layoutStyle"]', "gallery");
+    await page.click('form[action$="/layout"] button[type="submit"]');
+    await shoot(page, "15-report-layout-customized.png");
 
     await page.click('form[action$="/status"] button[type="submit"]');
     await expect(page.getByText("Final")).toBeVisible();
-    await shoot(page, "17-report-final.png");
+    await shoot(page, "16-report-final.png");
   });
 
   test("export the finished report and asset", async () => {
@@ -176,13 +170,25 @@ test.describe("Studio golden path", () => {
     expect(pdfResponse.headers()["content-type"]).toBe("application/pdf");
   });
 
-  test("album shows uploaded media", async () => {
-    await page.goto("/album");
-    await shoot(page, "18-album.png");
+  test("media grid shows uploaded photos and the lightbox opens", async () => {
+    await page.goto("/media");
+    await shoot(page, "17-media-grid.png");
+
+    const firstImage = page.locator("a.album-card").first();
+    await expect(firstImage).toBeVisible();
+    await firstImage.click();
+    await expect(page).toHaveURL(/\/media\/view\/[a-f0-9-]+$/);
+
+    await page.click("#lightbox-trigger");
+    await expect(page.locator("#lightbox-overlay")).toBeVisible();
+    await page.click("#lightbox-rotate");
+    await shoot(page, "18-media-lightbox.png");
+    await page.click("#lightbox-close");
+    await expect(page.locator("#lightbox-overlay")).toBeHidden();
   });
 
-  test("Settings -> Users lists accounts", async () => {
-    await page.goto("/settings/users");
+  test("Settings Users table lists accounts", async () => {
+    await page.goto("/settings");
     await expect(page.getByText(ADMIN_EMAIL)).toBeVisible();
     await shoot(page, "19-settings-users.png");
   });

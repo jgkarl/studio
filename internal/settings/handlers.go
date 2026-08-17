@@ -2,9 +2,8 @@ package settings
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
-	"strconv"
+	"regexp"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -23,27 +22,14 @@ type Service struct {
 	Auth *auth.Service
 }
 
-// Mount registers every settings route on mux. Classifiers and tags require a signed-in user
+// Mount registers every settings route on mux. Classifiers require a signed-in user
 // (RequireUser, not RequireAdmin — the nav only shows a Settings link to admins, but
-// conservators can still reach these routes directly, same as the original app); Users
-// management is RequireAdmin-gated since it can grant admin access to any account.
+// conservators can still reach these routes directly, same as the original app); the inlined
+// Users role table is RequireAdmin-gated since it can grant admin access to any account.
 func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /settings", svc.Auth.RequireUser(svc.handleIndex))
-
-	mux.HandleFunc("GET /settings/classifiers", svc.Auth.RequireUser(svc.handleClassifiersIndex))
-	mux.HandleFunc("GET /settings/classifiers/{type}", svc.Auth.RequireUser(svc.handleClassifierType))
 	mux.HandleFunc("POST /settings/classifiers/{type}", svc.Auth.RequireUser(svc.handleClassifierCreate))
-	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/update", svc.Auth.RequireUser(svc.handleClassifierUpdate))
-	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/reorder", svc.Auth.RequireUser(svc.handleClassifierReorder))
 	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/delete", svc.Auth.RequireUser(svc.handleClassifierDelete))
-
-	mux.HandleFunc("GET /settings/tags", svc.Auth.RequireUser(svc.handleTagsIndex))
-	mux.HandleFunc("POST /settings/tags", svc.Auth.RequireUser(svc.handleTagCreate))
-	mux.HandleFunc("POST /settings/tags/{id}/rename", svc.Auth.RequireUser(svc.handleTagRename))
-	mux.HandleFunc("POST /settings/tags/{id}/reorder", svc.Auth.RequireUser(svc.handleTagReorder))
-	mux.HandleFunc("POST /settings/tags/{id}/delete", svc.Auth.RequireUser(svc.handleTagDelete))
-
-	mux.HandleFunc("GET /settings/users", svc.Auth.RequireAdmin(svc.handleUsersIndex))
 	mux.HandleFunc("POST /settings/users/{id}/role", svc.Auth.RequireAdmin(svc.handleUpdateUserRole))
 }
 
@@ -52,87 +38,45 @@ func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
 	_ = page.Render(r.Context(), w)
 }
 
-// --- Landing -------------------------------------------------------------------------------
-
 func (svc *Service) handleIndex(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	ctx := r.Context()
-	classifierCount, err := CountClassifiers(ctx, svc.Pool, ClassifierTypes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tagCountRow, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Tag", scanCount)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tagCount := 0
-	if tagCountRow != nil {
-		tagCount = *tagCountRow
-	}
-	pendingRow, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM User WHERE role = ?", scanCount, auth.RolePending)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	pendingCount := 0
-	if pendingRow != nil {
-		pendingCount = *pendingRow
-	}
-	writeHTML(w, r, IndexPage(chromeFor(r, user, "/settings"), classifierCount, len(ClassifierTypes), tagCount, pendingCount))
-}
-
-// --- Classifiers -----------------------------------------------------------------------------
-
-func (svc *Service) handleClassifiersIndex(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	counts := map[ClassifierType]int{}
-	for _, t := range ClassifierTypes {
-		n, err := CountClassifiers(r.Context(), svc.Pool, []ClassifierType{t})
+	groups := make([]ClassifierGroup, 0, len(SettingsManagedTypes))
+	for _, t := range SettingsManagedTypes {
+		rows, err := GetAllClassifiers(ctx, svc.Pool, t)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		counts[t] = n
+		groups = append(groups, ClassifierGroup{Type: t, Label: ClassifierTypeLabels[t], Rows: rows})
 	}
-	writeHTML(w, r, ClassifiersIndexPage(chromeFor(r, user, "/settings/classifiers"), counts))
+
+	var users []auth.User
+	if user.HasRole(auth.RoleAdmin) {
+		var err error
+		users, err = auth.ListUsers(ctx, svc.Pool)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writeHTML(w, r, IndexPage(chromeFor(r, user, "/settings"), groups, users))
 }
 
-func (svc *Service) handleClassifierType(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	t := ClassifierType(r.PathValue("type"))
-	if !IsValidClassifierType(string(t)) {
-		http.NotFound(w, r)
-		return
-	}
-	rows, err := GetAllClassifiers(r.Context(), svc.Pool, t)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeHTML(w, r, ClassifierTypePage(chromeFor(r, user, "/settings/classifiers"), t, rows, r.URL.Query().Get("edit")))
-}
+// --- Classifiers -----------------------------------------------------------------------------
 
-func parseClassifierData(raw string) (string, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", nil
-	}
-	if !json.Valid([]byte(trimmed)) {
-		return "", errInvalidJSON
-	}
-	return trimmed, nil
-}
+var slugNonWord = regexp.MustCompile(`[^a-z0-9]+`)
 
-var errInvalidJSON = &jsonError{}
-
-type jsonError struct{}
-
-func (*jsonError) Error() string {
-	return `Extra data must be valid JSON (e.g. {"defaultRate": 60}) or left blank.`
+// slugify turns a display title into a lowercase_with_underscores code — the flat Settings page
+// only asks for a title, unlike the old per-type admin table's separate Code field.
+func slugify(title string) string {
+	s := slugNonWord.ReplaceAllString(strings.ToLower(strings.TrimSpace(title)), "_")
+	return strings.Trim(s, "_")
 }
 
 func (svc *Service) handleClassifierCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	t := ClassifierType(r.PathValue("type"))
-	if !IsValidClassifierType(string(t)) {
+	if !IsSettingsManagedType(t) {
 		http.NotFound(w, r)
 		return
 	}
@@ -140,74 +84,26 @@ func (svc *Service) handleClassifierCreate(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	code := strings.TrimSpace(r.FormValue("code"))
 	title := strings.TrimSpace(r.FormValue("title"))
-	if code == "" || title == "" {
-		http.Error(w, "Code and title are required.", http.StatusBadRequest)
-		return
-	}
-	data, err := parseClassifierData(r.FormValue("data"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	sequence, _ := strconv.Atoi(r.FormValue("sequence"))
-
-	if _, err := CreateClassifier(r.Context(), svc.Pool, ClassifierInput{
-		Type: t, Code: code, Title: title,
-		Description: strings.TrimSpace(r.FormValue("description")),
-		Sequence:    sequence,
-		IsActive:    true,
-		Data:        data,
-	}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/settings/classifiers/"+string(t), http.StatusSeeOther)
-}
-
-func (svc *Service) handleClassifierUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	t := r.PathValue("type")
-	id := r.PathValue("id")
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	title := strings.TrimSpace(r.FormValue("title"))
-	if title == "" {
+	code := slugify(title)
+	if title == "" || code == "" {
 		http.Error(w, "Title is required.", http.StatusBadRequest)
 		return
 	}
-	data, err := parseClassifierData(r.FormValue("data"))
+
+	ctx := r.Context()
+	count, err := CountClassifiers(ctx, svc.Pool, []ClassifierType{t})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	sequence, _ := strconv.Atoi(r.FormValue("sequence"))
-
-	if err := UpdateClassifier(r.Context(), svc.Pool, id, ClassifierInput{
-		Title:       title,
-		Description: strings.TrimSpace(r.FormValue("description")),
-		Sequence:    sequence,
-		IsActive:    r.FormValue("isActive") == "on",
-		Data:        data,
+	if _, err := CreateClassifier(ctx, svc.Pool, ClassifierInput{
+		Type: t, Code: code, Title: title, Sequence: count, IsActive: true,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/settings/classifiers/"+t, http.StatusSeeOther)
-}
-
-func (svc *Service) handleClassifierReorder(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	if err := ReorderClassifier(r.Context(), svc.Pool, r.PathValue("id"), r.FormValue("direction")); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/settings/classifiers/"+r.PathValue("type"), http.StatusSeeOther)
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
 func (svc *Service) handleClassifierDelete(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -215,60 +111,36 @@ func (svc *Service) handleClassifierDelete(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	http.Redirect(w, r, "/settings/classifiers/"+r.PathValue("type"), http.StatusSeeOther)
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
-// --- Tags ------------------------------------------------------------------------------------
+// --- Users (inlined, admin only) --------------------------------------------------------------
 
-func (svc *Service) handleTagsIndex(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	tags, err := GetAllTagsWithUsage(r.Context(), svc.Pool)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+var assignableRoles = []auth.Role{auth.RolePending, auth.RoleConservator, auth.RoleAdmin}
+
+func isAssignableRole(role string) bool {
+	for _, r := range assignableRoles {
+		if string(r) == role {
+			return true
+		}
 	}
-	writeHTML(w, r, TagsIndexPage(chromeFor(r, user, "/settings/tags"), tags, r.URL.Query().Get("edit")))
+	return false
 }
 
-func (svc *Service) handleTagCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
+func (svc *Service) handleUpdateUserRole(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	if err := CreateTag(r.Context(), svc.Pool, r.FormValue("name"), r.FormValue("category")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	targetID := r.PathValue("id")
+	role := r.FormValue("role")
+	if !isAssignableRole(role) {
+		http.Error(w, "Invalid role.", http.StatusBadRequest)
 		return
 	}
-	http.Redirect(w, r, "/settings/tags", http.StatusSeeOther)
-}
-
-func (svc *Service) handleTagRename(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	if err := RenameTag(r.Context(), svc.Pool, r.PathValue("id"), r.FormValue("name"), r.FormValue("category")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	http.Redirect(w, r, "/settings/tags", http.StatusSeeOther)
-}
-
-func (svc *Service) handleTagReorder(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	if err := ReorderTag(r.Context(), svc.Pool, r.PathValue("id"), r.FormValue("direction")); err != nil {
+	if _, err := studiodb.Execute(r.Context(), svc.Pool, "UPDATE User SET role = ? WHERE id = ?", role, targetID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/settings/tags", http.StatusSeeOther)
-}
-
-func (svc *Service) handleTagDelete(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := DeleteTag(r.Context(), svc.Pool, r.PathValue("id")); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/settings/tags", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }

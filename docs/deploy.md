@@ -8,8 +8,8 @@ build step on the VPS itself.
 
 ## Why Debian 12, specifically
 
-The binary is dynamically linked against `libvips.so.42` (image processing — thumbnails, the
-IIIF deep-zoom viewer) and its own dependency chain (glib, cairo, pango, libjpeg, libpng, ...).
+The binary is dynamically linked against `libvips.so.42` (image processing — upload thumbnails)
+and its own dependency chain (glib, cairo, pango, libjpeg, libpng, ...).
 On **Ubuntu**, several of those transitive packages (`libmagickcore`/`libmagickwand`, pulled in by
 libvips) are gated behind Ubuntu Pro/ESM and fail to install on a plain account. **Debian doesn't
 have this problem at all** — `apt install libvips42` pulls in everything it needs from the regular

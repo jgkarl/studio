@@ -1,7 +1,5 @@
-// Package assets is the Asset module: the physical object being conserved, its materials,
-// condition-state history, and tags. Photo attachment on condition records (the original app's
-// recordAssetState/FileField) is added when the Media module (7) lands - photos are optional
-// there even in the original, so condition tracking works fully without them in the meantime.
+// Package assets is the Asset module: the physical object being conserved and its
+// condition-state history.
 package assets
 
 import (
@@ -50,13 +48,6 @@ type ListRow struct {
 	ThumbnailMediaID      sql.NullString
 }
 
-type Material struct {
-	ID         string
-	MaterialID string
-	Role       sql.NullString
-	Title      string
-}
-
 type State struct {
 	ID          string
 	Condition   string
@@ -65,8 +56,7 @@ type State struct {
 }
 
 type ProjectSummary struct {
-	ID          string
-	Title       string
-	CompletedAt sql.NullTime
-	OrderNumber sql.NullString
+	ID    string
+	Title string
+	Stage string
 }

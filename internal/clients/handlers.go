@@ -22,13 +22,8 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /clients/new", svc.Auth.RequireUser(svc.handleNewForm))
 	mux.HandleFunc("POST /clients", svc.Auth.RequireUser(svc.handleCreate))
 	mux.HandleFunc("GET /clients/{id}", svc.Auth.RequireUser(svc.handleDetail))
-	// /clients/edit/{id}, not /clients/{id}/edit - the latter is ambiguous with commerce's
-	// /clients/quotes/{id} and /clients/orders/{id} under Go 1.22's ServeMux (same segment
-	// count, wildcard in a different position - it refuses to register and panics at startup).
 	mux.HandleFunc("GET /clients/edit/{id}", svc.Auth.RequireUser(svc.handleEditForm))
 	mux.HandleFunc("POST /clients/{id}/update", svc.Auth.RequireUser(svc.handleUpdate))
-	mux.HandleFunc("POST /clients/{id}/tags", svc.Auth.RequireUser(svc.handleAddTag))
-	mux.HandleFunc("POST /clients/{id}/tags/{assignmentId}/delete", svc.Auth.RequireUser(svc.handleRemoveTag))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -128,16 +123,6 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	quotes, err := ListQuotesForClient(ctx, svc.Pool, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	orders, err := ListOrdersForClient(ctx, svc.Pool, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	clientTypes, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierClientType)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -153,13 +138,8 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tagAssignments, err := settings.GetTagAssignments(ctx, svc.Pool, "Client", id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
-	writeHTML(w, r, DetailPage(chromeFor(r, user, "/clients"), *client, typeLabel, assets, quotes, orders, clientTypes, contactMethods, tagAssignments))
+	writeHTML(w, r, DetailPage(chromeFor(r, user, "/clients"), *client, typeLabel, assets, clientTypes, contactMethods))
 }
 
 func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -193,28 +173,6 @@ func (svc *Service) handleUpdate(w http.ResponseWriter, r *http.Request, user *a
 	}
 	id := r.PathValue("id")
 	if err := Update(r.Context(), svc.Pool, id, formInput(r)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/clients/"+id, http.StatusSeeOther)
-}
-
-func (svc *Service) handleAddTag(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	id := r.PathValue("id")
-	if err := settings.AddTagToEntity(r.Context(), svc.Pool, "Client", id, r.FormValue("name")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	http.Redirect(w, r, "/clients/"+id, http.StatusSeeOther)
-}
-
-func (svc *Service) handleRemoveTag(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	id := r.PathValue("id")
-	if err := settings.RemoveTagAssignment(r.Context(), svc.Pool, r.PathValue("assignmentId")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

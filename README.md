@@ -7,20 +7,19 @@ rewrite is actually built, and `docs/setup.md` for a more detailed local-dev wal
 quick version below.
 
 Same philosophy as the original: no ORM, hand-written SQL and row types, no web framework, plain
-templ templates, JS only where a page genuinely needs client-side interactivity (vendored
-libraries where they have a real framework-agnostic build, small vanilla islands otherwise — see
-`static/js/` and `static/vendor/` as those modules land).
+templ templates, JS only where a page genuinely needs client-side interactivity — small vanilla
+islands, no bundler, no vendored libraries (see `static/js/`).
 
 ## Requirements
 
 - Go 1.25+ (the module's `go.mod` pins this — `go` itself will auto-fetch a matching toolchain if
   your installed version is older, no manual upgrade needed)
 - [templ](https://templ.guide) CLI: `go install github.com/a-h/templ/cmd/templ@latest`
-- `libvips` (image processing — thumbnails, the IIIF deep-zoom viewer): `apt install libvips-dev`
-  on Debian/Ubuntu for local dev (needs the `-dev` headers to *build*; the deployed binary only
-  needs the runtime `libvips42` package — see `docs/deploy.md`). **Debian, not Ubuntu, if you can
-  choose** — Ubuntu gates several of libvips's transitive dependencies behind Ubuntu Pro/ESM and
-  the plain-account install fails; Debian has no such restriction.
+- `libvips` (image processing — upload thumbnails): `apt install libvips-dev` on Debian/Ubuntu for
+  local dev (needs the `-dev` headers to *build*; the deployed binary only needs the runtime
+  `libvips42` package — see `docs/deploy.md`). **Debian, not Ubuntu, if you can choose** — Ubuntu
+  gates several of libvips's transitive dependencies behind Ubuntu Pro/ESM and the plain-account
+  install fails; Debian has no such restriction.
 - SQLite itself needs nothing installed — the driver (`modernc.org/sqlite`) is pure Go, compiled
   straight into the binary.
 
@@ -66,21 +65,19 @@ cd e2e && npm install && npm test               # end-to-end (needs a server run
 ## Layout
 
 See the module list in git history / commit messages for build order. Each top-level package
-under `internal/` is one self-contained module (auth, clients, assets, workflows, media, commerce,
-reporter, export, settings, seed) with its own routes, templ views, and SQL — `internal/db` and
-`internal/web` are the only shared infrastructure every module builds on, and `internal/testutil`
-is test-only support (a real migrated SQLite database per test, no mocks).
+under `internal/` is one self-contained module (auth, clients, assets, treatments, workflows
+[routes as `/projects`], media, reporter [routes as `/reports`], export, settings, seed) with its
+own routes, templ views, and SQL — `internal/db` and `internal/web` are the only shared
+infrastructure every module builds on, and `internal/testutil` is test-only support (a real
+migrated SQLite database per test, no mocks). Commerce (Quote/Order/Invoice), Tags, and
+Materials-as-a-relation were removed in a later refactor to match the design artifact this app now
+follows — see `docs/tech-stack.md`.
 
 ## Known, disclosed differences from the original app
 
 A few spots where this rewrite made a different call than the original TypeScript app, on
 purpose — see `docs/tech-stack.md` for the reasoning behind each:
 
-- **TipTap** (the Reporter module's rich text editor) loads live from the esm.sh CDN via an
-  import map rather than being vendored offline — it has no single flat browser bundle the way
-  OpenSeadragon does, and this project deliberately has no JS bundler to produce one.
-- **IIIF `quality=bitonal`** is approximated as grayscale — govips has no direct 1-bit threshold
-  operation the way `sharp` does. Nothing in this app's own UI requests bitonal.
 - **No fictional demo-data seed.** Structural reference data (Classifiers) seeds automatically;
   the original's `db/seed.ts` demo clients/assets/workflows does not have a Go equivalent — every
   entity it would create is reachable through the app's own forms instead.

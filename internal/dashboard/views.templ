@@ -6,28 +6,29 @@ import (
 	"studio/internal/web"
 )
 
-templ Page(c web.Chrome, clientCount, assetCount int, activeProjects []activeProject, openOrders []openOrder, draftReports int, orderStatusLabels map[string]string) {
-	@web.AppLayout(c.Dict.Dashboard.Title, c, pageBody(c, clientCount, assetCount, activeProjects, openOrders, draftReports, orderStatusLabels))
+templ Page(c web.Chrome, clientCount, assetCount, treatmentCount int, activeProjects []activeProject, draftReportRows []draftReport, draftReports int) {
+	@web.AppLayout(c.Dict.Dashboard.Title, c, pageBody(c, clientCount, assetCount, treatmentCount, activeProjects, draftReportRows, draftReports))
 }
 
-templ pageBody(c web.Chrome, clientCount, assetCount int, activeProjects []activeProject, openOrders []openOrder, draftReports int, orderStatusLabels map[string]string) {
+templ pageBody(c web.Chrome, clientCount, assetCount, treatmentCount int, activeProjects []activeProject, draftReportRows []draftReport, draftReports int) {
 	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, newIntakeLink())
 	<div class="stat-grid">
 		@statCard(strconv.Itoa(clientCount), c.Dict.Dashboard.Clients, "/clients")
 		@statCard(strconv.Itoa(assetCount), c.Dict.Dashboard.Assets, "/assets")
-		@statCard(strconv.Itoa(len(activeProjects)), c.Dict.Dashboard.ActiveWorkflows, "/workflows")
-		@statCard(strconv.Itoa(draftReports), c.Dict.Dashboard.DraftReports, "/reporter")
+		@statCard(strconv.Itoa(treatmentCount), c.Dict.Dashboard.Treatments, "/treatments")
+		@statCard(strconv.Itoa(len(activeProjects)), c.Dict.Dashboard.ActiveProjects, "/projects")
+		@statCard(strconv.Itoa(draftReports), c.Dict.Dashboard.DraftReports, "/reports")
 	</div>
 	<div class="dashboard-columns">
 		@web.Card() {
-			<h2 class="dashboard-heading">{ c.Dict.Dashboard.ActiveWorkflowsHeading }</h2>
+			<h2 class="dashboard-heading">{ c.Dict.Dashboard.ActiveProjectsHeading }</h2>
 			if len(activeProjects) == 0 {
 				<p class="empty-state">{ c.Dict.Dashboard.NothingInProgress }</p>
 			}
 			<ul class="dashboard-list">
 				for _, p := range activeProjects {
 					<li>
-						<a href={ templ.URL("/workflows/" + p.ID) }>{ p.Title }</a>
+						<a href={ templ.URL("/projects/" + p.ID) }>{ p.Title }</a>
 						<div class="page-subtitle">
 							if p.AssetTitle != "" {
 								{ p.AssetTitle }
@@ -40,19 +41,19 @@ templ pageBody(c web.Chrome, clientCount, assetCount int, activeProjects []activ
 			</ul>
 		}
 		@web.Card() {
-			<h2 class="dashboard-heading">{ c.Dict.Dashboard.OpenOrdersHeading }</h2>
-			if len(openOrders) == 0 {
-				<p class="empty-state">{ c.Dict.Dashboard.NoOpenOrders }</p>
+			<h2 class="dashboard-heading">{ c.Dict.Dashboard.DraftReportsHeading }</h2>
+			if len(draftReportRows) == 0 {
+				<p class="empty-state">{ c.Dict.Dashboard.NoDraftReports }</p>
 			}
 			<ul class="dashboard-list">
-				for _, o := range openOrders {
+				for _, rep := range draftReportRows {
 					<li>
-						<a href={ templ.URL("/clients/orders/" + o.ID) }>{ o.OrderNumber } — { o.ClientName }</a>
+						<a href={ templ.URL("/reports/" + rep.ID) }>{ rep.Title }</a>
 						<div class="page-subtitle">
-							if label, ok := orderStatusLabels[o.Status]; ok {
-								{ label }
+							if rep.AssetTitle != "" {
+								{ rep.AssetTitle }
 							} else {
-								{ o.Status }
+								{ rep.AssetReferenceCode }
 							}
 						</div>
 					</li>

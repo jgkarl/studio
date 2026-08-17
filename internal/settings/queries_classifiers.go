@@ -156,7 +156,6 @@ func ReorderClassifier(ctx context.Context, pool *sql.DB, id, direction string) 
 // row still in use would orphan those references, so it's blocked in favor of deactivating.
 var classifierUsageChecks = map[ClassifierType]string{
 	ClassifierAssetType:    "SELECT COUNT(*) AS n FROM Asset WHERE assetTypeId = ?",
-	ClassifierMaterial:     "SELECT COUNT(*) AS n FROM AssetMaterial WHERE materialId = ?",
 	ClassifierActivityType: "SELECT COUNT(*) AS n FROM Activity WHERE activityTypeId = ?",
 }
 

@@ -8,11 +8,17 @@ import (
 	studiodb "studio/internal/db"
 )
 
-const reportColumns = "id, projectId, assetId, title, content, status, authorId, createdAt, updatedAt"
+const reportColumns = `id, projectId, assetId, title, content, status, authorId,
+	summary, conditionFindings, treatmentPerformed, materialsUsed, recommendations,
+	coverMediaId, layoutStyle, showCover, showSummary, showCondition, showTreatment, showMaterials, showRecommendations,
+	createdAt, updatedAt`
 
 func scanReport(rows *sql.Rows) (Report, error) {
 	var r Report
-	err := rows.Scan(&r.ID, &r.ProjectID, &r.AssetID, &r.Title, &r.Content, &r.Status, &r.AuthorID, &r.CreatedAt, &r.UpdatedAt)
+	err := rows.Scan(&r.ID, &r.ProjectID, &r.AssetID, &r.Title, &r.Content, &r.Status, &r.AuthorID,
+		&r.Summary, &r.ConditionFindings, &r.TreatmentPerformed, &r.MaterialsUsed, &r.Recommendations,
+		&r.CoverMediaID, &r.LayoutStyle, &r.ShowCover, &r.ShowSummary, &r.ShowCondition, &r.ShowTreatment, &r.ShowMaterials, &r.ShowRecommendations,
+		&r.CreatedAt, &r.UpdatedAt)
 	return r, err
 }
 
@@ -69,21 +75,44 @@ func ListProjectOptions(ctx context.Context, q studiodb.Querier) ([]ProjectOptio
 	return studiodb.Query(ctx, q, "SELECT id, title FROM Project ORDER BY createdAt DESC", scanProjectOption)
 }
 
-func Create(ctx context.Context, q studiodb.Querier, assetID string, projectID *string, title, content, authorID string) (string, error) {
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func Create(ctx context.Context, q studiodb.Querier, assetID string, projectID *string, title, authorID string, sections Sections) (string, error) {
 	id := studiodb.NewID()
 	now := time.Now()
 	var projectArg any
 	if projectID != nil {
 		projectArg = *projectID
 	}
-	_, err := studiodb.Execute(ctx, q,
-		"INSERT INTO Report (id, assetId, projectId, title, content, authorId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		id, assetID, projectArg, title, content, authorID, now, now)
+	_, err := studiodb.Execute(ctx, q, `
+		INSERT INTO Report (id, assetId, projectId, title, content, status, authorId, conditionFindings, treatmentPerformed, createdAt, updatedAt)
+		VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
+		id, assetID, projectArg, title, emptyDoc(), authorID,
+		nullIfEmpty(sections.ConditionFindings), nullIfEmpty(sections.TreatmentPerformed), now, now)
 	return id, err
 }
 
-func SaveContent(ctx context.Context, q studiodb.Querier, id, content string) error {
-	_, err := studiodb.Execute(ctx, q, "UPDATE Report SET content = ?, updatedAt = ? WHERE id = ?", content, time.Now(), id)
+func UpdateSections(ctx context.Context, q studiodb.Querier, id string, in SectionsInput) error {
+	_, err := studiodb.Execute(ctx, q, `
+		UPDATE Report SET summary = ?, conditionFindings = ?, treatmentPerformed = ?, materialsUsed = ?, recommendations = ?, updatedAt = ?
+		WHERE id = ?`,
+		nullIfEmpty(in.Summary), nullIfEmpty(in.ConditionFindings), nullIfEmpty(in.TreatmentPerformed),
+		nullIfEmpty(in.MaterialsUsed), nullIfEmpty(in.Recommendations), time.Now(), id)
+	return err
+}
+
+func UpdateLayout(ctx context.Context, q studiodb.Querier, id string, in LayoutInput) error {
+	_, err := studiodb.Execute(ctx, q, `
+		UPDATE Report SET layoutStyle = ?, coverMediaId = ?,
+			showCover = ?, showSummary = ?, showCondition = ?, showTreatment = ?, showMaterials = ?, showRecommendations = ?, updatedAt = ?
+		WHERE id = ?`,
+		in.LayoutStyle, nullIfEmpty(in.CoverMediaID),
+		in.ShowCover, in.ShowSummary, in.ShowCondition, in.ShowTreatment, in.ShowMaterials, in.ShowRecommendations, time.Now(), id)
 	return err
 }
 

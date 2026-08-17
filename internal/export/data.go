@@ -7,7 +7,6 @@ import (
 
 	"studio/internal/assets"
 	"studio/internal/clients"
-	"studio/internal/commerce"
 	"studio/internal/media"
 	"studio/internal/reporter"
 	"studio/internal/settings"
@@ -19,11 +18,11 @@ type Service struct {
 	Media *media.Service
 }
 
-func projectStatusLabel(completedAt sql.NullTime) string {
-	if completedAt.Valid {
-		return "Completed"
+func stageLabel(labels map[string]string, stage string) string {
+	if label, ok := labels[stage]; ok {
+		return label
 	}
-	return "Open"
+	return stage
 }
 
 func reversed[T any](in []T) []T {
@@ -60,11 +59,11 @@ func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, er
 	}
 	client, _ := clients.GetByID(ctx, svc.Pool, asset.ClientID)
 	assetType, _ := settings.GetClassifierByID(ctx, svc.Pool, asset.AssetTypeID)
-	materials, _ := assets.ListMaterials(ctx, svc.Pool, id)
 	states, _ := assets.ListStates(ctx, svc.Pool, id) // DESC — reversed below for chronological order
 	states = reversed(states)
 	projects, _ := assets.ListProjectsForAsset(ctx, svc.Pool, id)
 	conditionLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierConditionState)
+	stageLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierProjectStage)
 
 	details := []string{}
 	if assetType != nil {
@@ -84,16 +83,6 @@ func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, er
 	}
 	if client != nil {
 		details = append(details, "Owner: "+client.Name)
-	}
-	if len(materials) > 0 {
-		titles := ""
-		for i, m := range materials {
-			if i > 0 {
-				titles += ", "
-			}
-			titles += m.Title
-		}
-		details = append(details, "Materials: "+titles)
 	}
 	if asset.Description.Valid && asset.Description.String != "" {
 		details = append(details, asset.Description.String)
@@ -118,9 +107,9 @@ func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, er
 	if len(projects) > 0 {
 		var paragraphs []string
 		for _, p := range projects {
-			paragraphs = append(paragraphs, fmt.Sprintf("%s — status: %s", p.Title, projectStatusLabel(p.CompletedAt)))
+			paragraphs = append(paragraphs, fmt.Sprintf("%s — stage: %s", p.Title, stageLabel(stageLabels, p.Stage)))
 		}
-		sections = append(sections, Section{Heading: "Workflows", Paragraphs: paragraphs})
+		sections = append(sections, Section{Heading: "Projects", Paragraphs: paragraphs})
 	}
 
 	return &Doc{Title: asset.DisplayName(), Subtitle: asset.ReferenceCode, Sections: sections}, nil
@@ -144,6 +133,7 @@ func (svc *Service) GetProjectExportData(ctx context.Context, id string) (*Doc, 
 	client, _ := clients.GetByID(ctx, svc.Pool, asset.ClientID)
 	activities, _ := workflows.ListActivities(ctx, svc.Pool, id) // DESC — reversed below
 	activities = reversed(activities)
+	stageLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierProjectStage)
 
 	clientName := ""
 	if client != nil {
@@ -154,7 +144,7 @@ func (svc *Service) GetProjectExportData(ctx context.Context, id string) (*Doc, 
 		Paragraphs: []string{
 			"Asset: " + asset.DisplayName(),
 			"Owner: " + clientName,
-			"Status: " + projectStatusLabel(project.CompletedAt),
+			"Stage: " + stageLabel(stageLabels, project.Stage),
 		},
 	}}
 
@@ -171,63 +161,9 @@ func (svc *Service) GetProjectExportData(ctx context.Context, id string) (*Doc, 
 	return &Doc{Title: project.Title, Subtitle: asset.DisplayName(), Sections: sections}, nil
 }
 
-func (svc *Service) GetOrderExportData(ctx context.Context, id string) (*Doc, error) {
-	order, err := commerce.GetOrderByID(ctx, svc.Pool, id)
-	if err != nil {
-		return nil, err
-	}
-	if order == nil {
-		return nil, fmt.Errorf("order %s not found", id)
-	}
-	client, _ := clients.GetByID(ctx, svc.Pool, order.ClientID)
-	projects, _ := commerce.ListProjectsOnOrder(ctx, svc.Pool, id)
-	invoices, _ := commerce.ListInvoicesForOrder(ctx, svc.Pool, id) // DESC — reversed below
-	invoices = reversed(invoices)
-
-	orderStatusLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierOrderStatus)
-	invoiceStatusLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierInvoiceStatus)
-
-	clientName := ""
-	if client != nil {
-		clientName = client.Name
-	}
-	statusLabel := orderStatusLabels[order.Status]
-	if statusLabel == "" {
-		statusLabel = order.Status
-	}
-
-	var projectLines []string
-	for _, p := range projects {
-		assetName := p.AssetReferenceCode
-		if p.AssetTitle.Valid && p.AssetTitle.String != "" {
-			assetName = p.AssetTitle.String
-		}
-		projectLines = append(projectLines, fmt.Sprintf("%s (%s) — %s", p.Title, assetName, projectStatusLabel(p.CompletedAt)))
-	}
-
-	sections := []Section{
-		{Heading: "Order overview", Paragraphs: []string{"Client: " + clientName, "Status: " + statusLabel}},
-		{Heading: "Workflows", Paragraphs: projectLines},
-	}
-
-	for _, inv := range invoices {
-		invStatusLabel := invoiceStatusLabels[inv.Status]
-		if invStatusLabel == "" {
-			invStatusLabel = inv.Status
-		}
-		var lines []string
-		for _, item := range inv.LineItems {
-			lines = append(lines, fmt.Sprintf("%s: %.2f", item.Description, item.Amount))
-		}
-		sections = append(sections, Section{
-			Heading:    fmt.Sprintf("Invoice — %s %.2f (%s)", inv.Currency, inv.Total, invStatusLabel),
-			Paragraphs: lines,
-		})
-	}
-
-	return &Doc{Title: order.OrderNumber, Subtitle: clientName, Sections: sections}, nil
-}
-
+// GetReportExportData renders a Report's five structured sections, skipping any the "Customize
+// layout" sidebar has hidden (report.Show*) and, for the cover, rendering it as its own
+// image-only section first if ShowCover and CoverMediaID are set.
 func (svc *Service) GetReportExportData(ctx context.Context, id string) (*Doc, error) {
 	report, err := reporter.GetByID(ctx, svc.Pool, id)
 	if err != nil {
@@ -238,11 +174,32 @@ func (svc *Service) GetReportExportData(ctx context.Context, id string) (*Doc, e
 	}
 	asset, _ := assets.GetByID(ctx, svc.Pool, report.AssetID)
 
-	sections := flattenTiptap(report.Content)
+	var sections []Section
+	if report.ShowCover && report.CoverMediaID.Valid {
+		sections = append(sections, Section{Heading: "Cover", Images: []Image{{MediaID: report.CoverMediaID.String}}})
+	}
+	if report.ShowSummary && report.Summary.Valid && report.Summary.String != "" {
+		sections = append(sections, Section{Heading: "Summary", Paragraphs: []string{report.Summary.String}})
+	}
+	if report.ShowCondition && report.ConditionFindings.Valid && report.ConditionFindings.String != "" {
+		sections = append(sections, Section{Heading: "Condition findings", Paragraphs: []string{report.ConditionFindings.String}})
+	}
+	if report.ShowTreatment && report.TreatmentPerformed.Valid && report.TreatmentPerformed.String != "" {
+		sections = append(sections, Section{Heading: "Treatment performed", Paragraphs: []string{report.TreatmentPerformed.String}})
+	}
+	if report.ShowMaterials && report.MaterialsUsed.Valid && report.MaterialsUsed.String != "" {
+		sections = append(sections, Section{Heading: "Materials used", Paragraphs: []string{report.MaterialsUsed.String}})
+	}
+	if report.ShowRecommendations && report.Recommendations.Valid && report.Recommendations.String != "" {
+		sections = append(sections, Section{Heading: "Recommendations", Paragraphs: []string{report.Recommendations.String}})
+	}
 
 	images, videos := svc.mediaFor(ctx, media.RefReport, report.ID)
 	if len(images) > 0 || len(videos) > 0 {
 		sections = append(sections, Section{Heading: "Attachments", Images: images, Videos: videos})
+	}
+	if len(sections) == 0 {
+		sections = []Section{{Heading: "Report", Paragraphs: []string{"(empty)"}}}
 	}
 
 	subtitle := ""

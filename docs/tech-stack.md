@@ -45,28 +45,31 @@ needs it.
   every module's `ON DELETE CASCADE`/`SET NULL`/`RESTRICT` relies on this being on),
   `journal_mode(WAL)` (concurrent readers alongside one writer), `busy_timeout(5000)`, and
   `_time_format=sqlite` (millisecond-precision `time.Time` read/write — matters for the
-  polymorphic `MediaReference`/`TagAssignment` tables' "first row by `createdAt`" ordering).
+  polymorphic `MediaReference` table's "first row by `createdAt`" ordering).
 - **SQLite quirks worth knowing if you touch a query:** `condition` and `Order` are reserved
-  words needing double-quoting (`"condition"`, `"Order"`) as bare identifiers; foreign keys must
-  be declared inline in `CREATE TABLE` (no `ALTER TABLE ... ADD CONSTRAINT`) — the one circular
-  reference (`Asset.currentStateId` <-> `AssetState.assetId`) relies on SQLite allowing a
-  `REFERENCES` to a table that doesn't exist yet at `CREATE TABLE` time.
+  words needing double-quoting (`"condition"`, `"Order"`) as bare identifiers (the `Order` table
+  itself was dropped along with the rest of Commerce — see below — but the reserved-word note
+  still applies to `condition`); foreign keys must be declared inline in `CREATE TABLE` (no
+  `ALTER TABLE ... ADD CONSTRAINT`) — the one circular reference (`Asset.currentStateId` <->
+  `AssetState.assetId`) relies on SQLite allowing a `REFERENCES` to a table that doesn't exist yet
+  at `CREATE TABLE` time. Adding a column with `ALTER TABLE ... ADD COLUMN` works fine even with a
+  `REFERENCES` clause (used for `Report.coverMediaId`); dropping or changing an existing column
+  doesn't (used for `Project`'s `0004`/`0006` migrations) — those go through the standard
+  create-new-table/copy-data/drop-old/rename dance instead.
 
-## Image processing: govips (cgo) + a hand-built IIIF API
+## Image processing: govips (cgo), thumbnails only
 
 - [`github.com/davidbyttow/govips/v2`](https://github.com/davidbyttow/govips), a cgo binding to
   `libvips` — the one part of this app that isn't pure Go. Used for upload-time thumbnail
-  generation (`internal/media/service.go`) and a from-scratch IIIF Image API v3 implementation
-  (`internal/media/iiif.go`: region/size/rotation/quality parsing hand-ported onto govips ops)
-  powering the deep-zoom viewer.
+  generation (`internal/media/service.go`). A from-scratch IIIF Image API v3 implementation used
+  to live here too (deep-zoom region/size/rotation/quality transforms) but was removed along with
+  the OpenSeadragon viewer it powered — the design artifact's Media view is a lightbox (CSS
+  rotate/brightness/contrast, no server-side transform), not a deep-zoom viewer.
 - This is why the build/release process (below) runs inside Docker rather than `go build`
   directly on most dev machines — govips needs `libvips-dev` installed to compile against, and
   **Debian, not Ubuntu**, specifically: several of libvips's transitive dependencies
   (`libmagickcore`/`libmagickwand`) are gated behind Ubuntu Pro/ESM on Ubuntu with no plain-account
   fallback; Debian's regular archive has no such gating.
-- One deliberate gap vs. `sharp` (the original app's image library): govips has no direct 1-bit
-  threshold operation, so IIIF `quality=bitonal` is approximated as grayscale. Nothing in this
-  app's own UI requests bitonal — it's spec surface for third-party IIIF clients, not app-invoked.
 
 ## Auth: hand-rolled, no external provider
 
@@ -76,20 +79,17 @@ needs it.
 - `ALLOW_DEV_LOGIN=true` adds a one-click picker (any existing user, no password) for local/staging
   use only — never set it on a real deployment.
 
-## JS: no bundler, per-page vanilla or a real vendored/CDN library
+## JS: no bundler, plain vanilla islands only
 
-There is no `npm run build` step for the frontend — no webpack/esbuild/vite. Every script is
-either:
-- **Plain vanilla JS**, loaded via `<script type="module">` (e.g. `static/js/kanban.js`'s native
-  HTML5 Drag and Drop for the orders board — chosen specifically over `dnd-kit`, which has no
-  vanilla build).
-- **Vendored as-is**, when a library ships a real framework-agnostic flat bundle: OpenSeadragon
-  (`static/vendor/`, downloaded UMD build, checked in — used for the deep-zoom IIIF viewer).
-- **Loaded live via an ESM CDN** ([esm.sh](https://esm.sh)) through a plain
-  `<script type="importmap">`, only when a library has no such flat bundle: TipTap
-  (`internal/reporter`'s rich text editor). This is a disclosed tradeoff — the genuine library,
-  zero build step, at the cost of a runtime dependency on esm.sh being reachable. Every other
-  library avoided this by being vendorable or replaceable with vanilla JS.
+There is no `npm run build` step for the frontend — no webpack/esbuild/vite, and no vendored or
+CDN-loaded third-party JS at all (OpenSeadragon and a CDN-loaded TipTap both used to live here;
+both were removed when the deep-zoom viewer and rich-text editor they powered were replaced —
+see `docs/tech-stack.md`'s image-processing section and `internal/reporter`'s structured sections).
+Every script is plain vanilla JS loaded via `<script type="module">`, reused across every kanban
+board on a shared `data-url-template`/`data-status-field` convention (`static/js/kanban.js` —
+native HTML5 Drag and Drop, chosen over `dnd-kit`, which has no vanilla build) plus small
+single-page islands (`static/js/lightbox.js` for the Media view, `static/js/album.js` for the
+media grid's filter/search).
 
 ## Build & deploy
 

@@ -96,58 +96,6 @@ func UpdateProfile(ctx context.Context, q studiodb.Querier, id string, in Input)
 	return err
 }
 
-// --- Materials -------------------------------------------------------------------------------
-
-func scanMaterial(rows *sql.Rows) (Material, error) {
-	var m Material
-	err := rows.Scan(&m.ID, &m.MaterialID, &m.Role, &m.Title)
-	return m, err
-}
-
-func ListMaterials(ctx context.Context, q studiodb.Querier, assetID string) ([]Material, error) {
-	return studiodb.Query(ctx, q, `
-		SELECT am.id, am.materialId, am.role, c.title FROM AssetMaterial am JOIN Classifier c ON c.id = am.materialId
-		WHERE am.assetId = ?`, scanMaterial, assetID)
-}
-
-func AddMaterial(ctx context.Context, q studiodb.Querier, assetID, materialID, role string) error {
-	existing, err := studiodb.QueryOne(ctx, q, "SELECT id FROM AssetMaterial WHERE assetId = ? AND materialId = ?", scanID, assetID, materialID)
-	if err != nil {
-		return err
-	}
-	if existing != nil {
-		_, err := studiodb.Execute(ctx, q, "UPDATE AssetMaterial SET role = ? WHERE id = ?", nullIfEmpty(role), *existing)
-		return err
-	}
-	_, err = studiodb.Execute(ctx, q, "INSERT INTO AssetMaterial (id, assetId, materialId, role) VALUES (?, ?, ?, ?)",
-		studiodb.NewID(), assetID, materialID, nullIfEmpty(role))
-	return err
-}
-
-func scanID(rows *sql.Rows) (string, error) {
-	var id string
-	err := rows.Scan(&id)
-	return id, err
-}
-
-func RemoveMaterial(ctx context.Context, q studiodb.Querier, assetMaterialID string) error {
-	_, err := studiodb.Execute(ctx, q, "DELETE FROM AssetMaterial WHERE id = ?", assetMaterialID)
-	return err
-}
-
-func AttachMaterialsOnCreate(ctx context.Context, q studiodb.Querier, assetID string, materialIDs []string) error {
-	for _, mid := range materialIDs {
-		if mid == "" {
-			continue
-		}
-		if _, err := studiodb.Execute(ctx, q, "INSERT INTO AssetMaterial (id, assetId, materialId) VALUES (?, ?, ?)",
-			studiodb.NewID(), assetID, mid); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // --- Condition states (AssetState) ------------------------------------------------------------
 
 func scanState(rows *sql.Rows) (State, error) {
@@ -185,16 +133,16 @@ func ptrToAny(s *string) any {
 	return *s
 }
 
-// --- Workflows summary (Project) --------------------------------------------------------------
+// --- Projects summary ---------------------------------------------------------------------
 
 func scanProjectSummary(rows *sql.Rows) (ProjectSummary, error) {
 	var p ProjectSummary
-	err := rows.Scan(&p.ID, &p.Title, &p.CompletedAt, &p.OrderNumber)
+	err := rows.Scan(&p.ID, &p.Title, &p.Stage)
 	return p, err
 }
 
 func ListProjectsForAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]ProjectSummary, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT p.id, p.title, p.completedAt, o.orderNumber FROM Project p LEFT JOIN "Order" o ON o.id = p.orderId
+		SELECT p.id, p.title, p.stage FROM Project p
 		WHERE p.assetId = ? ORDER BY p.createdAt DESC`, scanProjectSummary, assetID)
 }

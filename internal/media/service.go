@@ -100,52 +100,6 @@ func nullIfZero(n int) any {
 	return n
 }
 
-// SaveEditedImage saves a painted/annotated copy as a brand-new Media row — the edit is a
-// sibling of the source, never an overwrite. Copies the source's first MediaReference (role
-// suffixed "(edited)") so the edit shows up right next to the original everywhere it does.
-func (s *Service) SaveEditedImage(ctx context.Context, sourceMediaID string, data []byte, uploadedByUserID string) (*Media, error) {
-	source, err := GetByID(ctx, s.Pool, sourceMediaID)
-	if err != nil {
-		return nil, err
-	}
-	sourceRef, err := studiodb.QueryOne(ctx, s.Pool,
-		"SELECT "+referenceColumns+" FROM MediaReference WHERE mediaId = ? ORDER BY createdAt ASC LIMIT 1", scanReference, sourceMediaID)
-	if err != nil {
-		return nil, err
-	}
-
-	sum := sha256.Sum256(data)
-	checksum := hex.EncodeToString(sum[:])
-	id := studiodb.NewID()
-	if _, err := studiodb.Execute(ctx, s.Pool,
-		"INSERT INTO Media (id, storageKey, kind, mimeType, sizeBytes, checksum, uploadedByUserId, editedFromId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		id, "", KindImage, "image/png", len(data), checksum, uploadedByUserID, source.ID); err != nil {
-		return nil, err
-	}
-
-	originalKey := id + "/original.png"
-	if err := s.Storage.Put(originalKey, data); err != nil {
-		return nil, err
-	}
-	width, height := s.storeImageVariants(id, data)
-
-	if sourceRef != nil {
-		role := "edited"
-		if sourceRef.Role.Valid && sourceRef.Role.String != "" {
-			role = sourceRef.Role.String + " (edited)"
-		}
-		if err := s.AttachMediaReference(ctx, id, sourceRef.ReferencingType, sourceRef.ReferencingID, role, sourceRef.SortOrder); err != nil {
-			return nil, err
-		}
-	}
-
-	if _, err := studiodb.Execute(ctx, s.Pool, "UPDATE Media SET storageKey = ?, width = ?, height = ? WHERE id = ?",
-		originalKey, nullIfZero(width), nullIfZero(height), id); err != nil {
-		return nil, err
-	}
-	return GetByID(ctx, s.Pool, id)
-}
-
 func (s *Service) AttachMediaReference(ctx context.Context, mediaID string, refType ReferencingType, refID, role string, sortOrder int) error {
 	_, err := studiodb.Execute(ctx, s.Pool,
 		"INSERT INTO MediaReference (id, mediaId, referencingType, referencingId, role, sortOrder) VALUES (?, ?, ?, ?, ?, ?)",

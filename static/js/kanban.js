@@ -1,9 +1,17 @@
-// Orders kanban — native HTML5 Drag and Drop API, no dependency. dnd-kit (the original app's
-// drag library) is React-only with no framework-agnostic build, so this is a small vanilla
-// island instead rather than vendoring React+ReactDOM just for one board.
+// Generic kanban board — native HTML5 Drag and Drop API, no dependency. dnd-kit (the original
+// app's drag library) is React-only with no framework-agnostic build, so this is a small vanilla
+// island instead rather than vendoring React+ReactDOM just for one board. Reused by every kanban
+// in the app (currently just Projects); the board element carries the per-board config via data
+// attributes so this script itself never hardcodes an entity or route:
+//   data-url-template="/projects/{id}/stage"  — {id} is replaced with the dragged card's item id
+//   data-status-field="stage"                 — the form field name the new column code posts as
+// Each card carries data-item-id; each column (header + body) carries data-status.
 document.addEventListener("DOMContentLoaded", () => {
   const board = document.getElementById("kanban-board");
   if (!board) return;
+
+  const urlTemplate = board.dataset.urlTemplate;
+  const statusField = board.dataset.statusField;
 
   let draggingCard = null;
 
@@ -11,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     card.addEventListener("dragstart", (e) => {
       draggingCard = card;
       e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", card.dataset.orderId);
+      e.dataTransfer.setData("text/plain", card.dataset.itemId);
       card.classList.add("is-dragging");
     });
     card.addEventListener("dragend", () => {
@@ -35,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!draggingCard) return;
 
       const newStatus = column.dataset.status;
-      const orderId = draggingCard.dataset.orderId;
+      const itemId = draggingCard.dataset.itemId;
       const oldColumn = draggingCard.parentElement;
       if (oldColumn === column) return;
 
@@ -43,13 +51,13 @@ document.addEventListener("DOMContentLoaded", () => {
       updateCount(oldColumn);
       updateCount(column);
 
-      fetch(`/clients/orders/${orderId}/status`, {
+      fetch(urlTemplate.replace("{id}", itemId), {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           "X-Requested-With": "fetch",
         },
-        body: `status=${encodeURIComponent(newStatus)}`,
+        body: `${statusField}=${encodeURIComponent(newStatus)}`,
       }).then((res) => {
         if (!res.ok) {
           window.location.reload();

@@ -13,6 +13,7 @@ import (
 	"studio/internal/media"
 	"studio/internal/reporter"
 	"studio/internal/settings"
+	"studio/internal/treatments"
 	"studio/internal/web"
 )
 
@@ -30,10 +31,6 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /assets/{id}/edit", svc.Auth.RequireUser(svc.handleEditForm))
 	mux.HandleFunc("POST /assets/{id}/update", svc.Auth.RequireUser(svc.handleUpdate))
 	mux.HandleFunc("POST /assets/{id}/states", svc.Auth.RequireUser(svc.handleRecordState))
-	mux.HandleFunc("POST /assets/{id}/materials", svc.Auth.RequireUser(svc.handleAddMaterial))
-	mux.HandleFunc("POST /assets/{id}/materials/{materialId}/delete", svc.Auth.RequireUser(svc.handleRemoveMaterial))
-	mux.HandleFunc("POST /assets/{id}/tags", svc.Auth.RequireUser(svc.handleAddTag))
-	mux.HandleFunc("POST /assets/{id}/tags/{assignmentId}/delete", svc.Auth.RequireUser(svc.handleRemoveTag))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -66,12 +63,7 @@ func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	materials, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierMaterial)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeHTML(w, r, NewPage(chromeFor(r, user, "/assets"), allClients, assetTypes, materials, r.URL.Query().Get("clientId")))
+	writeHTML(w, r, NewPage(chromeFor(r, user, "/assets"), allClients, assetTypes, r.URL.Query().Get("clientId")))
 }
 
 func formInput(r *http.Request) Input {
@@ -129,16 +121,6 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 		return
 	}
 
-	if err := AttachMaterialsOnCreate(ctx, svc.Pool, id, r.Form["materialIds"]); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if tags := strings.TrimSpace(r.FormValue("tags")); tags != "" {
-		if err := settings.SetTags(ctx, svc.Pool, "Asset", id, tags); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
 	if intake := strings.TrimSpace(r.FormValue("intakeDescription")); intake != "" {
 		stateID, err := RecordState(ctx, svc.Pool, id, "intake", intake, nil, nil)
 		if err != nil {
@@ -177,11 +159,6 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	materials, err := ListMaterials(ctx, svc.Pool, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	states, err := ListStates(ctx, svc.Pool, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -192,30 +169,10 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tagAssignments, err := settings.GetTagAssignments(ctx, svc.Pool, "Asset", id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	conditions, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierConditionState)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	allMaterials, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierMaterial)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	attached := map[string]bool{}
-	for _, m := range materials {
-		attached[m.MaterialID] = true
-	}
-	var available []settings.Classifier
-	for _, m := range allMaterials {
-		if !attached[m.ID] {
-			available = append(available, m)
-		}
 	}
 	conditionByCode := map[string]settings.Classifier{}
 	for _, c := range conditions {
@@ -237,9 +194,14 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	assetTreatments, err := treatments.ListByAsset(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, materials, available, states,
-		projects, tagAssignments, conditions, conditionByCode, stateMedia, reports))
+	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, states,
+		projects, conditions, conditionByCode, stateMedia, reports, assetTreatments))
 }
 
 func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -286,55 +248,6 @@ func (svc *Service) handleRecordState(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
-}
-
-func (svc *Service) handleAddMaterial(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	id := r.PathValue("id")
-	materialID := r.FormValue("materialId")
-	if materialID == "" {
-		http.Error(w, "Select a material.", http.StatusBadRequest)
-		return
-	}
-	if err := AddMaterial(r.Context(), svc.Pool, id, materialID, r.FormValue("role")); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
-}
-
-func (svc *Service) handleRemoveMaterial(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	id := r.PathValue("id")
-	if err := RemoveMaterial(r.Context(), svc.Pool, r.PathValue("materialId")); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
-}
-
-func (svc *Service) handleAddTag(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	id := r.PathValue("id")
-	if err := settings.AddTagToEntity(r.Context(), svc.Pool, "Asset", id, r.FormValue("name")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
-}
-
-func (svc *Service) handleRemoveTag(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	id := r.PathValue("id")
-	if err := settings.RemoveTagAssignment(r.Context(), svc.Pool, r.PathValue("assignmentId")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

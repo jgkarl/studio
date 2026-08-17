@@ -11,7 +11,6 @@ import (
 	"studio/internal/assets"
 	"studio/internal/auth"
 	"studio/internal/clients"
-	"studio/internal/commerce"
 	"studio/internal/config"
 	"studio/internal/dashboard"
 	"studio/internal/db"
@@ -22,6 +21,7 @@ import (
 	"studio/internal/seed"
 	"studio/internal/session"
 	"studio/internal/settings"
+	"studio/internal/treatments"
 	"studio/internal/web"
 	"studio/internal/workflows"
 )
@@ -89,8 +89,8 @@ func main() {
 	clients.Mount(mux, &clients.Service{Pool: pool, Auth: authSvc})
 	assets.Mount(mux, &assets.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	media.Mount(mux, &media.HandlerService{Service: mediaSvc, Auth: authSvc})
-	workflows.Mount(mux, &workflows.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
-	commerce.Mount(mux, &commerce.Service{Pool: pool, Auth: authSvc})
+	treatments.Mount(mux, &treatments.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
+	workflows.Mount(mux, &workflows.Service{Pool: pool, Auth: authSvc})
 	reporter.Mount(mux, &reporter.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	export.Mount(mux, &export.Service{Pool: pool, Media: mediaSvc}, authSvc)
 

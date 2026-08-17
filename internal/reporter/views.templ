@@ -4,11 +4,11 @@ import "studio/internal/media"
 import "studio/internal/web"
 
 templ ListPage(c web.Chrome, rows []ListRow) {
-	@web.AppLayout("Reporter", c, listBody(rows))
+	@web.AppLayout("Reports", c, listBody(rows))
 }
 
 templ listBody(rows []ListRow) {
-	@web.PageHeader("Reporter", "Conservation write-ups.", newReportLink())
+	@web.PageHeader("Reports", "Conservation write-ups.", newReportLink())
 	@web.Card() {
 		if len(rows) == 0 {
 			<p class="empty-state">No reports yet.</p>
@@ -17,7 +17,7 @@ templ listBody(rows []ListRow) {
 			for _, row := range rows {
 				<li class="entity-list-row">
 					<div>
-						<a href={ templ.URL("/reporter/" + row.ID) } class="entity-list-name">{ row.Title }</a>
+						<a href={ templ.URL("/reports/" + row.ID) } class="entity-list-name">{ row.Title }</a>
 						<div class="page-subtitle">
 							if row.AssetTitle.Valid {
 								{ row.AssetTitle.String }
@@ -41,7 +41,7 @@ templ listBody(rows []ListRow) {
 }
 
 templ newReportLink() {
-	<a class="btn btn-primary" href="/reporter/new">
+	<a class="btn btn-primary" href="/reports/new">
 		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
 		New report
 	</a>
@@ -54,8 +54,8 @@ templ NewPage(c web.Chrome, assets []AssetOption, projects []ProjectOption, pres
 templ newBody(assets []AssetOption, projects []ProjectOption, preselectedAssetID, preselectedProjectID string) {
 	@web.PageHeader("New report", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/reporter" class="form-grid">
-			@web.Field("Asset", "") {
+		<form method="post" action="/reports" class="form-grid">
+			@web.Field("Asset", "pre-fills condition findings and treatment performed from this asset's history") {
 				<select class="input" name="assetId" required>
 					<option value="" disabled selected?={ preselectedAssetID == "" }>Select an asset…</option>
 					for _, a := range assets {
@@ -63,9 +63,9 @@ templ newBody(assets []AssetOption, projects []ProjectOption, preselectedAssetID
 					}
 				</select>
 			}
-			@web.Field("Workflow", "pre-fills a suggested outline from its Notebook data") {
+			@web.Field("Project", "optional — links this report to a project") {
 				<select class="input" name="projectId">
-					<option value="" selected?={ preselectedProjectID == "" }>No workflow — blank report</option>
+					<option value="" selected?={ preselectedProjectID == "" }>No project</option>
 					for _, p := range projects {
 						<option value={ p.ID } selected?={ p.ID == preselectedProjectID }>{ p.Title }</option>
 					}
@@ -100,7 +100,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 		@web.ExportLinks("report", report.ID)
 		if report.Status == "final" {
 			<span class="badge badge-green">Final</span>
-			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/status") }>
+			<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
 				<input type="hidden" name="status" value="draft"/>
 				<button type="submit" class="btn btn-secondary">
 					<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
@@ -109,7 +109,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 			</form>
 		} else {
 			<span class="badge badge-amber">Draft</span>
-			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/status") }>
+			<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
 				<input type="hidden" name="status" value="final"/>
 				<button type="submit" class="btn btn-secondary">
 					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
@@ -119,42 +119,113 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 		}
 	</div>
 
-	@reportEditor(report)
+	<div class="report-layout">
+		<div class="report-layout-main">
+			@web.Card() {
+				<form method="post" action={ templ.URL("/reports/" + report.ID + "/sections") } class="form-grid">
+					@web.Field("Summary", "") {
+						<textarea class="input" name="summary" rows="3" readonly?={ report.Status == "final" }>{ report.Summary.String }</textarea>
+					}
+					@web.Field("Condition findings", "") {
+						<textarea class="input" name="conditionFindings" rows="4" readonly?={ report.Status == "final" }>{ report.ConditionFindings.String }</textarea>
+					}
+					@web.Field("Treatment performed", "") {
+						<textarea class="input" name="treatmentPerformed" rows="4" readonly?={ report.Status == "final" }>{ report.TreatmentPerformed.String }</textarea>
+					}
+					@web.Field("Materials used", "") {
+						<textarea class="input" name="materialsUsed" rows="3" readonly?={ report.Status == "final" }>{ report.MaterialsUsed.String }</textarea>
+					}
+					@web.Field("Recommendations", "") {
+						<textarea class="input" name="recommendations" rows="3" readonly?={ report.Status == "final" }>{ report.Recommendations.String }</textarea>
+					}
+					if report.Status != "final" {
+						<button type="submit" class="btn btn-primary">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+							Save sections
+						</button>
+					}
+				</form>
+			}
 
-	@web.Card() {
-		<h2 class="dashboard-heading">Attachments <span class="page-subtitle">(images/video, not inline in the text)</span></h2>
-		@media.MediaGrid(attachments)
-		if report.Status != "final" {
-			<form method="post" action={ templ.URL("/reporter/" + report.ID + "/attachments") } enctype="multipart/form-data" class="row-actions form-section">
-				<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-				<button type="submit" class="btn btn-secondary">
-					<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-					Upload
-				</button>
-			</form>
-		}
-	}
+			@web.Card() {
+				<h2 class="dashboard-heading">Attachments <span class="page-subtitle">(images/video)</span></h2>
+				@media.MediaGrid(attachments)
+				if report.Status != "final" {
+					<form method="post" action={ templ.URL("/reports/" + report.ID + "/attachments") } enctype="multipart/form-data" class="row-actions form-section">
+						<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+						<button type="submit" class="btn btn-secondary">
+							<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+							Upload
+						</button>
+					</form>
+				}
+			}
+		</div>
+
+		<div class="report-layout-sidebar">
+			@web.Card() {
+				<h2 class="dashboard-heading">Customize layout</h2>
+				<form method="post" action={ templ.URL("/reports/" + report.ID + "/layout") } class="form-grid">
+					@web.Field("Layout style", "") {
+						<select class="input" name="layoutStyle">
+							for _, style := range []string{"standard", "compact", "gallery"} {
+								<option value={ style } selected?={ style == report.LayoutStyle }>{ layoutStyleLabel(style) }</option>
+							}
+						</select>
+					}
+					if len(attachments) > 0 {
+						@web.Field("Cover image", "") {
+							<select class="input" name="coverMediaId">
+								<option value="">None</option>
+								for _, ref := range attachments {
+									<option value={ ref.MediaID } selected?={ report.CoverMediaID.Valid && report.CoverMediaID.String == ref.MediaID }>{ ref.MediaID }</option>
+								}
+							</select>
+						}
+					}
+					<div class="checkbox-grid">
+						<label class="checkbox-field">
+							<input type="checkbox" name="showCover" checked?={ report.ShowCover }/>
+							Cover
+						</label>
+						<label class="checkbox-field">
+							<input type="checkbox" name="showSummary" checked?={ report.ShowSummary }/>
+							Summary
+						</label>
+						<label class="checkbox-field">
+							<input type="checkbox" name="showCondition" checked?={ report.ShowCondition }/>
+							Condition findings
+						</label>
+						<label class="checkbox-field">
+							<input type="checkbox" name="showTreatment" checked?={ report.ShowTreatment }/>
+							Treatment performed
+						</label>
+						<label class="checkbox-field">
+							<input type="checkbox" name="showMaterials" checked?={ report.ShowMaterials }/>
+							Materials used
+						</label>
+						<label class="checkbox-field">
+							<input type="checkbox" name="showRecommendations" checked?={ report.ShowRecommendations }/>
+							Recommendations
+						</label>
+					</div>
+					<button type="submit" class="btn btn-secondary">
+						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+						Save layout
+					</button>
+				</form>
+			}
+		</div>
+	</div>
 }
 
-templ reportEditor(report Report) {
-	<div
-		id="report-editor"
-		class="report-editor-root"
-		data-report-id={ report.ID }
-		data-readonly?={ report.Status == "final" }
-		data-content={ report.Content }
-	>
-		<div id="report-editor-toolbar" class="report-editor-toolbar"></div>
-		<div id="report-editor-content" class="report-editor-content"></div>
-	</div>
-	<script type="importmap">
-		{
-			"imports": {
-				"@tiptap/core": "https://esm.sh/@tiptap/core@3.28.0",
-				"@tiptap/starter-kit": "https://esm.sh/@tiptap/starter-kit@3.28.0",
-				"@tiptap/extension-image": "https://esm.sh/@tiptap/extension-image@3.28.0"
-			}
-		}
-	</script>
-	<script type="module" src="/static/js/report-editor.js"></script>
+func layoutStyleLabel(style string) string {
+	switch style {
+	case "compact":
+		return "Compact"
+	case "gallery":
+		return "Gallery"
+	default:
+		return "Standard"
+	}
 }
