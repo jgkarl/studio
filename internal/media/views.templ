@@ -96,11 +96,11 @@ func albumSearchHaystack(item AlbumItem) string {
 	return out
 }
 
-templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Reference) {
-	@web.AppLayout(mediaViewTitle(m, reference), c, mediaViewBody(m, uploadedByName, reference))
+templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+	@web.AppLayout(mediaViewTitle(m, reference), c, mediaViewBody(m, uploadedByName, reference, regions, annotationTypes))
 }
 
-templ mediaViewBody(m Media, uploadedByName string, reference *Reference) {
+templ mediaViewBody(m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
 	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m))
 	@web.Card() {
 		<div class="row-actions" style="margin-bottom: 0.75rem;">
@@ -117,7 +117,10 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference) {
 			<button type="button" id="lightbox-trigger" class="lightbox-trigger" data-media-id={ m.ID } aria-label="Open image viewer">
 				<img src={ "/api/media/" + m.ID } alt=""/>
 			</button>
-			<p class="page-subtitle" style="text-align: center; margin-top: 0.5rem;">Click to open · rotate, adjust, annotate</p>
+			<div class="row-actions" style="justify-content: center; margin-top: 0.5rem;">
+				<p class="page-subtitle" style="margin: 0;">Click to open · rotate, adjust, annotate</p>
+				<button type="button" id="iiif-viewer-trigger" class="btn btn-secondary">Deep zoom</button>
+			</div>
 		}
 		if m.Kind == KindVideo {
 			<video controls class="media-view-video" src={ "/api/media/" + m.ID + "?variant=original" }></video>
@@ -129,7 +132,147 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference) {
 	if m.Kind == KindImage {
 		@lightboxModal(m.ID)
 		<script src="/static/js/lightbox.js" defer></script>
+		@iiifViewerModal(m.ID)
+		<script src="/static/js/iiif-viewer.js" defer></script>
+		@patternLayerCard(m, regions, annotationTypes)
+		<script src="/static/js/pattern-layer.js" defer></script>
 	}
+}
+
+// iiifViewerModal is a read-only deep-zoom viewer backed by the real IIIF Image API
+// (internal/iiif) — wheel zooms, drag pans, both recomputing a pct: region server-side crop. Kept
+// separate from the pattern-layer card: combining live pan/zoom with drag-to-draw is a much
+// harder coordinate-transform problem than either alone. No vendored library (studio-go's own
+// README states that as an explicit value) — static/js/iiif-viewer.js is hand-rolled.
+templ iiifViewerModal(mediaID string) {
+	<div id="iiif-viewer-overlay" class="lightbox-overlay" hidden>
+		<div class="lightbox-modal iiif-viewer-modal">
+			<button type="button" id="iiif-viewer-close" class="lightbox-close" aria-label="Close">
+				<img src="/static/icons/close.svg" width="18" height="18" alt="" class="icon"/>
+			</button>
+			<div class="iiif-viewer-stage" id="iiif-viewer-stage" data-media-id={ mediaID }>
+				<img id="iiif-viewer-image" class="iiif-viewer-image" src={ "/api/iiif/" + mediaID + "/full/max/0/default.jpg" } alt=""/>
+			</div>
+			<div class="lightbox-control-row iiif-viewer-controls">
+				<button type="button" id="iiif-viewer-zoom-out" class="btn btn-secondary" aria-label="Zoom out">−</button>
+				<button type="button" id="iiif-viewer-zoom-in" class="btn btn-secondary" aria-label="Zoom in">+</button>
+				<button type="button" id="iiif-viewer-reset" class="btn btn-ghost">Reset</button>
+				<span class="page-subtitle">Scroll to zoom · drag to pan</span>
+			</div>
+		</div>
+	</div>
+}
+
+// patternLayerCard is the "basic pattern layer": the IIIF Image API's quality=gray transform as
+// the base image (that's the "bw image of the original"), an absolutely-positioned SVG overlay of
+// stored rectangle regions (percentage coordinates, so it stays correct at any rendered size), and
+// a legend underneath. Deliberately not the original app's freehand canvas painter — regions are
+// data (rows), never baked into a new raster image.
+templ patternLayerCard(m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+	@web.Card() {
+		<div class="pattern-layer-header">
+			<h2 class="dashboard-heading">Pattern layer</h2>
+			<div class="pattern-layer-controls">
+				<label class="checkbox-field">
+					<input type="checkbox" id="pattern-layer-show" checked/>
+					Show pattern layer
+				</label>
+				if len(annotationTypes) > 0 {
+					<label class="checkbox-field">
+						<input type="checkbox" id="pattern-layer-add-toggle"/>
+						+ Add region
+					</label>
+				}
+			</div>
+		</div>
+		if len(annotationTypes) == 0 {
+			<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before drawing regions.</p>
+		} else {
+			<div class="pattern-layer-palette" id="pattern-layer-palette" hidden>
+				for i, t := range annotationTypes {
+					<label class="pattern-layer-palette-item">
+						<input type="radio" name="pattern-layer-type" value={ t.ID } checked?={ i == 0 }/>
+						<span class="pattern-layer-swatch" style={ "background-color:" + t.Color }></span>
+						{ t.Label }
+					</label>
+				}
+			</div>
+		}
+		<div class="pattern-layer-stage" id="pattern-layer-wrap" data-media-id={ m.ID }>
+			<img id="pattern-layer-image" class="pattern-layer-image" src={ "/api/iiif/" + m.ID + "/full/max/0/gray.jpg" } alt="Grayscale rendition"/>
+			<svg id="pattern-layer-svg" class="pattern-layer-svg" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+				<defs>
+					for _, t := range UsedTypeOptions(regions, annotationTypes) {
+						@hatchPatternDef(t)
+					}
+				</defs>
+				for _, r := range regions {
+					@regionRect(r, OptionByID(annotationTypes, r.AnnotationTypeID))
+				}
+			</svg>
+		</div>
+		@patternLayerLegend(regions, annotationTypes)
+	}
+}
+
+templ hatchPatternDef(t AnnotationTypeOption) {
+	<pattern
+		id={ "pattern-" + t.ID }
+		width="6"
+		height="6"
+		patternUnits="userSpaceOnUse"
+		patternTransform={ "rotate(" + strconv.Itoa(HatchAngle(t.Hatch)) + ")" }
+	>
+		<line x1="0" y1="3" x2="6" y2="3" stroke={ t.Color } stroke-width="1.5"></line>
+	</pattern>
+}
+
+templ regionRect(r AnnotationRegion, t AnnotationTypeOption) {
+	if t.ID != "" {
+		<rect
+			x={ formatPct(r.XPct) }
+			y={ formatPct(r.YPct) }
+			width={ formatPct(r.WidthPct) }
+			height={ formatPct(r.HeightPct) }
+			fill={ "url(#pattern-" + t.ID + ")" }
+			stroke={ t.Color }
+			stroke-width="0.3"
+			fill-opacity="0.55"
+		></rect>
+	}
+}
+
+templ patternLayerLegend(regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+	<div class="pattern-layer-legend">
+		if len(regions) == 0 {
+			<p class="page-subtitle">No regions marked yet.</p>
+		} else {
+			<div class="pattern-layer-legend-swatches">
+				for _, t := range UsedTypeOptions(regions, annotationTypes) {
+					<div class="pattern-layer-legend-item">
+						<span class="pattern-layer-swatch" style={ "background-color:" + t.Color }></span>
+						{ t.Label }
+					</div>
+				}
+			</div>
+			<ul class="pattern-layer-region-list">
+				for _, r := range regions {
+					<li>
+						<span>{ OptionByID(annotationTypes, r.AnnotationTypeID).Label }</span>
+						<form method="post" action={ templ.URL("/media/" + r.MediaID + "/annotations/" + r.ID + "/delete") } data-confirm="Remove this region?">
+							<button type="submit" class="tag-pill-remove" aria-label="Remove region">
+								<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
+							</button>
+						</form>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+func formatPct(n float64) string {
+	return strconv.FormatFloat(n, 'f', 3, 64)
 }
 
 // lightboxModal is a simple viewer, not an editor: rotate + brightness/contrast CSS filters and

@@ -15,6 +15,7 @@ import (
 	"studio/internal/dashboard"
 	"studio/internal/db"
 	"studio/internal/export"
+	"studio/internal/iiif"
 	"studio/internal/mail"
 	"studio/internal/media"
 	"studio/internal/reporter"
@@ -90,6 +91,7 @@ func main() {
 	workflows.Mount(mux, &workflows.Service{Pool: pool, Auth: authSvc})
 	reporter.Mount(mux, &reporter.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	export.Mount(mux, &export.Service{Pool: pool, Media: mediaSvc}, authSvc)
+	iiif.Mount(mux, &iiif.Service{Media: mediaSvc}, authSvc)
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

@@ -21,6 +21,7 @@ const (
 	ClassifierProjectStage    ClassifierType = "project_stage"
 	ClassifierPriority        ClassifierType = "priority"
 	ClassifierTreatmentMethod ClassifierType = "treatment_method"
+	ClassifierAnnotationType  ClassifierType = "annotation_type"
 )
 
 // ClassifierTypes is the display order for the /settings/classifiers index.
@@ -33,6 +34,7 @@ var ClassifierTypes = []ClassifierType{
 	ClassifierProjectStage,
 	ClassifierPriority,
 	ClassifierTreatmentMethod,
+	ClassifierAnnotationType,
 }
 
 var ClassifierTypeLabels = map[ClassifierType]string{
@@ -44,6 +46,7 @@ var ClassifierTypeLabels = map[ClassifierType]string{
 	ClassifierProjectStage:    "Project Stages",
 	ClassifierPriority:        "Priority",
 	ClassifierTreatmentMethod: "Treatment Methods",
+	ClassifierAnnotationType:  "Annotation Types (Pattern Layer)",
 }
 
 func IsValidClassifierType(t string) bool {
