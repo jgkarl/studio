@@ -7,15 +7,17 @@ import (
 	"time"
 
 	studiodb "studio/internal/db"
+	"studio/internal/i18n"
 )
 
 func scanClassifier(rows *sql.Rows) (Classifier, error) {
 	var c Classifier
-	err := rows.Scan(&c.ID, &c.Type, &c.Code, &c.Sequence, &c.Title, &c.Description, &c.Data, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+	err := rows.Scan(&c.ID, &c.Type, &c.Code, &c.Sequence, &c.Title, &c.TitleEt, &c.Description, &c.DescriptionEt,
+		&c.Data, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	return c, err
 }
 
-const classifierColumns = "id, type, code, sequence, title, description, data, isActive, createdAt, updatedAt"
+const classifierColumns = "id, type, code, sequence, title, titleEt, description, descriptionEt, data, isActive, createdAt, updatedAt"
 
 // GetClassifiers returns active classifiers of a type, in display order — what every <select> in
 // the app uses.
@@ -33,26 +35,26 @@ func GetClassifierByID(ctx context.Context, q studiodb.Querier, id string) (*Cla
 	return studiodb.QueryOne(ctx, q, "SELECT "+classifierColumns+" FROM Classifier WHERE id = ?", scanClassifier, id)
 }
 
-// GetClassifierLabel resolves a code to its display title, falling back to the code itself if
-// the classifier row is missing.
-func GetClassifierLabel(ctx context.Context, q studiodb.Querier, t ClassifierType, code string) (string, error) {
+// GetClassifierLabel resolves a code to its display title (locale-resolved via ClassifierLabel),
+// falling back to the code itself if the classifier row is missing.
+func GetClassifierLabel(ctx context.Context, q studiodb.Querier, t ClassifierType, code string, locale i18n.Locale) (string, error) {
 	row, err := studiodb.QueryOne(ctx, q, "SELECT "+classifierColumns+" FROM Classifier WHERE type = ? AND code = ?", scanClassifier, t, code)
 	if err != nil || row == nil {
 		return code, err
 	}
-	return row.Title, nil
+	return ClassifierLabel(*row, locale), nil
 }
 
-// GetClassifierLabelMap builds a {code: title} map for a type — handy for label lookups without
-// N+1 queries (e.g. rendering a list of Orders, each with its own status code).
-func GetClassifierLabelMap(ctx context.Context, q studiodb.Querier, t ClassifierType) (map[string]string, error) {
+// GetClassifierLabelMap builds a {code: title} map for a type, locale-resolved — handy for label
+// lookups without N+1 queries (e.g. rendering a list of Treatments, each with its own method code).
+func GetClassifierLabelMap(ctx context.Context, q studiodb.Querier, t ClassifierType, locale i18n.Locale) (map[string]string, error) {
 	rows, err := studiodb.Query(ctx, q, "SELECT "+classifierColumns+" FROM Classifier WHERE type = ?", scanClassifier, t)
 	if err != nil {
 		return nil, err
 	}
 	m := make(map[string]string, len(rows))
 	for _, row := range rows {
-		m[row.Code] = row.Title
+		m[row.Code] = ClassifierLabel(row, locale)
 	}
 	return m, nil
 }
@@ -84,28 +86,32 @@ func scanCount(rows *sql.Rows) (int, error) {
 }
 
 type ClassifierInput struct {
-	Type        ClassifierType
-	Code        string
-	Title       string
-	Description string
-	Sequence    int
-	IsActive    bool
-	Data        string // raw JSON text, already validated by the caller; "" means NULL
+	Type          ClassifierType
+	Code          string
+	Title         string
+	TitleEt       string
+	Description   string
+	DescriptionEt string
+	Sequence      int
+	IsActive      bool
+	Data          string // raw JSON text, already validated by the caller; "" means NULL
 }
 
 func CreateClassifier(ctx context.Context, q studiodb.Querier, in ClassifierInput) (string, error) {
 	id := studiodb.NewID()
 	_, err := studiodb.Execute(ctx, q,
-		"INSERT INTO Classifier (id, type, code, title, description, sequence, data, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		id, in.Type, in.Code, in.Title, nullIfEmpty(in.Description), in.Sequence, nullIfEmpty(in.Data), time.Now(),
+		"INSERT INTO Classifier (id, type, code, title, titleEt, description, descriptionEt, sequence, data, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		id, in.Type, in.Code, in.Title, nullIfEmpty(in.TitleEt), nullIfEmpty(in.Description), nullIfEmpty(in.DescriptionEt),
+		in.Sequence, nullIfEmpty(in.Data), time.Now(),
 	)
 	return id, err
 }
 
 func UpdateClassifier(ctx context.Context, q studiodb.Querier, id string, in ClassifierInput) error {
 	_, err := studiodb.Execute(ctx, q,
-		"UPDATE Classifier SET title = ?, description = ?, sequence = ?, isActive = ?, data = ?, updatedAt = ? WHERE id = ?",
-		in.Title, nullIfEmpty(in.Description), in.Sequence, in.IsActive, nullIfEmpty(in.Data), time.Now(), id,
+		"UPDATE Classifier SET title = ?, titleEt = ?, description = ?, descriptionEt = ?, sequence = ?, isActive = ?, data = ?, updatedAt = ? WHERE id = ?",
+		in.Title, nullIfEmpty(in.TitleEt), nullIfEmpty(in.Description), nullIfEmpty(in.DescriptionEt), in.Sequence,
+		in.IsActive, nullIfEmpty(in.Data), time.Now(), id,
 	)
 	return err
 }

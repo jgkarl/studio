@@ -70,4 +70,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const header = columnBody.parentElement.querySelector(".kanban-column-header .page-subtitle");
     if (header) header.textContent = columnBody.querySelectorAll(".kanban-card").length;
   }
+
+  // Search: cards live one per column (not one flat list), so this stays board-specific rather
+  // than reusing static/js/entity-list-filter.js, which assumes a single flat <ul>/<li> list.
+  const search = document.getElementById("kanban-search");
+  if (search) {
+    search.addEventListener("input", () => {
+      const q = search.value.trim().toLowerCase();
+      board.querySelectorAll(".kanban-card").forEach((card) => {
+        card.hidden = q !== "" && !(card.dataset.search || "").toLowerCase().includes(q);
+      });
+    });
+  }
 });

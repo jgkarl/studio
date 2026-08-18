@@ -8,28 +8,35 @@ import (
 	studiodb "studio/internal/db"
 )
 
-const treatmentColumns = "id, assetId, method, title, notes, performedByUserId, performedAt, createdAt, updatedAt"
+const treatmentColumns = "id, assetId, method, title, notes, performedByUserId, performedAt, createdAt, updatedAt, deletedAt"
 
 func scanTreatment(rows *sql.Rows) (Treatment, error) {
 	var t Treatment
 	err := rows.Scan(&t.ID, &t.AssetID, &t.Method, &t.Title, &t.Notes, &t.PerformedByUserID,
-		&t.PerformedAt, &t.CreatedAt, &t.UpdatedAt)
+		&t.PerformedAt, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt)
 	return t, err
 }
 
 func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Treatment, error) {
-	return studiodb.QueryOne(ctx, q, "SELECT "+treatmentColumns+" FROM Treatment WHERE id = ?", scanTreatment, id)
+	return studiodb.QueryOne(ctx, q, "SELECT "+treatmentColumns+" FROM Treatment WHERE id = ? AND deletedAt IS NULL", scanTreatment, id)
+}
+
+// Unlink soft-deletes the treatment — assetId is required (NOT NULL), so unlike Media there's no
+// "detach" possible; this hides it from every query while leaving the row in the database.
+func Unlink(ctx context.Context, q studiodb.Querier, id string) error {
+	_, err := studiodb.Execute(ctx, q, "UPDATE Treatment SET deletedAt = ?, updatedAt = ? WHERE id = ?", time.Now(), time.Now(), id)
+	return err
 }
 
 func scanDetailRow(rows *sql.Rows) (DetailRow, error) {
 	var d DetailRow
 	err := rows.Scan(&d.ID, &d.AssetID, &d.Method, &d.Title, &d.Notes, &d.PerformedByUserID,
-		&d.PerformedAt, &d.CreatedAt, &d.UpdatedAt, &d.AssetTitle, &d.AssetReferenceCode, &d.ClientID, &d.ClientName)
+		&d.PerformedAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt, &d.AssetTitle, &d.AssetReferenceCode, &d.ClientID, &d.ClientName)
 	return d, err
 }
 
 const treatmentDetailColumns = `t.id, t.assetId, t.method, t.title, t.notes, t.performedByUserId, t.performedAt,
-	t.createdAt, t.updatedAt`
+	t.createdAt, t.updatedAt, t.deletedAt`
 
 func GetDetailByID(ctx context.Context, q studiodb.Querier, id string) (*DetailRow, error) {
 	return studiodb.QueryOne(ctx, q, `
@@ -37,7 +44,7 @@ func GetDetailByID(ctx context.Context, q studiodb.Querier, id string) (*DetailR
 		FROM Treatment t
 		JOIN Asset a ON a.id = t.assetId
 		JOIN Client c ON c.id = a.clientId
-		WHERE t.id = ?`, scanDetailRow, id)
+		WHERE t.id = ? AND t.deletedAt IS NULL`, scanDetailRow, id)
 }
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
@@ -54,6 +61,7 @@ func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 		FROM Treatment t
 		JOIN Asset a ON a.id = t.assetId
 		JOIN Client c ON c.id = a.clientId
+		WHERE t.deletedAt IS NULL
 		ORDER BY t.performedAt DESC`, scanListRow)
 }
 
@@ -65,7 +73,7 @@ func ListByAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]Lis
 		FROM Treatment t
 		JOIN Asset a ON a.id = t.assetId
 		JOIN Client c ON c.id = a.clientId
-		WHERE t.assetId = ?
+		WHERE t.assetId = ? AND t.deletedAt IS NULL
 		ORDER BY t.performedAt DESC`, scanListRow, assetID)
 }
 
@@ -111,4 +119,17 @@ func Create(ctx context.Context, q studiodb.Querier, in Input) (string, error) {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, in.AssetID, in.Method, in.Title, in.Notes, nullIfEmpty(in.PerformedByUserID), performedAt, now)
 	return id, err
+}
+
+type UpdateInput struct {
+	Method string
+	Title  string
+	Notes  string
+}
+
+func Update(ctx context.Context, q studiodb.Querier, id string, in UpdateInput) error {
+	_, err := studiodb.Execute(ctx, q,
+		"UPDATE Treatment SET method = ?, title = ?, notes = ?, updatedAt = ? WHERE id = ?",
+		in.Method, in.Title, in.Notes, time.Now(), id)
+	return err
 }

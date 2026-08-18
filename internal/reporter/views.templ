@@ -1,7 +1,11 @@
 package reporter
 
-import "studio/internal/media"
-import "studio/internal/web"
+import (
+	"database/sql"
+
+	"studio/internal/media"
+	"studio/internal/web"
+)
 
 templ ListPage(c web.Chrome, rows []ListRow) {
 	@web.AppLayout("Reports", c, listBody(rows))
@@ -9,35 +13,66 @@ templ ListPage(c web.Chrome, rows []ListRow) {
 
 templ listBody(rows []ListRow) {
 	@web.PageHeader("Reports", "Conservation write-ups.", newReportLink())
-	@web.Card() {
-		if len(rows) == 0 {
-			<p class="empty-state">No reports yet.</p>
-		}
-		<ul class="entity-list">
-			for _, row := range rows {
-				<li class="entity-list-row">
-					<div>
-						<a href={ templ.URL("/reports/" + row.ID) } class="entity-list-name">{ row.Title }</a>
-						<div class="page-subtitle">
-							if row.AssetTitle.Valid {
-								{ row.AssetTitle.String }
+	<div data-el-root>
+		<div class="list-toolbar">
+			@web.EntityListSearchInput("Search by title, asset, author…")
+			@web.EntityListFilterSelect("status", "All statuses", []web.FilterOption{{Value: "draft", Label: "Draft"}, {Value: "final", Label: "Final"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+		</div>
+		@web.Card() {
+			if len(rows) == 0 {
+				<p class="empty-state">No reports yet.</p>
+			}
+			<ul class="entity-list" data-el-list>
+				for _, row := range rows {
+					<li
+						data-el-row
+						data-el-search={ reportSearchHaystack(row) }
+						data-el-status={ row.Status }
+						data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
+						data-el-group-client={ row.ClientName }
+					>
+						<div class="entity-list-row">
+							<div>
+								<a href={ templ.URL("/reports/" + row.ID) } class="entity-list-name">{ row.Title }</a>
+								<div class="page-subtitle">
+									if row.AssetTitle.Valid {
+										{ row.AssetTitle.String }
+									} else {
+										{ row.AssetReferenceCode }
+									}
+									if row.AuthorName.Valid {
+										· { row.AuthorName.String }
+									}
+								</div>
+							</div>
+							if row.Status == "final" {
+								<span class="badge badge-green">Final</span>
 							} else {
-								{ row.AssetReferenceCode }
-							}
-							if row.AuthorName.Valid {
-								· { row.AuthorName.String }
+								<span class="badge badge-amber">Draft</span>
 							}
 						</div>
-					</div>
-					if row.Status == "final" {
-						<span class="badge badge-green">Final</span>
-					} else {
-						<span class="badge badge-amber">Draft</span>
-					}
-				</li>
-			}
-		</ul>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+	<script src="/static/js/entity-list-filter.js" defer></script>
+}
+
+func assetLabel(title sql.NullString, referenceCode string) string {
+	if title.Valid && title.String != "" {
+		return title.String
 	}
+	return referenceCode
+}
+
+func reportSearchHaystack(row ListRow) string {
+	author := ""
+	if row.AuthorName.Valid {
+		author = row.AuthorName.String
+	}
+	return row.Title + " " + assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + author
 }
 
 templ newReportLink() {
@@ -82,6 +117,22 @@ templ newBody(assets []AssetOption, projects []ProjectOption, preselectedAssetID
 	}
 }
 
+// AddModalBody is the asset detail page's "Reports" section +Add content: title only, assetId
+// preset via a hidden input (no project picker — a report created this way just gets blank
+// suggested sections, same as picking "No project" on the full form).
+templ AddModalBody(assetID string) {
+	<form method="post" action="/reports" class="form-grid">
+		<input type="hidden" name="assetId" value={ assetID }/>
+		@web.Field("Title", "") {
+			<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
+		}
+		<button type="submit" class="btn btn-primary">
+			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			Create report
+		</button>
+	</form>
+}
+
 func assetOptionLabel(a AssetOption) string {
 	name := a.ReferenceCode
 	if a.Title.Valid && a.Title.String != "" {
@@ -98,6 +149,12 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 	@web.PageHeader(report.Title, "", templ.NopComponent)
 	<div class="row-actions" style="margin-bottom: 1rem;">
 		@web.ExportLinks("report", report.ID)
+		<form method="post" action={ templ.URL("/reports/" + report.ID + "/unlink") } data-confirm={ "Unlink \"" + report.Title + "\"? It stays in the database but won't show here anymore." }>
+			<button type="submit" class="btn btn-ghost">
+				<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+				Unlink
+			</button>
+		</form>
 		if report.Status == "final" {
 			<span class="badge badge-green">Final</span>
 			<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
@@ -118,7 +175,6 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 			</form>
 		}
 	</div>
-
 	<div class="report-layout">
 		<div class="report-layout-main">
 			@web.Card() {
@@ -146,7 +202,6 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 					}
 				</form>
 			}
-
 			@web.Card() {
 				<h2 class="dashboard-heading">Attachments <span class="page-subtitle">(images/video)</span></h2>
 				@media.MediaGrid(attachments)
@@ -161,7 +216,6 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 				}
 			}
 		</div>
-
 		<div class="report-layout-sidebar">
 			@web.Card() {
 				<h2 class="dashboard-heading">Customize layout</h2>

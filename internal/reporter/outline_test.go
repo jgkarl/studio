@@ -2,6 +2,7 @@ package reporter
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,28 @@ func mustExec(t *testing.T, q studiodb.Querier, query string, args ...any) {
 	if _, err := studiodb.Execute(context.Background(), q, query, args...); err != nil {
 		t.Fatalf("exec %q: %v", query, err)
 	}
+}
+
+// mustClassifierID looks up a Classifier row's id by (type, code) — used instead of inserting a
+// fresh fixture row, since db/migrations/0009_seed_classifiers.sql now seeds every asset_type/
+// treatment_method code these tests need as part of every testutil.OpenTestDB migration run, and
+// a second INSERT would collide with Classifier's (type, code) unique index.
+func mustClassifierID(t *testing.T, q studiodb.Querier, classifierType, code string) string {
+	t.Helper()
+	id, err := studiodb.QueryOne(context.Background(), q,
+		"SELECT id FROM Classifier WHERE type = ? AND code = ?",
+		func(rows *sql.Rows) (string, error) {
+			var id string
+			err := rows.Scan(&id)
+			return id, err
+		}, classifierType, code)
+	if err != nil {
+		t.Fatalf("looking up classifier %s/%s: %v", classifierType, code, err)
+	}
+	if id == nil {
+		t.Fatalf("classifier %s/%s not found — expected it to be seeded by 0009_seed_classifiers.sql", classifierType, code)
+	}
+	return *id
 }
 
 func TestBuildSuggestedOutlineUnknownAsset(t *testing.T) {
@@ -32,12 +55,7 @@ func TestBuildSuggestedOutline(t *testing.T) {
 	ctx := context.Background()
 	pool := testutil.OpenTestDB(t)
 
-	assetTypeID := studiodb.NewID()
-	mustExec(t, pool, `INSERT INTO Classifier (id, type, code, title, sequence, updatedAt) VALUES (?, 'asset_type', 'painting', 'Painting', 0, ?)`,
-		assetTypeID, time.Now())
-	methodID := studiodb.NewID()
-	mustExec(t, pool, `INSERT INTO Classifier (id, type, code, title, sequence, updatedAt) VALUES (?, 'treatment_method', 'surface_cleaning', 'Surface cleaning', 0, ?)`,
-		methodID, time.Now())
+	assetTypeID := mustClassifierID(t, pool, "asset_type", "painting")
 
 	clientID := studiodb.NewID()
 	mustExec(t, pool, "INSERT INTO Client (id, name, updatedAt) VALUES (?, ?, ?)", clientID, "Test Client", time.Now())
@@ -75,9 +93,7 @@ func TestBuildSuggestedOutlineSingleStateHasNoMostRecentLine(t *testing.T) {
 	ctx := context.Background()
 	pool := testutil.OpenTestDB(t)
 
-	assetTypeID := studiodb.NewID()
-	mustExec(t, pool, `INSERT INTO Classifier (id, type, code, title, sequence, updatedAt) VALUES (?, 'asset_type', 'painting', 'Painting', 0, ?)`,
-		assetTypeID, time.Now())
+	assetTypeID := mustClassifierID(t, pool, "asset_type", "painting")
 	clientID := studiodb.NewID()
 	mustExec(t, pool, "INSERT INTO Client (id, name, updatedAt) VALUES (?, ?, ?)", clientID, "Test Client", time.Now())
 	assetID := studiodb.NewID()

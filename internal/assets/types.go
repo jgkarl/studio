@@ -41,6 +41,7 @@ type ListRow struct {
 	ID                    string
 	Title                 sql.NullString
 	ReferenceCode         string
+	AssetTypeCode         string
 	AssetTypeTitle        string
 	ClientName            string
 	CurrentStateCondition sql.NullString

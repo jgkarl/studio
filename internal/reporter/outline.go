@@ -52,7 +52,7 @@ func BuildSuggestedOutline(ctx context.Context, q studiodb.Querier, assetID stri
 	treatmentRows, err := studiodb.Query(ctx, q, `
 		SELECT c.title, t.notes FROM Treatment t
 		JOIN Classifier c ON c.type = 'treatment_method' AND c.code = t.method
-		WHERE t.assetId = ? ORDER BY t.performedAt ASC`,
+		WHERE t.assetId = ? AND t.deletedAt IS NULL ORDER BY t.performedAt ASC`,
 		func(rows *sql.Rows) (treatmentRow, error) {
 			var tr treatmentRow
 			err := rows.Scan(&tr.MethodTitle, &tr.Notes)

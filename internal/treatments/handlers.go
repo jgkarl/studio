@@ -9,6 +9,7 @@ import (
 	"github.com/a-h/templ"
 
 	"studio/internal/auth"
+	"studio/internal/i18n"
 	"studio/internal/media"
 	"studio/internal/settings"
 	"studio/internal/web"
@@ -25,6 +26,9 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /treatments/new", svc.Auth.RequireUser(svc.handleNewForm))
 	mux.HandleFunc("POST /treatments", svc.Auth.RequireUser(svc.handleCreate))
 	mux.HandleFunc("GET /treatments/{id}", svc.Auth.RequireUser(svc.handleDetail))
+	mux.HandleFunc("GET /treatments/{id}/edit", svc.Auth.RequireUser(svc.handleEditForm))
+	mux.HandleFunc("POST /treatments/{id}/update", svc.Auth.RequireUser(svc.handleUpdate))
+	mux.HandleFunc("POST /treatments/{id}/unlink", svc.Auth.RequireUser(svc.handleUnlink))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -43,12 +47,17 @@ func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *aut
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	methodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	methodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod, i18n.GetLocale(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, ListPage(chromeFor(r, user, "/treatments"), rows, methodLabels))
+	methods, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, ListPage(chromeFor(r, user, "/treatments"), rows, methodLabels, methods))
 }
 
 func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -116,7 +125,7 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.NotFound(w, r)
 		return
 	}
-	methodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	methodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod, i18n.GetLocale(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -139,4 +148,62 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 	}
 
 	writeHTML(w, r, DetailPage(chromeFor(r, user, "/treatments"), *treatment, methodLabels, performedByName, photos))
+}
+
+func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	treatment, err := GetByID(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if treatment == nil {
+		http.NotFound(w, r)
+		return
+	}
+	methods, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, EditPage(chromeFor(r, user, "/treatments"), *treatment, methods))
+}
+
+func (svc *Service) handleUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id := r.PathValue("id")
+	if err := Update(r.Context(), svc.Pool, id, UpdateInput{
+		Method: r.FormValue("method"),
+		Title:  strings.TrimSpace(r.FormValue("title")),
+		Notes:  strings.TrimSpace(r.FormValue("notes")),
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/treatments/"+id, http.StatusSeeOther)
+}
+
+// handleUnlink soft-deletes the treatment (see Unlink's doc comment) and redirects back to the
+// asset it belonged to, matching the asset detail page's "unlink" action for this section.
+func (svc *Service) handleUnlink(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	treatment, err := GetByID(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if treatment == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := Unlink(ctx, svc.Pool, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/assets/"+treatment.AssetID, http.StatusSeeOther)
 }

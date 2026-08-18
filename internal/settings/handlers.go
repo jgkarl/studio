@@ -24,10 +24,12 @@ type Service struct {
 
 // Mount registers every settings route on mux. Classifiers require a signed-in user
 // (RequireUser, not RequireAdmin — the nav only shows a Settings link to admins, but
-// conservators can still reach these routes directly, same as the original app); the inlined
-// Users role table is RequireAdmin-gated since it can grant admin access to any account.
+// conservators can still reach these routes directly, same as the original app); the Users tab
+// (both viewing and its role-change mutation) is RequireAdmin-gated since it can grant admin
+// access to any account.
 func Mount(mux *http.ServeMux, svc *Service) {
-	mux.HandleFunc("GET /settings", svc.Auth.RequireUser(svc.handleIndex))
+	mux.HandleFunc("GET /settings", svc.Auth.RequireUser(svc.handleClassifiers))
+	mux.HandleFunc("GET /settings/users", svc.Auth.RequireAdmin(svc.handleUsers))
 	mux.HandleFunc("POST /settings/classifiers/{type}", svc.Auth.RequireUser(svc.handleClassifierCreate))
 	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/delete", svc.Auth.RequireUser(svc.handleClassifierDelete))
 	mux.HandleFunc("POST /settings/users/{id}/role", svc.Auth.RequireAdmin(svc.handleUpdateUserRole))
@@ -38,7 +40,7 @@ func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
 	_ = page.Render(r.Context(), w)
 }
 
-func (svc *Service) handleIndex(w http.ResponseWriter, r *http.Request, user *auth.User) {
+func (svc *Service) handleClassifiers(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	ctx := r.Context()
 	groups := make([]ClassifierGroup, 0, len(SettingsManagedTypes))
 	for _, t := range SettingsManagedTypes {
@@ -50,17 +52,16 @@ func (svc *Service) handleIndex(w http.ResponseWriter, r *http.Request, user *au
 		groups = append(groups, ClassifierGroup{Type: t, Label: ClassifierTypeLabels[t], Rows: rows})
 	}
 
-	var users []auth.User
-	if user.HasRole(auth.RoleAdmin) {
-		var err error
-		users, err = auth.ListUsers(ctx, svc.Pool)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
+	writeHTML(w, r, ClassifiersPage(chromeFor(r, user, "/settings"), groups, user.HasRole(auth.RoleAdmin)))
+}
 
-	writeHTML(w, r, IndexPage(chromeFor(r, user, "/settings"), groups, users))
+func (svc *Service) handleUsers(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	users, err := auth.ListUsers(r.Context(), svc.Pool)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, UsersPage(chromeFor(r, user, "/settings"), users))
 }
 
 // --- Classifiers -----------------------------------------------------------------------------
@@ -85,6 +86,7 @@ func (svc *Service) handleClassifierCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	title := strings.TrimSpace(r.FormValue("title"))
+	titleEt := strings.TrimSpace(r.FormValue("titleEt"))
 	code := slugify(title)
 	if title == "" || code == "" {
 		http.Error(w, "Title is required.", http.StatusBadRequest)
@@ -98,7 +100,7 @@ func (svc *Service) handleClassifierCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if _, err := CreateClassifier(ctx, svc.Pool, ClassifierInput{
-		Type: t, Code: code, Title: title, Sequence: count, IsActive: true,
+		Type: t, Code: code, Title: title, TitleEt: titleEt, Sequence: count, IsActive: true,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

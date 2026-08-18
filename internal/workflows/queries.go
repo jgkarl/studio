@@ -8,17 +8,29 @@ import (
 	studiodb "studio/internal/db"
 )
 
-const projectColumns = "id, assetId, title, stage, priority, targetReviewDate, assignedToUserId, startedAt, completedAt, createdAt, updatedAt"
+const projectColumns = "id, assetId, title, stage, priority, targetReviewDate, assignedToUserId, startedAt, completedAt, createdAt, updatedAt, deletedAt"
 
 func scanProject(rows *sql.Rows) (Project, error) {
 	var p Project
 	err := rows.Scan(&p.ID, &p.AssetID, &p.Title, &p.Stage, &p.Priority, &p.TargetReviewDate, &p.AssignedToUserID,
-		&p.StartedAt, &p.CompletedAt, &p.CreatedAt, &p.UpdatedAt)
+		&p.StartedAt, &p.CompletedAt, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt)
 	return p, err
 }
 
 func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Project, error) {
-	return studiodb.QueryOne(ctx, q, "SELECT "+projectColumns+" FROM Project WHERE id = ?", scanProject, id)
+	return studiodb.QueryOne(ctx, q, "SELECT "+projectColumns+" FROM Project WHERE id = ? AND deletedAt IS NULL", scanProject, id)
+}
+
+// Unlink soft-deletes the project — assetId is required (NOT NULL), so unlike Media there's no
+// "detach" possible; this hides it from every query while leaving the row in the database.
+func Unlink(ctx context.Context, q studiodb.Querier, id string) error {
+	_, err := studiodb.Execute(ctx, q, "UPDATE Project SET deletedAt = ?, updatedAt = ? WHERE id = ?", time.Now(), time.Now(), id)
+	return err
+}
+
+func UpdateTitle(ctx context.Context, q studiodb.Querier, id, title string) error {
+	_, err := studiodb.Execute(ctx, q, "UPDATE Project SET title = ?, updatedAt = ? WHERE id = ?", title, time.Now(), id)
+	return err
 }
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
@@ -35,6 +47,7 @@ func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 		FROM Project p
 		JOIN Asset a ON a.id = p.assetId
 		JOIN Client c ON c.id = a.clientId
+		WHERE p.deletedAt IS NULL
 		ORDER BY p.updatedAt DESC`, scanListRow)
 }
 

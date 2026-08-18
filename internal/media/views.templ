@@ -27,11 +27,9 @@ templ albumBody(items []AlbumItem) {
 			</label>
 			<span class="badge" id="album-count">{ strconv.Itoa(len(items)) } items</span>
 		</div>
-
 		if len(items) == 0 {
 			<p class="empty-state">No media uploaded yet.</p>
 		}
-
 		<div class="album-grid" id="album-grid">
 			for _, item := range items {
 				@albumCard(item)
@@ -115,7 +113,6 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference) {
 				<span class="badge">{ strconv.FormatInt(m.DurationSeconds.Int64, 10) }s</span>
 			}
 		</div>
-
 		if m.Kind == KindImage {
 			<button type="button" id="lightbox-trigger" class="lightbox-trigger" data-media-id={ m.ID } aria-label="Open image viewer">
 				<img src={ "/api/media/" + m.ID } alt=""/>

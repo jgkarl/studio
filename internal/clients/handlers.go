@@ -8,6 +8,7 @@ import (
 	"github.com/a-h/templ"
 
 	"studio/internal/auth"
+	"studio/internal/i18n"
 	"studio/internal/settings"
 	"studio/internal/web"
 )
@@ -42,12 +43,18 @@ func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *aut
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	typeLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierClientType)
+	locale := i18n.GetLocale(r)
+	typeLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierClientType, locale)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, ListPage(chromeFor(r, user, "/clients"), rows, typeLabels))
+	clientTypes, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierClientType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, ListPage(chromeFor(r, user, "/clients"), rows, typeLabels, clientTypes))
 }
 
 func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -133,7 +140,7 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	typeLabel, err := settings.GetClassifierLabel(ctx, svc.Pool, settings.ClassifierClientType, client.Type)
+	typeLabel, err := settings.GetClassifierLabel(ctx, svc.Pool, settings.ClassifierClientType, client.Type, i18n.GetLocale(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

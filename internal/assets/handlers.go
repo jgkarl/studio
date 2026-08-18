@@ -10,6 +10,7 @@ import (
 
 	"studio/internal/auth"
 	"studio/internal/clients"
+	"studio/internal/i18n"
 	"studio/internal/media"
 	"studio/internal/reporter"
 	"studio/internal/settings"
@@ -31,6 +32,8 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /assets/{id}/edit", svc.Auth.RequireUser(svc.handleEditForm))
 	mux.HandleFunc("POST /assets/{id}/update", svc.Auth.RequireUser(svc.handleUpdate))
 	mux.HandleFunc("POST /assets/{id}/states", svc.Auth.RequireUser(svc.handleRecordState))
+	mux.HandleFunc("POST /assets/{id}/media", svc.Auth.RequireUser(svc.handleAddMedia))
+	mux.HandleFunc("POST /assets/{id}/media/{refId}/unlink", svc.Auth.RequireUser(svc.handleUnlinkMedia))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -43,12 +46,24 @@ func chromeFor(r *http.Request, user *auth.User, active string) web.Chrome {
 }
 
 func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	rows, err := List(r.Context(), svc.Pool)
+	ctx := r.Context()
+	rows, err := List(ctx, svc.Pool)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, ListPage(chromeFor(r, user, "/assets"), rows))
+	locale := i18n.GetLocale(r)
+	assetTypes, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierAssetType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	conditions, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierConditionState)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, ListPage(chromeFor(r, user, "/assets"), rows, assetTypes, conditions, locale))
 }
 
 func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -199,14 +214,31 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	treatmentMethodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	locale := i18n.GetLocale(r)
+	treatmentMethodLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierTreatmentMethod, locale)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	treatmentMethods, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierTreatmentMethod)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	stageLabels, err := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierProjectStage, locale)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	assetMedia, err := svc.Media.GetReferencedMedia(ctx, media.RefAsset, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, states,
-		projects, conditions, conditionByCode, stateMedia, reports, assetTreatments, treatmentMethodLabels))
+		projects, conditions, conditionByCode, stateMedia, reports, assetTreatments, treatmentMethodLabels,
+		treatmentMethods, stageLabels, assetMedia))
 }
 
 func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -253,6 +285,32 @@ func (svc *Service) handleRecordState(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
+}
+
+// handleAddMedia attaches media directly to the asset itself (the asset detail view's Media
+// section's "+Add") — distinct from handleRecordState's photos, which attach to an AssetState.
+func (svc *Service) handleAddMedia(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id := r.PathValue("id")
+	if _, err := svc.Media.UploadAllAndAttach(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefAsset, id, "photo"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
+}
+
+// handleUnlinkMedia removes just the MediaReference join row (see media.Service.UnlinkReference's
+// doc comment) — the Media itself is shared library content and is never touched by this.
+func (svc *Service) handleUnlinkMedia(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	id := r.PathValue("id")
+	if err := svc.Media.UnlinkReference(r.Context(), r.PathValue("refId")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

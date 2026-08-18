@@ -4,7 +4,6 @@ package web
 // inconsistent by hand). Buttons/inputs/badges are plain HTML with the .btn/.input/.badge
 // utility classes from static/css/app.css directly in each page's markup — simple templates, no
 // component layer mirroring every HTML element.
-
 templ Card() {
 	<div class="card">
 		{ children... }
@@ -50,6 +49,81 @@ templ OpenBadge(completed bool) {
 	} else {
 		<span class="badge badge-amber">Open</span>
 	}
+}
+
+// ModalTrigger renders the "+ Add" button that opens the named Modal (see Modal below) — id must
+// match the modalID passed to that Modal. label defaults to "+ Add" when empty.
+templ ModalTrigger(modalID, label string) {
+	<button type="button" class="btn btn-secondary" data-modal-open={ modalID }>
+		<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+		if label != "" {
+			{ label }
+		} else {
+			+ Add
+		}
+	</button>
+}
+
+// Modal is the generic "+Add" dialog body — static/js/modal.js drives open/close via
+// data-modal-open/data-modal-close (see that file's doc comment for the full markup contract).
+// Pages using this must include modal.js once (see e.g. internal/assets/views.templ detailBody).
+templ Modal(modalID, title string) {
+	<div id={ modalID } class="modal-overlay" hidden>
+		<div class="modal-panel">
+			<button type="button" class="modal-close" data-modal-close aria-label="Close">
+				<img src="/static/icons/close.svg" width="16" height="16" alt=""/>
+			</button>
+			if title != "" {
+				<h2 class="modal-panel-title">{ title }</h2>
+			}
+			{ children... }
+		</div>
+	</div>
+}
+
+// FilterOption is one <option> for EntityListFilterSelect/EntityListGroupBySelect.
+type FilterOption struct {
+	Value string
+	Label string
+}
+
+// EntityListSearchInput renders the search text input static/js/entity-list-filter.js reads via
+// [data-el-search]. Place inside a toolbar div carrying [data-el-root] alongside a
+// <ul data-el-list> of [data-el-row] items — see that file's doc comment for the full markup
+// contract.
+templ EntityListSearchInput(placeholder string) {
+	<span class="search-wrap">
+		<img src="/static/icons/search.svg" width="16" height="16" alt="" class="icon"/>
+		<input type="text" data-el-search placeholder={ placeholder }/>
+	</span>
+}
+
+// EntityListFilterSelect renders one filter <select data-el-filter="key">. Each option's Value
+// must match the corresponding row's data-el-<key-hyphenated> attribute exactly (e.g. key
+// "assetType" matches data-el-asset-type).
+templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
+	<label class="filter-chip">
+		<img src="/static/icons/filter.svg" width="14" height="14" alt="" class="icon"/>
+		<select class="filter-chip-select" data-el-filter={ key }>
+			<option value="">{ allLabel }</option>
+			for _, opt := range options {
+				<option value={ opt.Value }>{ opt.Label }</option>
+			}
+		</select>
+	</label>
+}
+
+// EntityListGroupBySelect renders the "Group by" <select data-el-groupby>. Each option's Value
+// must match the corresponding row's data-el-group-<value-hyphenated> attribute exactly.
+templ EntityListGroupBySelect(options []FilterOption) {
+	<label class="filter-chip">
+		<select class="filter-chip-select" data-el-groupby>
+			<option value="">No grouping</option>
+			for _, opt := range options {
+				<option value={ opt.Value }>Group by { opt.Label }</option>
+			}
+		</select>
+	</label>
 }
 
 // PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page

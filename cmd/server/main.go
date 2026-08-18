@@ -45,9 +45,6 @@ func main() {
 	}
 	log.Println("database ready, migrations applied")
 
-	if err := seed.SeedAllClassifiers(ctx, pool); err != nil {
-		log.Fatalf("seeding classifiers: %v", err)
-	}
 	if err := seed.BootstrapAdmin(ctx, pool, cfg.BootstrapAdminName, cfg.BootstrapAdminEmail); err != nil {
 		log.Fatalf("bootstrapping admin: %v", err)
 	}

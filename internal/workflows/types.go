@@ -23,6 +23,7 @@ type Project struct {
 	CompletedAt      sql.NullTime
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	DeletedAt        sql.NullTime
 }
 
 type ListRow struct {

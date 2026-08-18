@@ -5,6 +5,9 @@ package settings
 import (
 	"database/sql"
 	"time"
+
+	"studio/internal/i18n"
+	"studio/internal/web"
 )
 
 type ClassifierType string
@@ -48,6 +51,27 @@ func IsValidClassifierType(t string) bool {
 	return ok
 }
 
+// ClassifierLabel is the single call site every display of a classifier's name should route
+// through — falls back to the (English) Title when TitleEt is empty and locale is "et", so
+// partially-translated data never renders blank.
+func ClassifierLabel(c Classifier, locale i18n.Locale) string {
+	if locale == i18n.LocaleET && c.TitleEt.Valid && c.TitleEt.String != "" {
+		return c.TitleEt.String
+	}
+	return c.Title
+}
+
+// ClassifierFilterOptions projects Classifier rows to web.FilterOption for
+// web.EntityListFilterSelect — Value is the stable code (matches a list row's data-el-* filter
+// attribute), Label is locale-resolved via ClassifierLabel.
+func ClassifierFilterOptions(classifiers []Classifier, locale i18n.Locale) []web.FilterOption {
+	out := make([]web.FilterOption, len(classifiers))
+	for i, c := range classifiers {
+		out[i] = web.FilterOption{Value: c.Code, Label: ClassifierLabel(c, locale)}
+	}
+	return out
+}
+
 // SettingsManagedTypes is the flat Settings screen's chip-group order: the design artifact's 5
 // headline groups (Asset Types, Condition States, Treatment Methods, Project Stages, Priority)
 // first, then Client Types and Contact Methods — real, still-used picklists (the New Client
@@ -82,14 +106,16 @@ type ClassifierGroup struct {
 }
 
 type Classifier struct {
-	ID          string
-	Type        ClassifierType
-	Code        string
-	Sequence    int
-	Title       string
-	Description sql.NullString
-	Data        sql.NullString // raw JSON text, stored/read verbatim - never decoded server-side
-	IsActive    bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID            string
+	Type          ClassifierType
+	Code          string
+	Sequence      int
+	Title         string
+	TitleEt       sql.NullString
+	Description   sql.NullString
+	DescriptionEt sql.NullString
+	Data          sql.NullString // raw JSON text, stored/read verbatim - never decoded server-side
+	IsActive      bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }

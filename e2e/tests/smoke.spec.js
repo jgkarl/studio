@@ -188,7 +188,9 @@ test.describe("Studio golden path", () => {
   });
 
   test("Settings Users table lists accounts", async () => {
-    await page.goto("/settings");
+    // Users now has its own tab (/settings/users) alongside Classifiers (/settings) — see
+    // internal/settings/views.templ's tabNav.
+    await page.goto("/settings/users");
     await expect(page.getByText(ADMIN_EMAIL)).toBeVisible();
     await shoot(page, "19-settings-users.png");
   });

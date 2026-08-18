@@ -35,6 +35,7 @@ type Report struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt sql.NullTime
 }
 
 type ListRow struct {
@@ -43,6 +44,7 @@ type ListRow struct {
 	Status             string
 	AssetTitle         sql.NullString
 	AssetReferenceCode string
+	ClientName         string
 	AuthorName         sql.NullString
 }
 

@@ -3,93 +3,92 @@ package settings
 import (
 	"studio/internal/auth"
 	"studio/internal/i18n"
-	"studio/internal/theme"
 	"studio/internal/web"
 )
 
-// IndexPage is the whole of Settings: one screen, no sub-navigation. Preferences (locale/theme —
-// the same toggles the navbar exposes) at the top, one chip-group per classifier type Settings
-// manages, and — admin only — the Users role table folded in below (see SettingsManagedTypes'
-// doc comment for why that's here despite not being in the design artifact's 5 groups).
-templ IndexPage(c web.Chrome, groups []ClassifierGroup, users []auth.User) {
-	@web.AppLayout("Settings", c, indexBody(c, groups, users))
+// tabNav is Settings' tab strip — Classifiers (every signed-in user) and, admin-only, Users.
+// Preferences (locale/theme) used to live on this page too; those are now account-menu-only (see
+// internal/web/navbar.templ) since they're duplicated there and don't need a second home.
+templ tabNav(active string, showUsers bool) {
+	<div class="tab-nav">
+		<a href="/settings" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "classifiers") }>Classifiers</a>
+		if showUsers {
+			<a href="/settings/users" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "users") }>Users</a>
+		}
+	</div>
 }
 
-templ indexBody(c web.Chrome, groups []ClassifierGroup, users []auth.User) {
-	@web.PageHeader("Settings", "Preferences and picklists used across the app.", templ.NopComponent)
+templ ClassifiersPage(c web.Chrome, groups []ClassifierGroup, isAdmin bool) {
+	@web.AppLayout("Settings", c, classifiersBody(groups, isAdmin, c.Locale))
+}
 
+templ classifiersBody(groups []ClassifierGroup, isAdmin bool, locale i18n.Locale) {
+	@web.PageHeader("Settings", "Picklists used across the app.", templ.NopComponent)
+	@tabNav("classifiers", isAdmin)
+	for _, group := range groups {
+		@classifierGroupCard(group, locale)
+	}
+}
+
+templ UsersPage(c web.Chrome, users []auth.User) {
+	@web.AppLayout("Settings", c, usersBody(users))
+}
+
+templ usersBody(users []auth.User) {
+	@web.PageHeader("Settings", "User accounts and roles.", templ.NopComponent)
+	@tabNav("users", true)
 	@web.Card() {
-		<h2 class="dashboard-heading">Preferences</h2>
-		<div class="row-actions">
-			<form method="post" action="/locale/toggle">
-				@web.Field("Language", currentLocaleName(c)) {
-					<button type="submit" class="btn btn-secondary">Switch to { targetLocaleName(c) }</button>
-				}
-			</form>
-			<form method="post" action="/theme/toggle">
-				@web.Field("Theme", currentThemeName(c)) {
-					<button type="submit" class="btn btn-secondary">Switch to { targetThemeName(c) }</button>
-				}
-			</form>
+		if len(users) == 0 {
+			<p class="empty-state">No users yet.</p>
+		}
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Name</th>
+						<th>Email</th>
+						<th>Status</th>
+						<th>Role</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, u := range users {
+						<tr>
+							<td>{ u.Name }</td>
+							<td>{ u.Email }</td>
+							<td>
+								if u.Provider.Valid && u.Provider.String == "email" {
+									if u.EmailVerifiedAt.Valid {
+										<span class="badge badge-green">Confirmed</span>
+									} else {
+										<span class="badge badge-amber">Awaiting confirmation</span>
+									}
+								} else {
+									<span class="page-subtitle">n/a</span>
+								}
+							</td>
+							<td>
+								<form method="post" action={ templ.URL("/settings/users/" + u.ID + "/role") } class="row-actions">
+									<select class="input" name="role" style="width: auto;">
+										for _, role := range assignableRoles {
+											<option value={ string(role) } selected?={ role == u.Role }>{ string(role) }</option>
+										}
+									</select>
+									<button type="submit" class="btn btn-secondary">
+										<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+										Save
+									</button>
+								</form>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
 		</div>
 	}
-
-	for _, group := range groups {
-		@classifierGroupCard(group)
-	}
-
-	if len(users) > 0 {
-		@web.Card() {
-			<h2 class="dashboard-heading">Users</h2>
-			<div class="table-wrap">
-				<table class="table">
-					<thead>
-						<tr>
-							<th>Name</th>
-							<th>Email</th>
-							<th>Status</th>
-							<th>Role</th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, u := range users {
-							<tr>
-								<td>{ u.Name }</td>
-								<td>{ u.Email }</td>
-								<td>
-									if u.Provider.Valid && u.Provider.String == "email" {
-										if u.EmailVerifiedAt.Valid {
-											<span class="badge badge-green">Confirmed</span>
-										} else {
-											<span class="badge badge-amber">Awaiting confirmation</span>
-										}
-									} else {
-										<span class="page-subtitle">n/a</span>
-									}
-								</td>
-								<td>
-									<form method="post" action={ templ.URL("/settings/users/" + u.ID + "/role") } class="row-actions">
-										<select class="input" name="role" style="width: auto;">
-											for _, role := range assignableRoles {
-												<option value={ string(role) } selected?={ role == u.Role }>{ string(role) }</option>
-											}
-										</select>
-										<button type="submit" class="btn btn-secondary">
-											<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
-											Save
-										</button>
-									</form>
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
-		}
-	}
 }
 
-templ classifierGroupCard(group ClassifierGroup) {
+templ classifierGroupCard(group ClassifierGroup, locale i18n.Locale) {
 	@web.Card() {
 		<h2 class="dashboard-heading">{ group.Label }</h2>
 		if len(group.Rows) == 0 {
@@ -98,7 +97,7 @@ templ classifierGroupCard(group ClassifierGroup) {
 		<div class="tag-pills">
 			for _, row := range group.Rows {
 				<span class="tag-pill">
-					{ row.Title }
+					{ ClassifierLabel(row, locale) }
 					<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
 						<button type="submit" class="tag-pill-remove" aria-label="Remove">
 							<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
@@ -108,8 +107,11 @@ templ classifierGroupCard(group ClassifierGroup) {
 			}
 		</div>
 		<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type)) } class="inline-edit-form">
-			@web.Field("Add option", "") {
+			@web.Field("Title (English)", "") {
 				<input class="input" name="title" required placeholder="New option name"/>
+			}
+			@web.Field("Title (Estonian)", "optional") {
+				<input class="input" name="titleEt" placeholder="Eestikeelne nimi"/>
 			}
 			<button type="submit" class="btn btn-secondary">
 				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
@@ -117,32 +119,4 @@ templ classifierGroupCard(group ClassifierGroup) {
 			</button>
 		</form>
 	}
-}
-
-func currentLocaleName(c web.Chrome) string {
-	if c.Locale == i18n.LocaleEN {
-		return "Currently English"
-	}
-	return "Currently Eesti"
-}
-
-func targetLocaleName(c web.Chrome) string {
-	if c.Locale == i18n.LocaleEN {
-		return "Eesti"
-	}
-	return "English"
-}
-
-func currentThemeName(c web.Chrome) string {
-	if c.Theme == theme.Dark {
-		return "Currently dark"
-	}
-	return "Currently light"
-}
-
-func targetThemeName(c web.Chrome) string {
-	if c.Theme == theme.Dark {
-		return "light"
-	}
-	return "dark"
 }

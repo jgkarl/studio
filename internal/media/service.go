@@ -107,6 +107,14 @@ func (s *Service) AttachMediaReference(ctx context.Context, mediaID string, refT
 	return err
 }
 
+// UnlinkReference removes just the MediaReference join row — the Media itself is shared library
+// content (may still be referenced elsewhere: an AssetState, an Activity, a Report cover) and is
+// never touched by this.
+func (s *Service) UnlinkReference(ctx context.Context, referenceID string) error {
+	_, err := studiodb.Execute(ctx, s.Pool, "DELETE FROM MediaReference WHERE id = ?", referenceID)
+	return err
+}
+
 func nullIfEmptyStr(s string) any {
 	if s == "" {
 		return nil

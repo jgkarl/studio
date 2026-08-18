@@ -65,26 +65,26 @@ func (svc *Service) handleIndex(w http.ResponseWriter, r *http.Request, user *au
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	treatmentCount, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Treatment", scanCount)
+	treatmentCount, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Treatment WHERE deletedAt IS NULL", scanCount)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	activeProjects, err := studiodb.Query(ctx, svc.Pool,
 		`SELECT p.id, p.title, a.title, a.referenceCode FROM Project p JOIN Asset a ON a.id = p.assetId
-		 WHERE p.stage != 'completed' ORDER BY p.updatedAt DESC LIMIT 6`, scanActiveProject)
+		 WHERE p.stage != 'completed' AND p.deletedAt IS NULL ORDER BY p.updatedAt DESC LIMIT 6`, scanActiveProject)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	draftReportRows, err := studiodb.Query(ctx, svc.Pool, `
 		SELECT r.id, r.title, a.title, a.referenceCode FROM Report r JOIN Asset a ON a.id = r.assetId
-		WHERE r.status = 'draft' ORDER BY r.updatedAt DESC LIMIT 6`, scanDraftReport)
+		WHERE r.status = 'draft' AND r.deletedAt IS NULL ORDER BY r.updatedAt DESC LIMIT 6`, scanDraftReport)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	draftReportCount, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Report WHERE status = ?", scanCount, "draft")
+	draftReportCount, err := studiodb.QueryOne(ctx, svc.Pool, "SELECT COUNT(*) AS n FROM Report WHERE status = ? AND deletedAt IS NULL", scanCount, "draft")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

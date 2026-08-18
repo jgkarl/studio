@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"studio/internal/clients"
+	"studio/internal/i18n"
 	"studio/internal/media"
 	"studio/internal/reporter"
 	"studio/internal/settings"
@@ -13,50 +14,58 @@ import (
 	"studio/internal/web"
 )
 
-templ ListPage(c web.Chrome, rows []ListRow) {
-	@web.AppLayout("Assets", c, listBody(rows))
+templ ListPage(c web.Chrome, rows []ListRow, assetTypes []settings.Classifier, conditions []settings.Classifier, locale i18n.Locale) {
+	@web.AppLayout("Assets", c, listBody(rows, assetTypes, conditions, locale))
 }
 
-templ listBody(rows []ListRow) {
+templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []settings.Classifier, locale i18n.Locale) {
 	@web.PageHeader("Assets", "The physical objects being conserved.", newAssetLink())
-	<div class="list-toolbar">
-		<span class="search-wrap">
-			<img src="/static/icons/search.svg" width="16" height="16" alt="" class="icon"/>
-			<input type="text" id="asset-search" placeholder="Search by title, artist, reference code…"/>
-		</span>
-	</div>
-	@web.Card() {
-		if len(rows) == 0 {
-			<p class="empty-state">No assets yet.</p>
-		}
-		<ul class="entity-list" id="asset-list">
-			for _, row := range rows {
-				<li>
-					<a href={ templ.URL("/assets/" + row.ID) } class="entity-list-row" data-search={ assetSearchHaystack(row) }>
-						@assetThumb(row)
-						<div>
-							<span class="entity-list-name">
-								if row.Title.Valid {
-									{ row.Title.String }
-								} else {
-									{ row.ReferenceCode }
-								}
-							</span>
-							<div class="page-subtitle">{ row.ReferenceCode } · { row.AssetTypeTitle } · owner: { row.ClientName }</div>
-						</div>
-						<div class="row-actions">
-							if row.CurrentStateCondition.Valid {
-								<span class="badge badge-amber">{ row.CurrentStateCondition.String }</span>
-							}
-							<span class="page-subtitle">{ strconv.Itoa(row.ProjectCount) } workflow(s)</span>
-						</div>
-						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
-					</a>
-				</li>
+	<div data-el-root>
+		<div class="list-toolbar">
+			@web.EntityListSearchInput("Search by title, artist, reference code…")
+			@web.EntityListFilterSelect("assetType", "All types", settings.ClassifierFilterOptions(assetTypes, locale))
+			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
+			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "client", Label: "Client"}})
+		</div>
+		@web.Card() {
+			if len(rows) == 0 {
+				<p class="empty-state">No assets yet.</p>
 			}
-		</ul>
-	}
-	<script src="/static/js/assets-search.js" defer></script>
+			<ul class="entity-list" data-el-list>
+				for _, row := range rows {
+					<li
+						data-el-row
+						data-el-search={ assetSearchHaystack(row) }
+						data-el-asset-type={ row.AssetTypeCode }
+						data-el-condition={ row.CurrentStateCondition.String }
+						data-el-group-client={ row.ClientName }
+					>
+						<a href={ templ.URL("/assets/" + row.ID) } class="entity-list-row">
+							@assetThumb(row)
+							<div>
+								<span class="entity-list-name">
+									if row.Title.Valid {
+										{ row.Title.String }
+									} else {
+										{ row.ReferenceCode }
+									}
+								</span>
+								<div class="page-subtitle">{ row.ReferenceCode } · { row.AssetTypeTitle } · owner: { row.ClientName }</div>
+							</div>
+							<div class="row-actions">
+								if row.CurrentStateCondition.Valid {
+									<span class="badge badge-amber">{ row.CurrentStateCondition.String }</span>
+								}
+								<span class="page-subtitle">{ strconv.Itoa(row.ProjectCount) } workflow(s)</span>
+							</div>
+							<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+						</a>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+	<script src="/static/js/entity-list-filter.js" defer></script>
 }
 
 templ assetThumb(row ListRow) {
@@ -83,10 +92,10 @@ templ newAssetLink() {
 }
 
 templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string) {
-	@web.AppLayout("New asset", c, newBody(allClients, assetTypes, preselectedClientID))
+	@web.AppLayout("New asset", c, newBody(allClients, assetTypes, preselectedClientID, c.Locale))
 }
 
-templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string) {
+templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string, locale i18n.Locale) {
 	@web.PageHeader("New asset", "", templ.NopComponent)
 	@web.Card() {
 		<form method="post" action="/assets" enctype="multipart/form-data" class="form-grid">
@@ -103,7 +112,7 @@ templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, pre
 					<select class="input" name="assetTypeId" required>
 						<option value="" disabled selected>Select a type…</option>
 						for _, at := range assetTypes {
-							<option value={ at.ID }>{ at.Title }</option>
+							<option value={ at.ID }>{ settings.ClassifierLabel(at, locale) }</option>
 						}
 					</select>
 				}
@@ -179,168 +188,306 @@ templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, pre
 templ DetailPage(c web.Chrome, asset Asset, client *clients.Client, assetType *settings.Classifier,
 	states []State, projects []ProjectSummary,
 	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia,
-	reports []reporter.ListRow, assetTreatments []treatments.ListRow, treatmentMethodLabels map[string]string) {
-	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, states, projects, conditions, conditionByCode, stateMedia, reports, assetTreatments, treatmentMethodLabels))
+	reports []reporter.ListRow, assetTreatments []treatments.ListRow, treatmentMethodLabels map[string]string,
+	treatmentMethods []settings.Classifier, stageLabels map[string]string, assetMedia []media.ReferenceWithMedia) {
+	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, states, projects, conditions, conditionByCode,
+		stateMedia, reports, assetTreatments, treatmentMethodLabels, treatmentMethods, stageLabels, assetMedia, c.Locale))
 }
 
 templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classifier,
 	states []State, projects []ProjectSummary,
 	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia,
-	reports []reporter.ListRow, assetTreatments []treatments.ListRow, treatmentMethodLabels map[string]string) {
-	@web.PageHeader(asset.DisplayName(), assetSubtitle(asset, client, assetType), assetActions(asset))
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Details</h2>
-		<dl class="detail-dl">
-			@detailField("Artist", asset.Artist.String)
-			@detailField("Creation period", asset.CreationPeriod.String)
-			@detailField("Dimensions", asset.Dimensions.String)
-			@detailField("Medium", asset.Medium.String)
-			@detailField("Weight", asset.Weight.String)
-			@detailField("Signature / marks", asset.SignatureMarks.String)
-			@detailField("Location in studio", asset.LocationInStudio.String)
-			@detailField("Insured", insuredLabel(asset.IsInsured))
-			@detailField("Estimated value", estimatedValueLabel(asset.EstimatedValue))
-			@detailField("Acquisition date", acquisitionDateLabel(asset.AcquisitionDate))
-		</dl>
-		if asset.Description.Valid {
-			<p class="detail-paragraph">{ asset.Description.String }</p>
-		}
-		if asset.Provenance.Valid {
-			<p class="detail-paragraph"><strong>Provenance:</strong> { asset.Provenance.String }</p>
-		}
-
+	reports []reporter.ListRow, assetTreatments []treatments.ListRow, treatmentMethodLabels map[string]string,
+	treatmentMethods []settings.Classifier, stageLabels map[string]string, assetMedia []media.ReferenceWithMedia, locale i18n.Locale) {
+	@web.PageHeader(asset.DisplayName(), asset.ReferenceCode+" · "+assetTypeTitle(assetType, locale), assetActions(asset))
+	if client != nil {
+		<p class="page-subtitle" style="margin-top:-0.75rem;margin-bottom:1rem;">
+			Owner: <a href={ templ.URL("/clients/" + client.ID) }>{ client.Name }</a>
+		</p>
 	}
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Condition history <span class="page-subtitle">(newest first)</span></h2>
-		if len(states) == 0 {
-			<p class="empty-state">No condition records yet.</p>
-		}
-		<ul class="condition-list">
-			for _, s := range states {
-				<li class="condition-item">
-					<div class="row-actions">
-						<span class={ "badge", severityToneClass(conditionByCode, s.Condition) }>{ conditionTitle(conditionByCode, s.Condition) }</span>
-						<span class="page-subtitle">{ s.RecordedAt.Format("2006-01-02 15:04") }</span>
-					</div>
-					<p class="detail-paragraph">{ s.Description }</p>
-					@media.MediaGrid(stateMedia[s.ID])
-				</li>
+	<div class="report-layout">
+		<div class="report-layout-main">
+			@web.Card() {
+				<h2 class="dashboard-heading">Details</h2>
+				<dl class="detail-dl">
+					@detailField("Artist", asset.Artist.String)
+					@detailField("Creation period", asset.CreationPeriod.String)
+					@detailField("Dimensions", asset.Dimensions.String)
+					@detailField("Medium", asset.Medium.String)
+					@detailField("Weight", asset.Weight.String)
+					@detailField("Signature / marks", asset.SignatureMarks.String)
+					@detailField("Location in studio", asset.LocationInStudio.String)
+					@detailField("Insured", insuredLabel(asset.IsInsured))
+					@detailField("Estimated value", estimatedValueLabel(asset.EstimatedValue))
+					@detailField("Acquisition date", acquisitionDateLabel(asset.AcquisitionDate))
+				</dl>
+				if asset.Description.Valid {
+					<p class="detail-paragraph">{ asset.Description.String }</p>
+				}
+				if asset.Provenance.Valid {
+					<p class="detail-paragraph"><strong>Provenance:</strong> { asset.Provenance.String }</p>
+				}
 			}
-		</ul>
-
-		<form method="post" action={ templ.URL("/assets/" + asset.ID + "/states") } enctype="multipart/form-data" class="inline-edit-form form-section">
-			<p class="form-section-title">Record condition manually</p>
-			@web.Field("Condition", "") {
-				<select class="input" name="condition">
-					for _, cond := range conditions {
-						<option value={ cond.Code }>{ cond.Title }</option>
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Latest condition report</h2>
+					@web.ModalTrigger("modal-condition", "Add")
+				</div>
+				if len(states) == 0 {
+					<p class="empty-state">No condition records yet.</p>
+				} else {
+					@conditionEntry(states[0], conditionByCode, stateMedia[states[0].ID], locale)
+					if len(states) > 1 {
+						<details class="form-section">
+							<summary class="form-section-title" style="cursor:pointer;">View full history</summary>
+							<ul class="condition-list">
+								for _, s := range states[1:] {
+									<li class="condition-item">
+										@conditionEntry(s, conditionByCode, stateMedia[s.ID], locale)
+									</li>
+								}
+							</ul>
+						</details>
 					}
-				</select>
+				}
+				@web.Modal("modal-condition", "Add: Latest condition report") {
+					<form method="post" action={ templ.URL("/assets/" + asset.ID + "/states") } enctype="multipart/form-data" class="form-grid">
+						@web.Field("Condition", "") {
+							<select class="input" name="condition">
+								for _, cond := range conditions {
+									<option value={ cond.Code }>{ settings.ClassifierLabel(cond, locale) }</option>
+								}
+							</select>
+						}
+						@web.Field("Description", "") {
+							<textarea class="input" name="description" rows="2" required></textarea>
+						}
+						@web.Field("Photos", "On a phone this opens your camera directly.") {
+							<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+						}
+						<button type="submit" class="btn btn-primary">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+							Save record
+						</button>
+					</form>
+				}
 			}
-			@web.Field("Description", "") {
-				<textarea class="input" name="description" rows="2" required></textarea>
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Treatments</h2>
+					@web.ModalTrigger("modal-treatment", "Add")
+				</div>
+				if len(assetTreatments) == 0 {
+					<p class="empty-state">No treatments logged yet.</p>
+				}
+				<ul class="entity-list">
+					for _, t := range assetTreatments {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
+							<div class="row-actions">
+								<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
+								<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+								<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+								<a href={ templ.URL("/treatments/" + t.ID + "/edit") } class="row-action-icon" title="Edit">
+									<img src="/static/icons/edit.svg" width="14" height="14" alt=""/>
+								</a>
+								<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Unlink \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
+									<button type="submit" class="row-action-icon" title="Unlink">
+										<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+									</button>
+								</form>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-treatment", "Add: Treatments") {
+					@treatments.AddModalBody(asset.ID, treatmentMethods, locale)
+				}
 			}
-			@web.Field("Photos", "On a phone this opens your camera directly.") {
-				<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Reports</h2>
+					@web.ModalTrigger("modal-report", "Add")
+				</div>
+				if len(reports) == 0 {
+					<p class="empty-state">No reports yet for this object.</p>
+				}
+				<ul class="entity-list">
+					for _, rep := range reports {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
+							<div class="row-actions">
+								<span class="badge">{ rep.Status }</span>
+								<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+								<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Unlink \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
+									<button type="submit" class="row-action-icon" title="Unlink">
+										<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+									</button>
+								</form>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-report", "Add: Reports") {
+					@reporter.AddModalBody(asset.ID)
+				}
 			}
-			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
-				Save record
-			</button>
-		</form>
-	}
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Photo &amp; document album</h2>
-		if len(flattenMedia(states, stateMedia)) == 0 {
-			<p class="empty-state">No media yet.</p>
-		}
-		@media.MediaGrid(flattenMedia(states, stateMedia))
-	}
-
-	@web.Card() {
-		<div class="card-header-row">
-			<h2 class="dashboard-heading">Treatments</h2>
-			<a class="btn btn-secondary" href={ templ.URL("/treatments/new?assetId=" + asset.ID) }>
-				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-				Log treatment
-			</a>
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Projects on this asset</h2>
+					@web.ModalTrigger("modal-project", "Add")
+				</div>
+				if len(projects) == 0 {
+					<p class="empty-state">No projects yet.</p>
+				}
+				<ul class="entity-list">
+					for _, p := range projects {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/projects/" + p.ID) } class="entity-list-name">{ p.Title }</a>
+							<div class="row-actions">
+								@web.OpenBadge(p.Stage == "completed")
+								<a href={ templ.URL("/projects/" + p.ID) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+								<a href={ templ.URL("/projects/" + p.ID + "/edit") } class="row-action-icon" title="Edit">
+									<img src="/static/icons/edit.svg" width="14" height="14" alt=""/>
+								</a>
+								<form method="post" action={ templ.URL("/projects/" + p.ID + "/unlink") } data-confirm={ "Unlink \"" + p.Title + "\"? It stays in the database but won't show here anymore." }>
+									<button type="submit" class="row-action-icon" title="Unlink">
+										<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+									</button>
+								</form>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-project", "Add: Projects") {
+					<form method="post" action="/projects" class="form-grid">
+						<input type="hidden" name="assetId" value={ asset.ID }/>
+						@web.Field("Title", "e.g. \"Cleaning and varnish removal\"") {
+							<input class="input" name="title" required/>
+						}
+						<button type="submit" class="btn btn-primary">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+							Create
+						</button>
+					</form>
+				}
+			}
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Media</h2>
+					@web.ModalTrigger("modal-media", "Add")
+				</div>
+				if len(assetMedia) == 0 {
+					<p class="empty-state">No media yet.</p>
+				}
+				<ul class="entity-list">
+					for _, ref := range assetMedia {
+						<li class="entity-list-row">
+							<a href={ mediaViewHref(ref) } class="entity-list-name">
+								<img class="entity-thumb" src={ "/api/media/" + ref.MediaID } alt="" style="width:2.5rem;height:2.5rem;display:inline-block;vertical-align:middle;margin-right:0.5rem;border-radius:4px;"/>
+								if ref.Role.Valid {
+									{ ref.Role.String }
+								} else {
+									{ string(ref.Media.Kind) }
+								}
+							</a>
+							<div class="row-actions">
+								<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+								<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
+									<button type="submit" class="row-action-icon" title="Unlink">
+										<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+									</button>
+								</form>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-media", "Add: Media") {
+					<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media") } enctype="multipart/form-data" class="form-grid">
+						@web.Field("Photos / video", "On a phone this opens your camera directly.") {
+							<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+						}
+						<button type="submit" class="btn btn-primary">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+							Upload
+						</button>
+					</form>
+				}
+			}
 		</div>
-		if len(assetTreatments) == 0 {
-			<p class="empty-state">No treatments logged yet.</p>
-		}
-		<ul class="entity-list">
-			for _, t := range assetTreatments {
-				<li class="entity-list-row">
-					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
-					<div class="row-actions">
-						<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
-						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
-					</div>
-				</li>
-			}
-		</ul>
-	}
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Reports</h2>
-		if len(reports) == 0 {
-			<p class="empty-state">No reports yet for this object.</p>
-		}
-		<ul class="entity-list">
-			for _, rep := range reports {
-				<li class="entity-list-row">
-					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
-					<span class="badge">{ rep.Status }</span>
-				</li>
-			}
-		</ul>
-	}
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Client</h2>
-		if client != nil {
-			<a href={ templ.URL("/clients/" + client.ID) } class="entity-list-name">{ client.Name }</a>
-			<p class="page-subtitle">
-				if client.ContactPerson.Valid {
-					{ client.ContactPerson.String }<br/>
+		<div class="report-layout-sidebar">
+			@web.Card() {
+				<h2 class="dashboard-heading">Current status</h2>
+				if len(activeProjects(projects)) == 0 {
+					<p class="page-subtitle">No active project right now.</p>
+				} else {
+					<ul class="entity-list">
+						for _, p := range activeProjects(projects) {
+							<li>
+								<a href={ templ.URL("/projects/" + p.ID) } class="entity-list-name">{ p.Title }</a>
+								<div>
+									<span class="badge badge-blue">{ stageLabel(stageLabels, p.Stage) }</span>
+								</div>
+							</li>
+						}
+					</ul>
 				}
-				if client.Email.Valid {
-					{ client.Email.String }
-				}
-			</p>
-		} else {
-			<p class="page-subtitle">No client on file.</p>
-		}
-	}
-
-	@web.Card() {
-		<h2 class="dashboard-heading">Projects on this asset</h2>
-		if len(projects) == 0 {
-			<p class="empty-state">No projects yet.</p>
-		}
-		<ul class="entity-list">
-			for _, p := range projects {
-				<li class="entity-list-row">
-					<div>
-						<a href={ templ.URL("/projects/" + p.ID) } class="entity-list-name">{ p.Title }</a>
-					</div>
-					@web.OpenBadge(p.Stage == "completed")
-				</li>
 			}
-		</ul>
-	}
+		</div>
+	</div>
+	<script src="/static/js/modal.js" defer></script>
+}
 
-	@web.Card() {
-		<h2 class="dashboard-heading">Current state</h2>
-		if asset.CurrentStateID.Valid && len(states) > 0 {
-			<span class={ "badge", severityToneClass(conditionByCode, states[0].Condition) }>{ conditionTitle(conditionByCode, states[0].Condition) }</span>
-		} else {
-			<p class="page-subtitle">Not yet assessed.</p>
+// conditionEntry renders one AssetState's badge/description/media — shared by the "Latest
+// condition report" card's headline entry and its "View full history" disclosure.
+templ conditionEntry(s State, conditionByCode map[string]settings.Classifier, refs []media.ReferenceWithMedia, locale i18n.Locale) {
+	<div class="row-actions">
+		<span class={ "badge", severityToneClass(conditionByCode, s.Condition) }>{ conditionTitle(conditionByCode, s.Condition, locale) }</span>
+		<span class="page-subtitle">{ s.RecordedAt.Format("2006-01-02 15:04") }</span>
+	</div>
+	<p class="detail-paragraph">{ s.Description }</p>
+	@media.MediaGrid(refs)
+}
+
+// activeProjects filters to non-completed projects — the "Current status" card's content, distinct
+// from "Projects on this asset" below it (which lists every project regardless of stage).
+func activeProjects(projects []ProjectSummary) []ProjectSummary {
+	var out []ProjectSummary
+	for _, p := range projects {
+		if p.Stage != "completed" {
+			out = append(out, p)
 		}
 	}
+	return out
+}
+
+func stageLabel(labels map[string]string, code string) string {
+	if label, ok := labels[code]; ok {
+		return label
+	}
+	return code
+}
+
+func mediaViewHref(ref media.ReferenceWithMedia) templ.SafeURL {
+	if ref.Media.Kind == media.KindVideo {
+		return templ.URL("/api/media/" + ref.MediaID + "?variant=original")
+	}
+	return templ.URL("/media/view/" + ref.MediaID)
+}
+
+func assetTypeTitle(assetType *settings.Classifier, locale i18n.Locale) string {
+	if assetType == nil {
+		return ""
+	}
+	return settings.ClassifierLabel(*assetType, locale)
 }
 
 templ EditPage(c web.Chrome, asset Asset) {
@@ -408,17 +555,6 @@ templ editBody(asset Asset) {
 	}
 }
 
-// flattenMedia collects every condition-state's media into one slice, ordered newest-state-first
-// (states is already fetched that way) - the source for the asset detail page's Media tab, which
-// has no dedicated per-asset media query of its own.
-func flattenMedia(states []State, stateMedia map[string][]media.ReferenceWithMedia) []media.ReferenceWithMedia {
-	var out []media.ReferenceWithMedia
-	for _, s := range states {
-		out = append(out, stateMedia[s.ID]...)
-	}
-	return out
-}
-
 templ assetActions(asset Asset) {
 	<a class="btn btn-secondary" href={ templ.URL("/assets/" + asset.ID + "/edit") }>
 		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
@@ -442,18 +578,6 @@ templ detailField(label, value string) {
 			}
 		</dd>
 	</div>
-}
-
-func assetSubtitle(asset Asset, client *clients.Client, assetType *settings.Classifier) string {
-	typeTitle := ""
-	if assetType != nil {
-		typeTitle = assetType.Title
-	}
-	clientName := ""
-	if client != nil {
-		clientName = client.Name
-	}
-	return asset.ReferenceCode + " · " + typeTitle + " · owner: " + clientName
 }
 
 func insuredLabel(b sql.NullBool) string {
@@ -494,9 +618,9 @@ func acquisitionDateInputValue(asset Asset) string {
 	return asset.AcquisitionDate.Time.Format("2006-01-02")
 }
 
-func conditionTitle(byCode map[string]settings.Classifier, code string) string {
+func conditionTitle(byCode map[string]settings.Classifier, code string, locale i18n.Locale) string {
 	if c, ok := byCode[code]; ok {
-		return c.Title
+		return settings.ClassifierLabel(c, locale)
 	}
 	return code
 }

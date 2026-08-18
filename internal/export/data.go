@@ -7,11 +7,17 @@ import (
 
 	"studio/internal/assets"
 	"studio/internal/clients"
+	"studio/internal/i18n"
 	"studio/internal/media"
 	"studio/internal/reporter"
 	"studio/internal/settings"
 	"studio/internal/workflows"
 )
+
+// exportLocale is fixed: exported HTML/PDF documents are plain, non-localized output regardless
+// of the viewer's own locale preference (no *http.Request reaches this package to read a cookie
+// from) — same scope decision as the rest of this package's hardcoded English strings.
+const exportLocale = i18n.LocaleEN
 
 type Service struct {
 	Pool  *sql.DB
@@ -62,8 +68,8 @@ func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, er
 	states, _ := assets.ListStates(ctx, svc.Pool, id) // DESC — reversed below for chronological order
 	states = reversed(states)
 	projects, _ := assets.ListProjectsForAsset(ctx, svc.Pool, id)
-	conditionLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierConditionState)
-	stageLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierProjectStage)
+	conditionLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierConditionState, exportLocale)
+	stageLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierProjectStage, exportLocale)
 
 	details := []string{}
 	if assetType != nil {
@@ -133,7 +139,7 @@ func (svc *Service) GetProjectExportData(ctx context.Context, id string) (*Doc, 
 	client, _ := clients.GetByID(ctx, svc.Pool, asset.ClientID)
 	activities, _ := workflows.ListActivities(ctx, svc.Pool, id) // DESC — reversed below
 	activities = reversed(activities)
-	stageLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierProjectStage)
+	stageLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierProjectStage, exportLocale)
 
 	clientName := ""
 	if client != nil {

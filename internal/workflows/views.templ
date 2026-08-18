@@ -5,6 +5,7 @@ import (
 
 	"studio/internal/assets"
 	"studio/internal/clients"
+	"studio/internal/i18n"
 	"studio/internal/settings"
 	"studio/internal/web"
 )
@@ -12,16 +13,22 @@ import (
 // ListPage is the Projects kanban board — one column per project_stage Classifier code, cards
 // dragged between columns via static/js/kanban.js posting to POST /projects/{id}/stage.
 templ ListPage(c web.Chrome, rows []ListRow, stages []settings.Classifier) {
-	@web.AppLayout("Projects", c, listBody(rows, stages))
+	@web.AppLayout("Projects", c, listBody(rows, stages, c.Locale))
 }
 
-templ listBody(rows []ListRow, stages []settings.Classifier) {
+templ listBody(rows []ListRow, stages []settings.Classifier, locale i18n.Locale) {
 	@web.PageHeader("Projects", "Drag a card to move it to the next stage.", newWorkflowLink())
+	<div class="list-toolbar">
+		<span class="search-wrap">
+			<img src="/static/icons/search.svg" width="16" height="16" alt="" class="icon"/>
+			<input type="text" id="kanban-search" placeholder="Search by title, asset, client…"/>
+		</span>
+	</div>
 	<div class="kanban-board" id="kanban-board" data-url-template="/projects/{id}/stage" data-status-field="stage">
 		for _, stage := range stages {
 			<div class="kanban-column" data-status={ stage.Code }>
 				<div class="kanban-column-header">
-					<h3>{ stage.Title }</h3>
+					<h3>{ settings.ClassifierLabel(stage, locale) }</h3>
 					<span class="page-subtitle">{ countByStage(rows, stage.Code) }</span>
 				</div>
 				<div class="kanban-column-body" data-status={ stage.Code }>
@@ -38,7 +45,7 @@ templ listBody(rows []ListRow, stages []settings.Classifier) {
 }
 
 templ kanbanCard(row ListRow) {
-	<div class="kanban-card" draggable="true" data-item-id={ row.ID }>
+	<div class="kanban-card" draggable="true" data-item-id={ row.ID } data-search={ kanbanCardSearchHaystack(row) }>
 		<a href={ templ.URL("/projects/" + row.ID) } class="entity-list-name">{ row.Title }</a>
 		<div class="page-subtitle">
 			if row.AssetTitle.Valid {
@@ -49,6 +56,17 @@ templ kanbanCard(row ListRow) {
 			· owner: { row.ClientName }
 		</div>
 	</div>
+}
+
+func kanbanCardSearchHaystack(row ListRow) string {
+	return row.Title + " " + assetOptionSearchLabel(row) + " " + row.ClientName
+}
+
+func assetOptionSearchLabel(row ListRow) string {
+	if row.AssetTitle.Valid && row.AssetTitle.String != "" {
+		return row.AssetTitle.String
+	}
+	return row.AssetReferenceCode
 }
 
 func countByStage(rows []ListRow, stage string) string {
@@ -107,24 +125,22 @@ func assetOptionLabel(a AssetOption) string {
 // record conservation work on an Asset; this page is just an anchor for the stage-advance
 // control, a link back to the Asset, and export.
 templ DetailPage(c web.Chrome, project Project, asset *assets.Asset, client *clients.Client, stages []settings.Classifier, assignedToName string) {
-	@web.AppLayout(project.Title, c, detailBody(project, asset, client, stages, assignedToName))
+	@web.AppLayout(project.Title, c, detailBody(project, asset, client, stages, assignedToName, c.Locale))
 }
 
-templ detailBody(project Project, asset *assets.Asset, client *clients.Client, stages []settings.Classifier, assignedToName string) {
+templ detailBody(project Project, asset *assets.Asset, client *clients.Client, stages []settings.Classifier, assignedToName string, locale i18n.Locale) {
 	@web.PageHeader(project.Title, detailSubtitle(asset, client), detailActions(project, asset))
-
 	@web.Card() {
 		<dl class="detail-dl">
-			@detailField("Stage", stageTitle(stages, project.Stage))
+			@detailField("Stage", stageTitle(stages, project.Stage, locale))
 			@detailField("Priority", project.Priority)
 			@detailField("Assigned to", assignedToName)
 		</dl>
-
 		<form method="post" action={ templ.URL("/projects/" + project.ID + "/stage") } class="inline-edit-form">
 			@web.Field("Move to stage", "") {
 				<select class="input" name="stage">
 					for _, stage := range stages {
-						<option value={ stage.Code } selected?={ stage.Code == project.Stage }>{ stage.Title }</option>
+						<option value={ stage.Code } selected?={ stage.Code == project.Stage }>{ settings.ClassifierLabel(stage, locale) }</option>
 					}
 				</select>
 			}
@@ -149,10 +165,10 @@ templ detailField(label, value string) {
 	</div>
 }
 
-func stageTitle(stages []settings.Classifier, code string) string {
+func stageTitle(stages []settings.Classifier, code string, locale i18n.Locale) string {
 	for _, s := range stages {
 		if s.Code == code {
-			return s.Title
+			return settings.ClassifierLabel(s, locale)
 		}
 	}
 	return code
@@ -165,7 +181,42 @@ templ detailActions(project Project, asset *assets.Asset) {
 			View asset
 		</a>
 	}
+	<a class="btn btn-secondary" href={ templ.URL("/projects/" + project.ID + "/edit") }>
+		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		Edit
+	</a>
+	<form method="post" action={ templ.URL("/projects/" + project.ID + "/unlink") } data-confirm={ "Unlink \"" + project.Title + "\"? It stays in the database but won't show here anymore." }>
+		<button type="submit" class="btn btn-ghost">
+			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+			Unlink
+		</button>
+	</form>
 	@web.ExportLinks("project", project.ID)
+}
+
+templ EditPage(c web.Chrome, project Project) {
+	@web.AppLayout("Edit "+project.Title, c, editBody(project))
+}
+
+templ editBody(project Project) {
+	@web.PageHeader("Edit "+project.Title, "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action={ templ.URL("/projects/" + project.ID + "/update") } class="form-grid">
+			@web.Field("Title", "") {
+				<input class="input" name="title" required value={ project.Title }/>
+			}
+			<div class="form-actions">
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Save
+				</button>
+				<a class="btn btn-ghost" href={ templ.URL("/projects/" + project.ID) }>
+					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					Cancel
+				</a>
+			</div>
+		</form>
+	}
 }
 
 func detailSubtitle(asset *assets.Asset, client *clients.Client) string {

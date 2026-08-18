@@ -26,15 +26,15 @@ func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Asset, error)
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
-	err := rows.Scan(&r.ID, &r.Title, &r.ReferenceCode, &r.AssetTypeTitle, &r.ClientName, &r.CurrentStateCondition,
+	err := rows.Scan(&r.ID, &r.Title, &r.ReferenceCode, &r.AssetTypeCode, &r.AssetTypeTitle, &r.ClientName, &r.CurrentStateCondition,
 		&r.ProjectCount, &r.ThumbnailMediaID)
 	return r, err
 }
 
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT a.id, a.title, a.referenceCode, at.title, c.name, cs.condition,
-		       (SELECT COUNT(*) FROM Project p WHERE p.assetId = a.id) AS projectCount,
+		SELECT a.id, a.title, a.referenceCode, at.code, at.title, c.name, cs.condition,
+		       (SELECT COUNT(*) FROM Project p WHERE p.assetId = a.id AND p.deletedAt IS NULL) AS projectCount,
 		       (SELECT mr.mediaId FROM MediaReference mr
 		          JOIN AssetState ast ON ast.id = mr.referencingId AND mr.referencingType = 'AssetState'
 		          JOIN Media m ON m.id = mr.mediaId AND m.kind = 'image'
@@ -144,5 +144,5 @@ func scanProjectSummary(rows *sql.Rows) (ProjectSummary, error) {
 func ListProjectsForAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]ProjectSummary, error) {
 	return studiodb.Query(ctx, q, `
 		SELECT p.id, p.title, p.stage FROM Project p
-		WHERE p.assetId = ? ORDER BY p.createdAt DESC`, scanProjectSummary, assetID)
+		WHERE p.assetId = ? AND p.deletedAt IS NULL ORDER BY p.createdAt DESC`, scanProjectSummary, assetID)
 }

@@ -19,6 +19,7 @@ type Treatment struct {
 	PerformedAt       time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	DeletedAt         sql.NullTime
 }
 
 type ListRow struct {

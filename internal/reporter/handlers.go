@@ -27,6 +27,7 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("POST /reports/{id}/layout", svc.Auth.RequireUser(svc.handleUpdateLayout))
 	mux.HandleFunc("POST /reports/{id}/status", svc.Auth.RequireUser(svc.handleSetStatus))
 	mux.HandleFunc("POST /reports/{id}/attachments", svc.Auth.RequireUser(svc.handleAddAttachments))
+	mux.HandleFunc("POST /reports/{id}/unlink", svc.Auth.RequireUser(svc.handleUnlink))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -131,6 +132,27 @@ func (svc *Service) handleUpdateSections(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
+}
+
+// handleUnlink soft-deletes the report (see Unlink's doc comment) and redirects back to the
+// asset it belonged to, matching the asset detail page's "unlink" action for this section.
+func (svc *Service) handleUnlink(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	report, err := GetByID(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if report == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := Unlink(ctx, svc.Pool, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/assets/"+report.AssetID, http.StatusSeeOther)
 }
 
 func (svc *Service) handleUpdateLayout(w http.ResponseWriter, r *http.Request, user *auth.User) {

@@ -97,7 +97,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 		ID, AssetID string
 		ProjectID   sql.NullString
 	}
-	assetStates, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM AssetState", "id", assetStateIDs,
+	assetStates, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM AssetState", "id", assetStateIDs, "",
 		func(rows *sql.Rows) (assetStateRow, error) {
 			var s assetStateRow
 			err := rows.Scan(&s.ID, &s.AssetID, &s.ProjectID)
@@ -107,7 +107,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 		return nil, err
 	}
 	type activityRow struct{ ID, ProjectID string }
-	activities, err := queryByIDs(ctx, q, "SELECT id, projectId FROM Activity", "id", activityIDs,
+	activities, err := queryByIDs(ctx, q, "SELECT id, projectId FROM Activity", "id", activityIDs, "",
 		func(rows *sql.Rows) (activityRow, error) {
 			var a activityRow
 			err := rows.Scan(&a.ID, &a.ProjectID)
@@ -120,7 +120,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 		ID, AssetID string
 		ProjectID   sql.NullString
 	}
-	reports, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM Report", "id", reportIDs,
+	reports, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM Report", "id", reportIDs, "AND deletedAt IS NULL",
 		func(rows *sql.Rows) (reportRow, error) {
 			var r reportRow
 			err := rows.Scan(&r.ID, &r.AssetID, &r.ProjectID)
@@ -130,7 +130,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 		return nil, err
 	}
 	type treatmentRow struct{ ID, AssetID string }
-	treatments, err := queryByIDs(ctx, q, "SELECT id, assetId FROM Treatment", "id", treatmentIDs,
+	treatments, err := queryByIDs(ctx, q, "SELECT id, assetId FROM Treatment", "id", treatmentIDs, "AND deletedAt IS NULL",
 		func(rows *sql.Rows) (treatmentRow, error) {
 			var t treatmentRow
 			err := rows.Scan(&t.ID, &t.AssetID)
@@ -185,7 +185,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 	}
 
 	type projectRow struct{ ID, Title, AssetID string }
-	projects, err := queryByIDs(ctx, q, "SELECT id, title, assetId FROM Project", "id", allProjectIDs,
+	projects, err := queryByIDs(ctx, q, "SELECT id, title, assetId FROM Project", "id", allProjectIDs, "AND deletedAt IS NULL",
 		func(rows *sql.Rows) (projectRow, error) {
 			var p projectRow
 			err := rows.Scan(&p.ID, &p.Title, &p.AssetID)
@@ -224,7 +224,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 		ID, ReferenceCode, ClientName string
 		Title                         sql.NullString
 	}
-	assetRows, err := queryByIDs(ctx, q, "SELECT a.id, a.title, a.referenceCode, c.name FROM Asset a JOIN Client c ON c.id = a.clientId", "a.id", allAssetIDs,
+	assetRows, err := queryByIDs(ctx, q, "SELECT a.id, a.title, a.referenceCode, c.name FROM Asset a JOIN Client c ON c.id = a.clientId", "a.id", allAssetIDs, "",
 		func(rows *sql.Rows) (assetRow, error) {
 			var a assetRow
 			err := rows.Scan(&a.ID, &a.Title, &a.ReferenceCode, &a.ClientName)
@@ -309,7 +309,10 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 // without querying at all when ids is empty (matches the original's
 // `ids.length ? query(...) : []`). idColumn should be table-qualified (e.g. "a.id") whenever
 // baseSQL joins another table with its own id column, to avoid an ambiguous-column error.
-func queryByIDs[T any](ctx context.Context, q studiodb.Querier, baseSQL, idColumn string, ids []string, scan studiodb.ScanFunc[T]) ([]T, error) {
+// extraWhere, if non-empty, is appended after the "id IN (...)" clause (e.g. "AND deletedAt IS
+// NULL" for tables with a soft-delete column — a soft-deleted row's context shouldn't surface in
+// Media's asset/project/client labels any more than the row itself surfaces elsewhere).
+func queryByIDs[T any](ctx context.Context, q studiodb.Querier, baseSQL, idColumn string, ids []string, extraWhere string, scan studiodb.ScanFunc[T]) ([]T, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -322,5 +325,9 @@ func queryByIDs[T any](ctx context.Context, q studiodb.Querier, baseSQL, idColum
 		placeholders += "?"
 		args[i] = id
 	}
-	return studiodb.Query(ctx, q, baseSQL+" WHERE "+idColumn+" IN ("+placeholders+")", scan, args...)
+	sqlText := baseSQL + " WHERE " + idColumn + " IN (" + placeholders + ")"
+	if extraWhere != "" {
+		sqlText += " " + extraWhere
+	}
+	return studiodb.Query(ctx, q, sqlText, scan, args...)
 }

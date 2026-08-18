@@ -1,45 +1,84 @@
 package treatments
 
 import (
+	"database/sql"
+
+	"studio/internal/i18n"
 	"studio/internal/media"
 	"studio/internal/settings"
 	"studio/internal/web"
 )
 
-templ ListPage(c web.Chrome, rows []ListRow, methodLabels map[string]string) {
-	@web.AppLayout("Treatments", c, listBody(rows, methodLabels))
+templ ListPage(c web.Chrome, rows []ListRow, methodLabels map[string]string, methods []settings.Classifier) {
+	@web.AppLayout("Treatments", c, listBody(rows, methodLabels, methods))
 }
 
-templ listBody(rows []ListRow, methodLabels map[string]string) {
+templ listBody(rows []ListRow, methodLabels map[string]string, methods []settings.Classifier) {
 	@web.PageHeader("Treatments", "Conservation work performed, per object.", newTreatmentLink())
-	@web.Card() {
-		if len(rows) == 0 {
-			<p class="empty-state">No treatments logged yet.</p>
-		}
-		<ul class="entity-list">
-			for _, row := range rows {
-				<li>
-					<a href={ templ.URL("/treatments/" + row.ID) } class="entity-list-row">
-						<div>
-							<span class="entity-list-name">{ row.Title }</span>
-							<div class="page-subtitle">
-								if row.AssetTitle.Valid {
-									{ row.AssetTitle.String }
-								} else {
-									{ row.AssetReferenceCode }
-								}
-								· owner: { row.ClientName }
-							</div>
-						</div>
-						<div class="row-actions">
-							<span class="badge">{ methodLabel(methodLabels, row.Method) }</span>
-							<span class="page-subtitle">{ row.PerformedAt.Format("2006-01-02") }</span>
-						</div>
-					</a>
-				</li>
+	<div data-el-root>
+		<div class="list-toolbar">
+			@web.EntityListSearchInput("Search by title, asset, client…")
+			@web.EntityListFilterSelect("method", "All methods", classifierFilterOptionsFromLabels(methods, methodLabels))
+			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+		</div>
+		@web.Card() {
+			if len(rows) == 0 {
+				<p class="empty-state">No treatments logged yet.</p>
 			}
-		</ul>
+			<ul class="entity-list" data-el-list>
+				for _, row := range rows {
+					<li
+						data-el-row
+						data-el-search={ treatmentSearchHaystack(row, methodLabels) }
+						data-el-method={ row.Method }
+						data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
+						data-el-group-client={ row.ClientName }
+					>
+						<a href={ templ.URL("/treatments/" + row.ID) } class="entity-list-row">
+							<div>
+								<span class="entity-list-name">{ row.Title }</span>
+								<div class="page-subtitle">
+									if row.AssetTitle.Valid {
+										{ row.AssetTitle.String }
+									} else {
+										{ row.AssetReferenceCode }
+									}
+									· owner: { row.ClientName }
+								</div>
+							</div>
+							<div class="row-actions">
+								<span class="badge">{ methodLabel(methodLabels, row.Method) }</span>
+								<span class="page-subtitle">{ row.PerformedAt.Format("2006-01-02") }</span>
+							</div>
+						</a>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+	<script src="/static/js/entity-list-filter.js" defer></script>
+}
+
+// classifierFilterOptionsFromLabels builds filter options from an already-fetched
+// []settings.Classifier plus a locale-resolved label map (avoids a second, redundant classifier
+// fetch just for the filter's option labels — handleList already has both).
+func classifierFilterOptionsFromLabels(classifiers []settings.Classifier, labels map[string]string) []web.FilterOption {
+	out := make([]web.FilterOption, len(classifiers))
+	for i, c := range classifiers {
+		out[i] = web.FilterOption{Value: c.Code, Label: methodLabel(labels, c.Code)}
 	}
+	return out
+}
+
+func assetLabel(title sql.NullString, referenceCode string) string {
+	if title.Valid && title.String != "" {
+		return title.String
+	}
+	return referenceCode
+}
+
+func treatmentSearchHaystack(row ListRow, methodLabels map[string]string) string {
+	return row.Title + " " + assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + methodLabel(methodLabels, row.Method)
 }
 
 templ newTreatmentLink() {
@@ -50,10 +89,10 @@ templ newTreatmentLink() {
 }
 
 templ NewPage(c web.Chrome, options []AssetOption, methods []settings.Classifier, preselectedAssetID string) {
-	@web.AppLayout("New treatment", c, newBody(options, methods, preselectedAssetID))
+	@web.AppLayout("New treatment", c, newBody(options, methods, preselectedAssetID, c.Locale))
 }
 
-templ newBody(options []AssetOption, methods []settings.Classifier, preselectedAssetID string) {
+templ newBody(options []AssetOption, methods []settings.Classifier, preselectedAssetID string, locale i18n.Locale) {
 	@web.PageHeader("New treatment", "", templ.NopComponent)
 	@web.Card() {
 		<form method="post" action="/treatments" enctype="multipart/form-data" class="form-grid">
@@ -65,20 +104,7 @@ templ newBody(options []AssetOption, methods []settings.Classifier, preselectedA
 					}
 				</select>
 			}
-			@web.Field("Method", "") {
-				<select class="input" name="method" required>
-					<option value="" disabled selected>Select…</option>
-					for _, m := range methods {
-						<option value={ m.Code }>{ m.Title }</option>
-					}
-				</select>
-			}
-			@web.Field("Title", "e.g. \"Surface cleaning — lower right quadrant\"") {
-				<input class="input" name="title" required/>
-			}
-			@web.Field("Notes", "") {
-				<textarea class="input" name="notes" rows="4" required></textarea>
-			}
+			@treatmentFields("", "", "", methods, locale)
 			@web.Field("Performed at", "") {
 				<input class="input" type="datetime-local" name="performedAt"/>
 			}
@@ -107,7 +133,6 @@ templ DetailPage(c web.Chrome, treatment DetailRow, methodLabels map[string]stri
 
 templ detailBody(treatment DetailRow, methodLabels map[string]string, performedByName string, photos []media.ReferenceWithMedia) {
 	@web.PageHeader(treatment.Title, detailSubtitle(treatment), detailActions(treatment))
-
 	@web.Card() {
 		<dl class="detail-dl">
 			@detailField("Method", methodLabel(methodLabels, treatment.Method))
@@ -144,6 +169,76 @@ templ detailActions(treatment DetailRow) {
 		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
 		View asset
 	</a>
+	<a class="btn btn-secondary" href={ templ.URL("/treatments/" + treatment.ID + "/edit") }>
+		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		Edit
+	</a>
+	<form method="post" action={ templ.URL("/treatments/" + treatment.ID + "/unlink") } data-confirm={ "Unlink \"" + treatment.Title + "\"? It stays in the database but won't show here anymore." }>
+		<button type="submit" class="btn btn-ghost">
+			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+			Unlink
+		</button>
+	</form>
+}
+
+templ EditPage(c web.Chrome, treatment Treatment, methods []settings.Classifier) {
+	@web.AppLayout("Edit "+treatment.Title, c, editBody(treatment, methods, c.Locale))
+}
+
+templ editBody(treatment Treatment, methods []settings.Classifier, locale i18n.Locale) {
+	@web.PageHeader("Edit "+treatment.Title, "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action={ templ.URL("/treatments/" + treatment.ID + "/update") } class="form-grid">
+			@treatmentFields(treatment.Method, treatment.Title, treatment.Notes, methods, locale)
+			<div class="form-actions">
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Save
+				</button>
+				<a class="btn btn-ghost" href={ templ.URL("/treatments/" + treatment.ID) }>
+					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					Cancel
+				</a>
+			</div>
+		</form>
+	}
+}
+
+// treatmentFields is the Method/Title/Notes field trio shared by the edit form here and the
+// asset detail page's "+Add" modal (see AddModalBody below) — assetId/performedAt/photos differ
+// per caller so they're not part of this shared slot.
+templ treatmentFields(method, title, notes string, methods []settings.Classifier, locale i18n.Locale) {
+	@web.Field("Method", "") {
+		<select class="input" name="method" required>
+			<option value="" disabled selected?={ method == "" }>Select…</option>
+			for _, m := range methods {
+				<option value={ m.Code } selected?={ m.Code == method }>{ settings.ClassifierLabel(m, locale) }</option>
+			}
+		</select>
+	}
+	@web.Field("Title", "e.g. \"Surface cleaning — lower right quadrant\"") {
+		<input class="input" name="title" required value={ title }/>
+	}
+	@web.Field("Notes", "") {
+		<textarea class="input" name="notes" rows="4" required>{ notes }</textarea>
+	}
+}
+
+// AddModalBody is the asset detail page's "Treatments" section +Add content: the same fields as
+// the full new-treatment form, minus the asset picker (assetId is preset via a hidden input,
+// since this modal only ever creates a treatment for the asset it's opened from).
+templ AddModalBody(assetID string, methods []settings.Classifier, locale i18n.Locale) {
+	<form method="post" action="/treatments" enctype="multipart/form-data" class="form-grid">
+		<input type="hidden" name="assetId" value={ assetID }/>
+		@treatmentFields("", "", "", methods, locale)
+		@web.Field("Photos", "On a phone this opens your camera directly.") {
+			<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+		}
+		<button type="submit" class="btn btn-primary">
+			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			Log treatment
+		</button>
+	</form>
 }
 
 func detailSubtitle(treatment DetailRow) string {

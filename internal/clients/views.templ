@@ -4,45 +4,72 @@ import (
 	"strconv"
 	"strings"
 
+	"studio/internal/i18n"
 	"studio/internal/settings"
 	"studio/internal/web"
 )
 
-templ ListPage(c web.Chrome, rows []ListRow, typeLabels map[string]string) {
-	@web.AppLayout("Clients", c, listBody(rows, typeLabels))
+templ ListPage(c web.Chrome, rows []ListRow, typeLabels map[string]string, clientTypes []settings.Classifier) {
+	@web.AppLayout("Clients", c, listBody(rows, typeLabels, clientTypes))
 }
 
-templ listBody(rows []ListRow, typeLabels map[string]string) {
+templ listBody(rows []ListRow, typeLabels map[string]string, clientTypes []settings.Classifier) {
 	@web.PageHeader("Clients", "Every client, with their assets at a glance.", newClientLink())
-	@web.Card() {
-		if len(rows) == 0 {
-			<p class="empty-state">No clients yet.</p>
-		}
-		<ul class="entity-list">
-			for _, row := range rows {
-				<li>
-					<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-row">
-						<span class="avatar-chip">{ clientInitials(row.Name) }</span>
-						<div>
-							<span class="entity-list-name">{ row.Name }</span>
-							<div class="page-subtitle">
-								if row.Email.Valid {
-									{ row.Email.String }
-								} else {
-									no email on file
-								}
-							</div>
-						</div>
-						<div class="row-actions">
-							<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
-							<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
-						</div>
-						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
-					</a>
-				</li>
+	<div data-el-root>
+		<div class="list-toolbar">
+			@web.EntityListSearchInput("Search by name, email…")
+			@web.EntityListFilterSelect("clientType", "All types", classifierFilterOptionsFromLabels(clientTypes, typeLabels))
+		</div>
+		@web.Card() {
+			if len(rows) == 0 {
+				<p class="empty-state">No clients yet.</p>
 			}
-		</ul>
+			<ul class="entity-list" data-el-list>
+				for _, row := range rows {
+					<li data-el-row data-el-search={ clientSearchHaystack(row, typeLabels) } data-el-client-type={ row.Type }>
+						<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-row">
+							<span class="avatar-chip">{ clientInitials(row.Name) }</span>
+							<div>
+								<span class="entity-list-name">{ row.Name }</span>
+								<div class="page-subtitle">
+									if row.Email.Valid {
+										{ row.Email.String }
+									} else {
+										no email on file
+									}
+								</div>
+							</div>
+							<div class="row-actions">
+								<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
+								<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
+							</div>
+							<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+						</a>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+	<script src="/static/js/entity-list-filter.js" defer></script>
+}
+
+// classifierFilterOptionsFromLabels builds filter options from an already-fetched
+// []settings.Classifier plus a locale-resolved label map (avoids a second, redundant classifier
+// fetch just for the filter's option labels — handleList already has both).
+func classifierFilterOptionsFromLabels(classifiers []settings.Classifier, labels map[string]string) []web.FilterOption {
+	out := make([]web.FilterOption, len(classifiers))
+	for i, c := range classifiers {
+		out[i] = web.FilterOption{Value: c.Code, Label: labelFor(labels, c.Code)}
 	}
+	return out
+}
+
+func clientSearchHaystack(row ListRow, typeLabels map[string]string) string {
+	email := ""
+	if row.Email.Valid {
+		email = row.Email.String
+	}
+	return row.Name + " " + email + " " + labelFor(typeLabels, row.Type)
 }
 
 func labelFor(m map[string]string, code string) string {
@@ -74,10 +101,10 @@ templ newClientLink() {
 }
 
 templ NewPage(c web.Chrome, clientTypes, contactMethods []settings.Classifier) {
-	@web.AppLayout("New client", c, newBody(clientTypes, contactMethods))
+	@web.AppLayout("New client", c, newBody(clientTypes, contactMethods, c.Locale))
 }
 
-templ newBody(clientTypes, contactMethods []settings.Classifier) {
+templ newBody(clientTypes, contactMethods []settings.Classifier, locale i18n.Locale) {
 	@web.PageHeader("New client", "", templ.NopComponent)
 	@web.Card() {
 		<form method="post" action="/clients" class="form-grid">
@@ -85,7 +112,7 @@ templ newBody(clientTypes, contactMethods []settings.Classifier) {
 				@web.Field("Type", "") {
 					<select class="input" name="type">
 						for _, ct := range clientTypes {
-							<option value={ ct.Code }>{ ct.Title }</option>
+							<option value={ ct.Code }>{ settings.ClassifierLabel(ct, locale) }</option>
 						}
 					</select>
 				}
@@ -112,7 +139,7 @@ templ newBody(clientTypes, contactMethods []settings.Classifier) {
 					<select class="input" name="preferredContactMethod">
 						<option value="">—</option>
 						for _, m := range contactMethods {
-							<option value={ m.Code }>{ m.Title }</option>
+							<option value={ m.Code }>{ settings.ClassifierLabel(m, locale) }</option>
 						}
 					</select>
 				}
@@ -192,17 +219,17 @@ templ clientActions(client Client) {
 }
 
 templ EditPage(c web.Chrome, client Client, clientTypes, contactMethods []settings.Classifier) {
-	@web.AppLayout("Edit "+client.Name, c, editBody(client, clientTypes, contactMethods))
+	@web.AppLayout("Edit "+client.Name, c, editBody(client, clientTypes, contactMethods, c.Locale))
 }
 
-templ editBody(client Client, clientTypes, contactMethods []settings.Classifier) {
+templ editBody(client Client, clientTypes, contactMethods []settings.Classifier, locale i18n.Locale) {
 	@web.PageHeader("Edit "+client.Name, "", templ.NopComponent)
 	@web.Card() {
 		<form method="post" action={ templ.URL("/clients/" + client.ID + "/update") } class="form-grid">
 			@web.Field("Type", "") {
 				<select class="input" name="type">
 					for _, ct := range clientTypes {
-						<option value={ ct.Code } selected?={ ct.Code == client.Type }>{ ct.Title }</option>
+						<option value={ ct.Code } selected?={ ct.Code == client.Type }>{ settings.ClassifierLabel(ct, locale) }</option>
 					}
 				</select>
 			}
@@ -225,7 +252,7 @@ templ editBody(client Client, clientTypes, contactMethods []settings.Classifier)
 				<select class="input" name="preferredContactMethod">
 					<option value="">—</option>
 					for _, m := range contactMethods {
-						<option value={ m.Code } selected?={ m.Code == client.PreferredContactMethod.String }>{ m.Title }</option>
+						<option value={ m.Code } selected?={ m.Code == client.PreferredContactMethod.String }>{ settings.ClassifierLabel(m, locale) }</option>
 					}
 				</select>
 			}
