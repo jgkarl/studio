@@ -101,7 +101,7 @@ templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Ref
 }
 
 templ mediaViewBody(m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
-	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m))
+	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m, len(regions) > 0))
 	@web.Card() {
 		<div class="row-actions" style="margin-bottom: 0.75rem;">
 			<span class="badge">{ string(m.Kind) }</span>
@@ -130,34 +130,42 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 		}
 	}
 	if m.Kind == KindImage {
-		@lightboxModal(m.ID, regions, annotationTypes)
+		@lightboxModal(m.ID, m.Description.String, regions, annotationTypes)
 		<script src="/static/js/lightbox.js" defer></script>
 		<script src="/static/js/pattern-layer.js" defer></script>
-		@iiifViewerModal(m.ID)
-		<script src="/static/js/iiif-viewer.js" defer></script>
+		@iiifViewerModal(m.ID, regions, annotationTypes)
+		<script src="/static/openseadragon/openseadragon.min.js" defer></script>
+		<script src="/static/js/osd-viewer.js" defer></script>
 	}
 }
 
-// iiifViewerModal is a read-only deep-zoom viewer backed by the real IIIF Image API
-// (internal/iiif) — wheel zooms, drag pans, both recomputing a pct: region server-side crop. Kept
-// separate from the lightbox/pattern-layer editor: combining live pan/zoom with drag-to-draw is a
-// much harder coordinate-transform problem than either alone. No vendored library (studio-go's own
-// README states that as an explicit value) — static/js/iiif-viewer.js is hand-rolled.
-templ iiifViewerModal(mediaID string) {
+// iiifViewerModal is the read-only deep-zoom viewer: OpenSeadragon (static/openseadragon/,
+// vendored — the one deliberate exception to this app's usual "no vendored libraries" rule, see
+// static/js/osd-viewer.js's header comment) tiling against the real IIIF Image API
+// (internal/iiif), with the same stored annotation regions (internal/media/annotations.go) and
+// legend the editor shows, overlaid via OpenSeadragon's own coordinate system so they track
+// pan/zoom automatically. Kept separate from the lightbox/pattern-layer editor: this is look-only,
+// no drawing here.
+templ iiifViewerModal(mediaID string, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
 	<div id="iiif-viewer-overlay" class="lightbox-overlay" hidden>
 		<div class="lightbox-modal iiif-viewer-modal">
 			<button type="button" id="iiif-viewer-close" class="lightbox-close" aria-label="Close">
 				<img src="/static/icons/close.svg" width="18" height="18" alt="" class="icon"/>
 			</button>
-			<div class="iiif-viewer-stage" id="iiif-viewer-stage" data-media-id={ mediaID }>
-				<img id="iiif-viewer-image" class="iiif-viewer-image" src={ "/api/iiif/" + mediaID + "/full/max/0/default.jpg" } alt=""/>
+			<div class="iiif-viewer-stage" id="iiif-viewer-stage" data-info-url={ "/api/iiif/" + mediaID + "/info.json" }>
+				<div id="osd-viewer" class="osd-viewer"></div>
+				<svg id="osd-annotation-overlay" class="osd-annotation-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+					<defs>
+						for _, t := range UsedTypeOptions(regions, annotationTypes) {
+							@hatchPatternDef(t)
+						}
+					</defs>
+					for _, r := range regions {
+						@regionShape(r, OptionByID(annotationTypes, r.AnnotationTypeID))
+					}
+				</svg>
 			</div>
-			<div class="lightbox-control-row iiif-viewer-controls">
-				<button type="button" id="iiif-viewer-zoom-out" class="btn btn-secondary" aria-label="Zoom out">−</button>
-				<button type="button" id="iiif-viewer-zoom-in" class="btn btn-secondary" aria-label="Zoom in">+</button>
-				<button type="button" id="iiif-viewer-reset" class="btn btn-ghost">Reset</button>
-				<span class="page-subtitle">Scroll to zoom · drag to pan</span>
-			</div>
+			@patternLayerLegend(regions, annotationTypes)
 		</div>
 	</div>
 }
@@ -236,14 +244,15 @@ func formatPct(n float64) string {
 }
 
 // lightboxModal is the image editor: an 80vw x 80vh modal combining the plain viewer (rotate +
-// brightness/contrast CSS filters, an ephemeral note never persisted - matches the design
-// artifact's own lightboxNote behavior, download) with the pattern layer - a percentage-coordinate
+// brightness/contrast CSS filters, download) with the pattern layer - a percentage-coordinate
 // SVG overlay of stored regions (rect or freehand-brush outlines, see AnnotationRegion), a
-// rectangle/brush draw tool with a type dropdown ("the reason" for a marked area), and a legend
-// that's always rendered underneath, whether or not there's anything marked yet. No raster
-// editing, no undo stack - regions are rows (internal/media/annotations.go), never baked into a
-// new image.
-templ lightboxModal(mediaID string, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+// rectangle/brush draw tool with a type dropdown ("the reason" for a marked area), a legend
+// that's always rendered underneath, whether or not there's anything marked yet, and a whole-image
+// note (Media.Description) with its own Save button — persisted via POST /media/{id}/description,
+// unlike the region shapes (already auto-saved per-draw). No raster editing, no undo stack -
+// regions are rows (internal/media/annotations.go), never baked into a new image (that only
+// happens server-side, on demand, for downloads/exports — see internal/media/rasterize.go).
+templ lightboxModal(mediaID, description string, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
 	<div id="lightbox-overlay" class="lightbox-overlay" hidden>
 		<div class="lightbox-modal">
 			<button type="button" id="lightbox-close" class="lightbox-close" aria-label="Close">
@@ -310,18 +319,30 @@ templ lightboxModal(mediaID string, regions []AnnotationRegion, annotationTypes 
 						</label>
 					</div>
 				}
-				<textarea id="lightbox-annotation" class="input" rows="2" placeholder="Add a note (not saved)…"></textarea>
+				<form id="lightbox-description-form" class="row-actions" data-media-id={ mediaID }>
+					<textarea id="lightbox-description" name="description" class="input" rows="2" placeholder="Add a note…">{ description }</textarea>
+					<button type="submit" class="btn btn-secondary" title="Save note">
+						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+						Save
+					</button>
+				</form>
 			</div>
 			@patternLayerLegend(regions, annotationTypes)
 		</div>
 	</div>
 }
 
-templ mediaViewActions(m Media) {
+templ mediaViewActions(m Media, hasRegions bool) {
 	<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
 		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
 		Download
 	</a>
+	if hasRegions {
+		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=annotated") }>
+			<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+			Download annotated
+		</a>
+	}
 	<a class="btn btn-ghost" href="/media">
 		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
 		Back

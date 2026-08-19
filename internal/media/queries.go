@@ -8,17 +8,27 @@ import (
 )
 
 const mediaColumns = `id, storageKey, kind, mimeType, sizeBytes, width, height, durationSeconds,
-	checksum, uploadedByUserId, editedFromId, createdAt`
+	checksum, uploadedByUserId, editedFromId, description, createdAt`
 
 func scanMedia(rows *sql.Rows) (Media, error) {
 	var m Media
 	err := rows.Scan(&m.ID, &m.StorageKey, &m.Kind, &m.MimeType, &m.SizeBytes, &m.Width, &m.Height,
-		&m.DurationSeconds, &m.Checksum, &m.UploadedByID, &m.EditedFromID, &m.CreatedAt)
+		&m.DurationSeconds, &m.Checksum, &m.UploadedByID, &m.EditedFromID, &m.Description, &m.CreatedAt)
 	return m, err
 }
 
 func GetByID(ctx context.Context, q studiodb.Querier, id string) (*Media, error) {
 	return studiodb.QueryOne(ctx, q, "SELECT "+mediaColumns+" FROM Media WHERE id = ?", scanMedia, id)
+}
+
+// UpdateDescription saves the lightbox editor's whole-image note.
+func UpdateDescription(ctx context.Context, q studiodb.Querier, mediaID, description string) error {
+	var val any
+	if description != "" {
+		val = description
+	}
+	_, err := studiodb.Execute(ctx, q, "UPDATE Media SET description = ? WHERE id = ?", val, mediaID)
+	return err
 }
 
 const referenceColumns = "id, mediaId, referencingType, referencingId, role, sortOrder, caption, createdAt"

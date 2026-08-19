@@ -1,7 +1,7 @@
 // Media view lightbox — a viewer, not an editor. Rotate + brightness/contrast are plain CSS
 // (transform/filter) applied to the already-rendered <img>, nothing round-trips to the server.
-// The annotation textarea is local-only state, matching the design artifact's own lightboxNote
-// behavior (resets whenever the lightbox closes, never persisted anywhere).
+// The description textarea (see static/js/pattern-layer.js for its save handler) is real
+// server-persisted state and is left untouched by reset().
 document.addEventListener("DOMContentLoaded", () => {
   const trigger = document.getElementById("lightbox-trigger");
   const overlay = document.getElementById("lightbox-overlay");
@@ -13,7 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const rotateBtn = document.getElementById("lightbox-rotate");
   const resetBtn = document.getElementById("lightbox-reset");
   const closeBtn = document.getElementById("lightbox-close");
-  const annotation = document.getElementById("lightbox-annotation");
 
   let rotation = 0;
 
@@ -29,7 +28,6 @@ document.addEventListener("DOMContentLoaded", () => {
     rotation = 0;
     brightness.value = 100;
     contrast.value = 100;
-    annotation.value = "";
     applyFilters();
     applyRotation();
   }

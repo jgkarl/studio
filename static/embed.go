@@ -4,5 +4,5 @@ package static
 
 import "embed"
 
-//go:embed css js icons fonts
+//go:embed css js icons fonts openseadragon
 var Files embed.FS

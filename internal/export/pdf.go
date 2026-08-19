@@ -54,13 +54,17 @@ func (svc *Service) RenderPDF(ctx context.Context, doc *Doc) ([]byte, error) {
 		}
 
 		for _, img := range section.Images {
-			file, err := svc.Media.ReadMediaFile(ctx, img.MediaID, "web")
-			if err != nil || file == nil {
+			data, mimeType, err := svc.exportImageBytes(ctx, img.MediaID)
+			if err != nil || data == nil {
 				continue
+			}
+			imageType := "JPG"
+			if mimeType == "image/png" {
+				imageType = "PNG"
 			}
 			imgCounter++
 			name := fmt.Sprintf("export-img-%d", imgCounter)
-			info := pdf.RegisterImageOptionsReader(name, fpdf.ImageOptions{ImageType: "JPG"}, bytes.NewReader(file.Data))
+			info := pdf.RegisterImageOptionsReader(name, fpdf.ImageOptions{ImageType: imageType}, bytes.NewReader(data))
 			if info == nil || info.Width() == 0 {
 				continue
 			}
@@ -68,8 +72,16 @@ func (svc *Service) RenderPDF(ctx context.Context, doc *Doc) ([]byte, error) {
 			if pdf.GetY()+h > pdfPageBotY {
 				pdf.AddPage()
 			}
-			pdf.ImageOptions(name, pdfMargin, pdf.GetY(), pdfImgMaxW, h, false, fpdf.ImageOptions{ImageType: "JPG"}, 0, "")
+			pdf.ImageOptions(name, pdfMargin, pdf.GetY(), pdfImgMaxW, h, false, fpdf.ImageOptions{ImageType: imageType}, 0, "")
 			pdf.Ln(h + 3)
+			if img.Caption != "" {
+				pdf.SetFont("Helvetica", "I", 9)
+				pdf.SetTextColor(87, 83, 78)
+				pdf.MultiCell(0, 5, tr(img.Caption), "", "L", false)
+				pdf.SetTextColor(0, 0, 0)
+				pdf.SetFont("Helvetica", "", 10)
+				pdf.Ln(1)
+			}
 		}
 
 		if len(section.Videos) > 0 {

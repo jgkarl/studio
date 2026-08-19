@@ -9,6 +9,7 @@ import (
 	"github.com/a-h/templ"
 
 	"stuudio/internal/auth"
+	"stuudio/internal/i18n"
 	"stuudio/internal/settings"
 	"stuudio/internal/web"
 )
@@ -27,6 +28,7 @@ func Mount(mux *http.ServeMux, svc *HandlerService) {
 	mux.HandleFunc("GET /media/view/{mediaId}", svc.Auth.RequireUser(svc.handleMediaView))
 	mux.HandleFunc("POST /media/{id}/annotations", svc.Auth.RequireUser(svc.handleCreateAnnotation))
 	mux.HandleFunc("POST /media/{id}/annotations/{regionId}/delete", svc.Auth.RequireUser(svc.handleDeleteAnnotation))
+	mux.HandleFunc("POST /media/{id}/description", svc.Auth.RequireUser(svc.handleUpdateDescription))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -41,11 +43,24 @@ func chromeFor(r *http.Request, user *auth.User, active string) web.Chrome {
 // --- Serving routes (public) -----------------------------------------------------------------
 
 func (svc *HandlerService) handleServeMedia(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if r.URL.Query().Get("variant") == "annotated" {
+		png, mimeType, err := svc.RenderAnnotatedImage(r.Context(), id, i18n.GetLocale(r))
+		if err == nil && png != nil {
+			w.Header().Set("Content-Type", mimeType)
+			w.Header().Set("Content-Disposition", `attachment; filename="`+id+`-annotated.png"`)
+			_, _ = w.Write(png)
+			return
+		}
+		// No regions (or rendering failed) — fall through to the plain web variant below rather
+		// than 404ing a media item that just has nothing to annotate.
+	}
+
 	variant := "web"
 	if r.URL.Query().Get("variant") == "original" {
 		variant = "original"
 	}
-	file, err := svc.ReadMediaFile(r.Context(), r.PathValue("id"), variant)
+	file, err := svc.ReadMediaFile(r.Context(), id, variant)
 	if err != nil || file == nil {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
@@ -144,6 +159,25 @@ func (svc *HandlerService) handleCreateAnnotation(w http.ResponseWriter, r *http
 	// The drag-to-draw UI (static/js/pattern-layer.js) posts via fetch and reloads the page
 	// itself on success — a redirect response body would just be discarded. A plain form post
 	// (no JS) still gets sent back to the media view, same convention as handleSetStage.
+	if r.Header.Get("X-Requested-With") == "fetch" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, "/media/view/"+id, http.StatusSeeOther)
+}
+
+// handleUpdateDescription saves the lightbox editor's whole-image note (see Media.Description) —
+// same fetch-or-plain-form-post convention as handleCreateAnnotation.
+func (svc *HandlerService) handleUpdateDescription(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	id := r.PathValue("id")
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	if err := UpdateDescription(r.Context(), svc.Pool, id, r.FormValue("description")); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if r.Header.Get("X-Requested-With") == "fetch" {
 		w.WriteHeader(http.StatusNoContent)
 		return

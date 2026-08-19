@@ -48,12 +48,27 @@ func (svc *Service) mediaFor(ctx context.Context, refType media.ReferencingType,
 	for _, ref := range refs {
 		switch ref.Media.Kind {
 		case media.KindImage:
-			images = append(images, Image{MediaID: ref.MediaID})
+			images = append(images, Image{MediaID: ref.MediaID, Caption: ref.Media.Description.String})
 		case media.KindVideo:
-			videos = append(videos, Image{MediaID: ref.MediaID})
+			videos = append(videos, Image{MediaID: ref.MediaID, Caption: ref.Media.Description.String})
 		}
 	}
 	return images, videos
+}
+
+// exportImageBytes resolves what to actually embed for one export image: the server-rasterized,
+// annotation-flattened PNG (internal/media/rasterize.go) when the media has drawn regions,
+// otherwise the plain "web" JPEG — RenderAnnotatedImage itself signals "nothing to flatten" with a
+// nil first return, which is exactly the fallback condition here.
+func (svc *Service) exportImageBytes(ctx context.Context, mediaID string) (data []byte, mimeType string, err error) {
+	if png, mime, err := svc.Media.RenderAnnotatedImage(ctx, mediaID, exportLocale); err == nil && png != nil {
+		return png, mime, nil
+	}
+	file, err := svc.Media.ReadMediaFile(ctx, mediaID, "web")
+	if err != nil || file == nil {
+		return nil, "", err
+	}
+	return file.Data, file.MimeType, nil
 }
 
 func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, error) {

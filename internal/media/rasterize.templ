@@ -1,0 +1,15 @@
+package media
+
+// regionsAndDefsFragment renders just the pattern <defs> + region shapes (no outer <svg>, no base
+// image) — the piece RenderAnnotatedImage (rasterize.go) reuses verbatim from the live
+// editor/viewer so a flattened export matches exactly what a conservator sees on the page.
+templ regionsAndDefsFragment(regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+	<defs>
+		for _, t := range UsedTypeOptions(regions, annotationTypes) {
+			@hatchPatternDef(t)
+		}
+	</defs>
+	for _, r := range regions {
+		@regionShape(r, OptionByID(annotationTypes, r.AnnotationTypeID))
+	}
+}

@@ -10,15 +10,20 @@ import (
 )
 
 func (svc *Service) imageTag(ctx context.Context, img Image) string {
-	file, err := svc.Media.ReadMediaFile(ctx, img.MediaID, "web")
-	if err != nil || file == nil {
+	data, mimeType, err := svc.exportImageBytes(ctx, img.MediaID)
+	if err != nil || data == nil {
 		return ""
 	}
-	b64 := base64.StdEncoding.EncodeToString(file.Data)
+	b64 := base64.StdEncoding.EncodeToString(data)
+	captionHTML := ""
+	if img.Caption != "" {
+		captionHTML = `<p style="font-size:0.85rem;color:#57534e;margin:4px 0 0;">` + html.EscapeString(img.Caption) + `</p>`
+	}
 	return fmt.Sprintf(`<div style="margin:8px 0;">
     <img src="data:%s;base64,%s" alt="%s" style="max-width:100%%;border-radius:6px;display:block;" />
+    %s
     <a href="/media/view/%s" target="_blank" rel="noreferrer" style="font-size:0.8rem;color:#78716c;">🔍 View full resolution</a>
-  </div>`, file.MimeType, b64, html.EscapeString(img.Caption), img.MediaID)
+  </div>`, mimeType, b64, html.EscapeString(img.Caption), captionHTML, img.MediaID)
 }
 
 func videoTag(img Image) string {

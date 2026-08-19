@@ -58,6 +58,7 @@ type Media struct {
 	Checksum        string
 	UploadedByID    string
 	EditedFromID    sql.NullString
+	Description     sql.NullString
 	CreatedAt       time.Time
 }
 

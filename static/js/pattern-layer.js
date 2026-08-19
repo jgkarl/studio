@@ -6,6 +6,23 @@
 // needed. The SVG overlay + legend are always rendered (no show/hide toggle) whenever the
 // lightbox is open; this script only handles arming/drawing/persisting new regions.
 document.addEventListener("DOMContentLoaded", () => {
+  const descriptionForm = document.getElementById("lightbox-description-form");
+  if (descriptionForm) {
+    descriptionForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const mediaId = descriptionForm.dataset.mediaId;
+      const description = descriptionForm.querySelector("#lightbox-description").value;
+      fetch(`/media/${mediaId}/description`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "fetch",
+        },
+        body: `description=${encodeURIComponent(description)}`,
+      });
+    });
+  }
+
   const wrap = document.getElementById("pattern-layer-wrap");
   const addToggle = document.getElementById("pattern-layer-add-toggle");
   const toolSelect = document.getElementById("pattern-layer-tool");

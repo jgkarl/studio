@@ -7,7 +7,10 @@ walkthrough than the quick version below.
 
 Same philosophy as the original: no ORM, hand-written SQL and row types, no web framework, plain
 templ templates, JS only where a page genuinely needs client-side interactivity — small vanilla
-islands, no bundler, no vendored libraries (see `static/js/`).
+islands, no bundler, almost no vendored libraries (see `static/js/`). The one deliberate exception
+is [OpenSeadragon](https://openseadragon.github.io/) (`static/openseadragon/`), vendored for the
+deep-zoom media viewer's real tile scheduling against the IIIF Image API — see
+`static/js/osd-viewer.js`'s header comment.
 
 ## Requirements
 
