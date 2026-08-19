@@ -75,6 +75,17 @@ func ClassifierFilterOptions(classifiers []Classifier, locale i18n.Locale) []web
 	return out
 }
 
+// ClassifierAutocompleteOptions projects Classifier rows to web.ClassifierOption for
+// web.ClassifierAutocomplete — Title is locale-resolved via ClassifierLabel, ID/Code carried
+// through so the field can bind by either depending on what the target column stores.
+func ClassifierAutocompleteOptions(classifiers []Classifier, locale i18n.Locale) []web.ClassifierOption {
+	out := make([]web.ClassifierOption, len(classifiers))
+	for i, c := range classifiers {
+		out[i] = web.ClassifierOption{ID: c.ID, Code: c.Code, Title: ClassifierLabel(c, locale)}
+	}
+	return out
+}
+
 // SettingsManagedTypes is the flat Settings screen's chip-group order: the design artifact's 5
 // headline groups (Asset Types, Condition States, Treatment Methods, Project Stages, Priority)
 // first, then Client Types and Contact Methods — real, still-used picklists (the New Client

@@ -43,7 +43,6 @@ type NavDict struct {
 type DashboardDict struct {
 	Title, Subtitle                                             string
 	ClientsLabel, AssetsLabel, ProjectsLabel, ReportsLabel      string
-	ActiveLabel, AllLabel, DraftLabel, FinalLabel               string
 	ActiveProjectsHeading, NothingInProgress                    string
 	AssessmentsCardLabel, TreatmentsCardLabel, ReportsCardLabel string
 	NoneYet                                                     string
@@ -70,7 +69,6 @@ var dictionaries = map[Locale]Dictionary{
 		Dashboard: DashboardDict{
 			Title: "Töölaud", Subtitle: "Ülevaade käimasolevast tööst.",
 			ClientsLabel: "Kliendid", AssetsLabel: "Esemed", ProjectsLabel: "Projektid", ReportsLabel: "Aruanded",
-			ActiveLabel: "aktiivsed", AllLabel: "kokku", DraftLabel: "mustandid", FinalLabel: "valmis",
 			ActiveProjectsHeading: "Aktiivsed projektid", NothingInProgress: "Hetkel pole käimasolevaid töid.",
 			AssessmentsCardLabel: "Hinnangud", TreatmentsCardLabel: "Töötlused", ReportsCardLabel: "Aruanded",
 			NoneYet: "Pole veel.",
@@ -89,7 +87,6 @@ var dictionaries = map[Locale]Dictionary{
 		Dashboard: DashboardDict{
 			Title: "Dashboard", Subtitle: "An overview of work in progress.",
 			ClientsLabel: "Clients", AssetsLabel: "Assets", ProjectsLabel: "Projects", ReportsLabel: "Reports",
-			ActiveLabel: "active", AllLabel: "all", DraftLabel: "draft", FinalLabel: "final",
 			ActiveProjectsHeading: "Active projects", NothingInProgress: "Nothing in progress right now.",
 			AssessmentsCardLabel: "Assessments", TreatmentsCardLabel: "Treatments", ReportsCardLabel: "Reports",
 			NoneYet: "None yet.",

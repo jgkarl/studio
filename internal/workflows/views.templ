@@ -49,7 +49,7 @@ templ listBody(rows []ListRow, stages []settings.Classifier, locale i18n.Locale)
 }
 
 templ kanbanCard(row ListRow) {
-	<div class="kanban-card" draggable="true" data-item-id={ row.ID } data-search={ kanbanCardSearchHaystack(row) }>
+	<div class="kanban-card" draggable="true" data-item-id={ row.ID } data-search={ kanbanCardSearchHaystack(row) } data-href={ "/projects/" + row.ID }>
 		<a href={ templ.URL("/projects/" + row.ID) } class="entity-list-name">{ row.Title }</a>
 		<div class="page-subtitle">
 			if row.AssetTitle.Valid {
@@ -112,19 +112,12 @@ templ newBody(options []AssetOption, conditions []settings.Classifier, preselect
 			<div class="form-section">
 				<p class="form-section-title">Initial assessment <span class="page-subtitle">(optional)</span></p>
 				@web.Field("Condition", "") {
-					<select class="input" name="assessmentCondition">
-						<option value="">Select…</option>
-						for _, cond := range conditions {
-							<option value={ cond.Code }>{ settings.ClassifierLabel(cond, locale) }</option>
-						}
-					</select>
+					@web.ClassifierAutocomplete("assessmentCondition", "condition_state", "code", "", "Select…", settings.ClassifierAutocompleteOptions(conditions, locale))
 				}
 				@web.Field("Description", "") {
 					<textarea class="input" name="assessmentDescription" rows="2" placeholder="Condition on arrival…"></textarea>
 				}
-				@web.Field("Photos", "On a phone this opens your camera directly.") {
-					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-				}
+				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 			</div>
 			<button type="submit" class="btn btn-primary">
 				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
@@ -132,6 +125,7 @@ templ newBody(options []AssetOption, conditions []settings.Classifier, preselect
 			</button>
 		</form>
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 func assetOptionLabel(a AssetOption) string {
@@ -158,7 +152,15 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 	projectAssessments []assessments.ListRow, conditions []settings.Classifier,
 	projectTreatments []treatments.ListRow, treatmentMethodLabels map[string]string, treatmentMethods []settings.Classifier,
 	projectReports []reporter.ListRow, projectMedia []media.ReferenceWithMedia, damageMappingCount int, locale i18n.Locale) {
-	@web.PageHeader(project.Title, detailSubtitle(asset, client), detailActions(project, asset))
+	@web.PageHeader(project.Title, "", detailActions(project, asset))
+	<p class="page-subtitle">
+		if asset != nil {
+			<a href={ templ.URL("/assets/" + asset.ID) }>{ asset.DisplayName() }</a>
+		}
+		if client != nil {
+			· owner: <a href={ templ.URL("/clients/" + client.ID) }>{ client.Name }</a>
+		}
+	</p>
 	<div class="report-layout">
 		<div class="report-layout-main">
 			@web.Card() {
@@ -308,9 +310,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 				</ul>
 				@web.Modal("modal-media", "Add: Media") {
 					<form method="post" action={ templ.URL("/projects/" + project.ID + "/media") } enctype="multipart/form-data" class="form-grid">
-						@web.Field("Photos / video", "On a phone this opens your camera directly.") {
-							<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-						}
+						@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
 						<button type="submit" class="btn btn-primary">
 							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
 							Upload
@@ -414,14 +414,3 @@ templ editBody(project Project) {
 	}
 }
 
-func detailSubtitle(asset *assets.Asset, client *clients.Client) string {
-	assetName := ""
-	if asset != nil {
-		assetName = asset.DisplayName()
-	}
-	clientName := ""
-	if client != nil {
-		clientName = client.Name
-	}
-	return assetName + " · owner: " + clientName
-}

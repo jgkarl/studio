@@ -20,35 +20,33 @@ templ listBody(rows []ListRow, typeLabels map[string]string, clientTypes []setti
 			@web.EntityListSearchInput("Search by name, email…")
 			@web.EntityListFilterSelect("clientType", "All types", classifierFilterOptionsFromLabels(clientTypes, typeLabels))
 		</div>
-		@web.Card() {
-			if len(rows) == 0 {
-				<p class="empty-state">No clients yet.</p>
-			}
-			<ul class="entity-list" data-el-list>
-				for _, row := range rows {
-					<li data-el-row data-el-search={ clientSearchHaystack(row, typeLabels) } data-el-client-type={ row.Type }>
-						<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-row">
-							<span class="avatar-chip">{ clientInitials(row.Name) }</span>
-							<div>
-								<span class="entity-list-name">{ row.Name }</span>
-								<div class="page-subtitle">
-									if row.Email.Valid {
-										{ row.Email.String }
-									} else {
-										no email on file
-									}
-								</div>
-							</div>
-							<div class="row-actions">
-								<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
-								<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
-							</div>
-							<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
-						</a>
-					</li>
-				}
-			</ul>
+		if len(rows) == 0 {
+			<p class="empty-state">No clients yet.</p>
 		}
+		<ul class="entity-list" data-el-list>
+			for _, row := range rows {
+				<li data-el-row data-el-search={ clientSearchHaystack(row, typeLabels) } data-el-client-type={ row.Type }>
+					<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-row">
+						<span class="avatar-chip">{ clientInitials(row.Name) }</span>
+						<div>
+							<span class="entity-list-name">{ row.Name }</span>
+							<div class="page-subtitle">
+								if row.Email.Valid {
+									{ row.Email.String }
+								} else {
+									no email on file
+								}
+							</div>
+						</div>
+						<div class="row-actions">
+							<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
+							<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
+						</div>
+						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+					</a>
+				</li>
+			}
+		</ul>
 	</div>
 	<script src="/static/js/entity-list-filter.js" defer></script>
 }
@@ -110,11 +108,7 @@ templ newBody(clientTypes, contactMethods []settings.Classifier, locale i18n.Loc
 		<form method="post" action="/clients" class="form-grid">
 			<div class="form-row-2">
 				@web.Field("Type", "") {
-					<select class="input" name="type">
-						for _, ct := range clientTypes {
-							<option value={ ct.Code }>{ settings.ClassifierLabel(ct, locale) }</option>
-						}
-					</select>
+					@web.ClassifierAutocomplete("type", "client_type", "code", firstCode(clientTypes), "Select a type…", settings.ClassifierAutocompleteOptions(clientTypes, locale))
 				}
 				@web.Field("Name", "") {
 					<input class="input" name="name" required placeholder="Jane Doe"/>
@@ -136,12 +130,7 @@ templ newBody(clientTypes, contactMethods []settings.Classifier, locale i18n.Loc
 					<input class="input" name="phone" placeholder="+1 555 0100"/>
 				}
 				@web.Field("Preferred contact method", "") {
-					<select class="input" name="preferredContactMethod">
-						<option value="">—</option>
-						for _, m := range contactMethods {
-							<option value={ m.Code }>{ settings.ClassifierLabel(m, locale) }</option>
-						}
-					</select>
+					@web.ClassifierAutocomplete("preferredContactMethod", "contact_method", "code", "", "—", settings.ClassifierAutocompleteOptions(contactMethods, locale))
 				}
 			</div>
 			@web.Field("Address", "") {
@@ -175,6 +164,17 @@ templ newBody(clientTypes, contactMethods []settings.Classifier, locale i18n.Loc
 			</button>
 		</form>
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
+}
+
+// firstCode mirrors a plain <select>'s implicit "first option is selected by default" behavior —
+// ClassifierAutocomplete needs that default spelled out since an empty, untouched text field
+// would otherwise submit blank instead of the classifier a bare <select> used to default to.
+func firstCode(classifiers []settings.Classifier) string {
+	if len(classifiers) == 0 {
+		return ""
+	}
+	return classifiers[0].Code
 }
 
 templ DetailPage(c web.Chrome, client Client, typeLabel string, assets []AssetSummary, clientTypes, contactMethods []settings.Classifier) {
@@ -227,11 +227,7 @@ templ editBody(client Client, clientTypes, contactMethods []settings.Classifier,
 	@web.Card() {
 		<form method="post" action={ templ.URL("/clients/" + client.ID + "/update") } class="form-grid">
 			@web.Field("Type", "") {
-				<select class="input" name="type">
-					for _, ct := range clientTypes {
-						<option value={ ct.Code } selected?={ ct.Code == client.Type }>{ settings.ClassifierLabel(ct, locale) }</option>
-					}
-				</select>
+				@web.ClassifierAutocomplete("type", "client_type", "code", client.Type, "Select a type…", settings.ClassifierAutocompleteOptions(clientTypes, locale))
 			}
 			@web.Field("Name", "") {
 				<input class="input" name="name" value={ client.Name } required/>
@@ -249,12 +245,7 @@ templ editBody(client Client, clientTypes, contactMethods []settings.Classifier,
 				<input class="input" name="phone" value={ client.Phone.String }/>
 			}
 			@web.Field("Preferred contact method", "") {
-				<select class="input" name="preferredContactMethod">
-					<option value="">—</option>
-					for _, m := range contactMethods {
-						<option value={ m.Code } selected?={ m.Code == client.PreferredContactMethod.String }>{ settings.ClassifierLabel(m, locale) }</option>
-					}
-				</select>
+				@web.ClassifierAutocomplete("preferredContactMethod", "contact_method", "code", client.PreferredContactMethod.String, "—", settings.ClassifierAutocompleteOptions(contactMethods, locale))
 			}
 			@web.Field("Address", "") {
 				<textarea class="input" name="address" rows="2">{ client.Address.String }</textarea>
@@ -291,6 +282,7 @@ templ editBody(client Client, clientTypes, contactMethods []settings.Classifier,
 			</div>
 		</form>
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 func detailSubtitle(client Client, typeLabel string) string {

@@ -229,6 +229,27 @@ html[data-theme="dark"] .card {
   outline-offset: 1px;
 }
 
+/* One consistent dropdown arrow everywhere, replacing each browser's own default chevron. Only
+   background-image/-repeat/-position/-size are set here (not the `background` shorthand) so this
+   layers on top of the shared .input background-color above instead of resetting it.
+   `select.input` (matching real specificity 0,1,1) is listed alongside plain `select` because
+   most <select>s carry class="input" from the shared rule above — its own `background: ...`
+   shorthand resets background-image at specificity 0,1,0, which beats a bare `select` (0,0,1)
+   regardless of source order. */
+select.input, select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2rem;
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 1rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23798492' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+}
+
+html[data-theme="dark"] select.input, html[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23979FAB' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+}
+
 .empty-state {
   padding: 1.5rem 0;
   text-align: center;
@@ -355,7 +376,8 @@ html[data-theme="dark"] .card {
 
 .inline-edit-form {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 0.75rem;
 }
 
@@ -398,6 +420,20 @@ html[data-theme="dark"] .icon {
 
 .icon-invert {
   filter: invert(1) !important;
+}
+
+/* Visually hides an element while keeping it in the accessibility tree and clickable via an
+   associated <label for> — used to hide the native file input behind a styled .btn trigger. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .avatar-chip {
@@ -728,7 +764,7 @@ html[data-theme="dark"] .navbar-icon-btn {
 
 @media (min-width: 1024px) {
   .stat-grid {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
@@ -852,6 +888,11 @@ html[data-theme="dark"] .stat-card {
   gap: 0.875rem;
   padding: 0.75rem 0;
   border-top: 1px solid var(--border-light);
+  text-decoration: none;
+}
+
+.entity-list-row:hover {
+  text-decoration: underline;
 }
 
 .entity-list-row:first-child {
@@ -1802,11 +1843,11 @@ html[data-theme="dark"] .kanban-card {
 .filter-chip-select {
   border: none;
   outline: none;
-  background: transparent;
+  background-color: transparent;
   color: var(--text);
   font-family: var(--font-body);
   font-size: 13px;
-  padding: 0;
+  padding: 0 1.35rem 0 0;
 }
 
 .entity-list-group-header {

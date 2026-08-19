@@ -18,22 +18,20 @@ templ pageBody(c web.Chrome,
 	cards []projectCard) {
 	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, newIntakeLink())
 	<div class="stat-grid">
-		@dualStatCard(clientActive, clientAll, c.Dict.Dashboard.ClientsLabel, c.Dict.Dashboard.ActiveLabel, c.Dict.Dashboard.AllLabel, "/clients")
-		@dualStatCard(assetActive, assetAll, c.Dict.Dashboard.AssetsLabel, c.Dict.Dashboard.ActiveLabel, c.Dict.Dashboard.AllLabel, "/assets")
-		@dualStatCard(projectActive, projectAll, c.Dict.Dashboard.ProjectsLabel, c.Dict.Dashboard.ActiveLabel, c.Dict.Dashboard.AllLabel, "/projects")
-		@dualStatCard(reportDraft, reportFinal, c.Dict.Dashboard.ReportsLabel, c.Dict.Dashboard.DraftLabel, c.Dict.Dashboard.FinalLabel, "/reports")
+		@dualStatCard(clientActive, clientAll, c.Dict.Dashboard.ClientsLabel, "/clients")
+		@dualStatCard(assetActive, assetAll, c.Dict.Dashboard.AssetsLabel, "/assets")
+		@dualStatCard(projectActive, projectAll, c.Dict.Dashboard.ProjectsLabel, "/projects")
+		@dualStatCard(reportDraft, reportFinal, c.Dict.Dashboard.ReportsLabel, "/reports")
 	</div>
-	@web.Card() {
-		<h2 class="dashboard-heading">{ c.Dict.Dashboard.ActiveProjectsHeading }</h2>
-		if len(cards) == 0 {
-			<p class="empty-state">{ c.Dict.Dashboard.NothingInProgress }</p>
-		}
-		<div class="dashboard-project-cards">
-			for _, card := range cards {
-				@projectCardView(card, c)
-			}
-		</div>
+	<h2 class="dashboard-heading">{ c.Dict.Dashboard.ActiveProjectsHeading }</h2>
+	if len(cards) == 0 {
+		<p class="empty-state">{ c.Dict.Dashboard.NothingInProgress }</p>
 	}
+	<div class="dashboard-project-cards">
+		for _, card := range cards {
+			@projectCardView(card, c)
+		}
+	</div>
 }
 
 templ newIntakeLink() {
@@ -43,14 +41,13 @@ templ newIntakeLink() {
 	</a>
 }
 
-templ dualStatCard(primary, secondary int, label, primaryLabel, secondaryLabel, href string) {
+templ dualStatCard(primary, secondary int, label, href string) {
 	<a href={ templ.URL(href) } class="stat-card">
 		<div class="stat-value">
 			{ strconv.Itoa(primary) }
 			<span class="page-subtitle">/ { strconv.Itoa(secondary) }</span>
 		</div>
 		<div class="stat-label">{ label }</div>
-		<div class="page-subtitle">{ primaryLabel } / { secondaryLabel }</div>
 	</a>
 }
 

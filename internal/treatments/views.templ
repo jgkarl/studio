@@ -21,40 +21,38 @@ templ listBody(rows []ListRow, methodLabels map[string]string, methods []setting
 			@web.EntityListFilterSelect("method", "All methods", classifierFilterOptionsFromLabels(methods, methodLabels))
 			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
 		</div>
-		@web.Card() {
-			if len(rows) == 0 {
-				<p class="empty-state">No treatments logged yet.</p>
-			}
-			<ul class="entity-list" data-el-list>
-				for _, row := range rows {
-					<li
-						data-el-row
-						data-el-search={ treatmentSearchHaystack(row, methodLabels) }
-						data-el-method={ row.Method }
-						data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
-						data-el-group-client={ row.ClientName }
-					>
-						<a href={ templ.URL("/treatments/" + row.ID) } class="entity-list-row">
-							<div>
-								<span class="entity-list-name">{ row.Title }</span>
-								<div class="page-subtitle">
-									if row.AssetTitle.Valid {
-										{ row.AssetTitle.String }
-									} else {
-										{ row.AssetReferenceCode }
-									}
-									· owner: { row.ClientName }
-								</div>
-							</div>
-							<div class="row-actions">
-								<span class="badge">{ methodLabel(methodLabels, row.Method) }</span>
-								<span class="page-subtitle">{ row.PerformedAt.Format("2006-01-02") }</span>
-							</div>
-						</a>
-					</li>
-				}
-			</ul>
+		if len(rows) == 0 {
+			<p class="empty-state">No treatments logged yet.</p>
 		}
+		<ul class="entity-list" data-el-list>
+			for _, row := range rows {
+				<li
+					data-el-row
+					data-el-search={ treatmentSearchHaystack(row, methodLabels) }
+					data-el-method={ row.Method }
+					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
+					data-el-group-client={ row.ClientName }
+				>
+					<a href={ templ.URL("/treatments/" + row.ID) } class="entity-list-row">
+						<div>
+							<span class="entity-list-name">{ row.Title }</span>
+							<div class="page-subtitle">
+								if row.AssetTitle.Valid {
+									{ row.AssetTitle.String }
+								} else {
+									{ row.AssetReferenceCode }
+								}
+								· owner: { row.ClientName }
+							</div>
+						</div>
+						<div class="row-actions">
+							<span class="badge">{ methodLabel(methodLabels, row.Method) }</span>
+							<span class="page-subtitle">{ row.PerformedAt.Format("2006-01-02") }</span>
+						</div>
+					</a>
+				</li>
+			}
+		</ul>
 	</div>
 	<script src="/static/js/entity-list-filter.js" defer></script>
 }
@@ -111,9 +109,7 @@ templ newBody(projects []ProjectOption, methods []settings.Classifier, preselect
 				@web.Field("Performed at", "") {
 					<input class="input" type="datetime-local" name="performedAt"/>
 				}
-				@web.Field("Photos", "On a phone this opens your camera directly.") {
-					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-				}
+				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
 					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
 					Log treatment
@@ -121,6 +117,7 @@ templ newBody(projects []ProjectOption, methods []settings.Classifier, preselect
 			</form>
 		}
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 func projectOptionLabel(p ProjectOption) string {
@@ -210,6 +207,7 @@ templ editBody(treatment Treatment, methods []settings.Classifier, locale i18n.L
 			</div>
 		</form>
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 // treatmentFields is the Method/Title/Notes field trio shared by the edit form here and the
@@ -217,12 +215,7 @@ templ editBody(treatment Treatment, methods []settings.Classifier, locale i18n.L
 // per caller so they're not part of this shared slot.
 templ treatmentFields(method, title, notes string, methods []settings.Classifier, locale i18n.Locale) {
 	@web.Field("Method", "") {
-		<select class="input" name="method" required>
-			<option value="" disabled selected?={ method == "" }>Select…</option>
-			for _, m := range methods {
-				<option value={ m.Code } selected?={ m.Code == method }>{ settings.ClassifierLabel(m, locale) }</option>
-			}
-		</select>
+		@web.ClassifierAutocomplete("method", "treatment_method", "code", method, "Select…", settings.ClassifierAutocompleteOptions(methods, locale))
 	}
 	@web.Field("Title", "e.g. \"Surface cleaning — lower right quadrant\"") {
 		<input class="input" name="title" required value={ title }/>
@@ -250,14 +243,13 @@ templ AddModalBody(projectID string, projects []ProjectOption, methods []setting
 			}
 		}
 		@treatmentFields("", "", "", methods, locale)
-		@web.Field("Photos", "On a phone this opens your camera directly.") {
-			<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-		}
+		@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 		<button type="submit" class="btn btn-primary">
 			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
 			Log treatment
 		</button>
 	</form>
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 func detailSubtitle(treatment DetailRow) string {

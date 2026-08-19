@@ -26,6 +26,12 @@ document.addEventListener("DOMContentLoaded", () => {
       card.classList.remove("is-dragging");
       draggingCard = null;
     });
+    // Whole-card click navigates to the project — skipped when the click landed on the title
+    // link itself (that already navigates via its own href) so we don't double-navigate.
+    card.addEventListener("click", (e) => {
+      if (!card.dataset.href || e.target.closest("a")) return;
+      window.location.href = card.dataset.href;
+    });
   });
 
   board.querySelectorAll(".kanban-column-body").forEach((column) => {

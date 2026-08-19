@@ -16,6 +16,7 @@ import (
 // toggle — plain raw SQL rather than importing internal/clients/assets/workflows, which already
 // import this package (for their own Reports sections) and would cycle back.
 type clientInfoRow struct {
+	ID                                                                   string
 	Name, OrganizationName, ContactPerson, Email, Phone, Address, Notes sql.NullString
 }
 
@@ -120,9 +121,10 @@ func projectField(row projectInfoRow, field string) string {
 // InfoPanel is the Report's Client/Asset/Project info blocks, already filtered to whichever
 // fields Settings -> Features -> "Reportable fields" has enabled.
 type InfoPanel struct {
-	Client  []InfoField
-	Asset   []InfoField
-	Project []InfoField
+	Client   []InfoField
+	ClientID string
+	Asset    []InfoField
+	Project  []InfoField
 }
 
 func BuildInfoPanel(ctx context.Context, q studiodb.Querier, assetID, projectID string) (InfoPanel, error) {
@@ -149,11 +151,11 @@ func BuildInfoPanel(ctx context.Context, q studiodb.Querier, assetID, projectID 
 	}
 
 	client, err := studiodb.QueryOne(ctx, q, `
-		SELECT c.name, c.organizationName, c.contactPerson, c.email, c.phone, c.address, c.notes
+		SELECT c.id, c.name, c.organizationName, c.contactPerson, c.email, c.phone, c.address, c.notes
 		FROM Client c JOIN Asset a ON a.clientId = c.id WHERE a.id = ?`,
 		func(rows *sql.Rows) (clientInfoRow, error) {
 			var c clientInfoRow
-			err := rows.Scan(&c.Name, &c.OrganizationName, &c.ContactPerson, &c.Email, &c.Phone, &c.Address, &c.Notes)
+			err := rows.Scan(&c.ID, &c.Name, &c.OrganizationName, &c.ContactPerson, &c.Email, &c.Phone, &c.Address, &c.Notes)
 			return c, err
 		}, assetID)
 	if err != nil {
@@ -175,6 +177,7 @@ func BuildInfoPanel(ctx context.Context, q studiodb.Querier, assetID, projectID 
 	panel := InfoPanel{}
 	if client != nil {
 		panel.Client = fieldsFor("client", enabled["client"], func(f string) string { return clientField(*client, f) })
+		panel.ClientID = client.ID
 	}
 	if asset != nil {
 		panel.Asset = fieldsFor("asset", enabled["asset"], func(f string) string { return assetField(*asset, f) })

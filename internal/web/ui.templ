@@ -20,6 +20,19 @@ templ Field(label string, hint string) {
 	</div>
 }
 
+// FileInput replaces a raw <input type="file"> with a styled "Choose files…" trigger — the
+// native input stays functional (multi-select, camera capture on mobile) but visually hidden;
+// clicking the label opens its file picker natively, no JS required.
+templ FileInput(name, label, hint string) {
+	@Field(label, hint) {
+		<input type="file" id={ name + "-input" } name={ name } multiple accept="image/*,video/*" capture="environment" class="sr-only"/>
+		<label for={ name + "-input" } class="btn btn-secondary">
+			<img src="/static/icons/upload.svg" width="14" height="14" alt="" class="icon"/>
+			Choose files…
+		</label>
+	}
+}
+
 templ Alert(tone string) {
 	<p class={ "alert", templ.KV("alert-error", tone == "error"), templ.KV("alert-success", tone == "success") }>
 		{ children... }
@@ -103,7 +116,6 @@ templ EntityListSearchInput(placeholder string) {
 // "assetType" matches data-el-asset-type).
 templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
 	<label class="filter-chip">
-		<img src="/static/icons/filter.svg" width="14" height="14" alt="" class="icon"/>
 		<select class="filter-chip-select" data-el-filter={ key }>
 			<option value="">{ allLabel }</option>
 			for _, opt := range options {
@@ -124,6 +136,42 @@ templ EntityListGroupBySelect(options []FilterOption) {
 			}
 		</select>
 	</label>
+}
+
+// ClassifierOption is one entry a ClassifierAutocomplete's <datalist> can match against.
+type ClassifierOption struct {
+	ID    string
+	Code  string
+	Title string
+}
+
+// ClassifierAutocomplete replaces a classifier-bound <select> with a type-ahead text field: typing
+// a value already in options matches it (case-insensitively, resolved client-side by
+// static/js/classifier-autocomplete.js); typing something new creates that classifier on blur via
+// POST /settings/classifiers/{type}/find-or-create and selects the new row — no trip to Settings
+// required first. valueKey is "id" or "code", matching whichever the target field stores (most
+// foreign keys store the classifier id; a few historic fields — Assessment.condition,
+// Project.stage-adjacent fields — store the classifier's code string directly).
+templ ClassifierAutocomplete(name, classifierType, valueKey, selected, placeholder string, options []ClassifierOption) {
+	<div class="classifier-autocomplete" data-classifier-autocomplete data-classifier-type={ classifierType } data-value-key={ valueKey }>
+		<input type="hidden" name={ name } value={ selected } data-ca-value/>
+		<input type="text" class="input" list={ name + "-options" } placeholder={ placeholder }
+			value={ selectedLabelFor(options, valueKey, selected) } data-ca-text/>
+		<datalist id={ name + "-options" } data-ca-options>
+			for _, opt := range options {
+				<option value={ opt.Title } data-id={ opt.ID } data-code={ opt.Code }></option>
+			}
+		</datalist>
+	</div>
+}
+
+func selectedLabelFor(options []ClassifierOption, valueKey, selected string) string {
+	for _, opt := range options {
+		if (valueKey == "code" && opt.Code == selected) || (valueKey != "code" && opt.ID == selected) {
+			return opt.Title
+		}
+	}
+	return ""
 }
 
 // PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page

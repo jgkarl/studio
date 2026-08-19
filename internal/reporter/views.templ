@@ -21,43 +21,44 @@ templ listBody(rows []ListRow) {
 			@web.EntityListFilterSelect("status", "All statuses", []web.FilterOption{{Value: "draft", Label: "Draft"}, {Value: "final", Label: "Final"}})
 			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
 		</div>
-		@web.Card() {
-			if len(rows) == 0 {
-				<p class="empty-state">No reports yet.</p>
-			}
-			<ul class="entity-list" data-el-list>
-				for _, row := range rows {
-					<li
-						data-el-row
-						data-el-search={ reportSearchHaystack(row) }
-						data-el-status={ row.Status }
-						data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
-						data-el-group-client={ row.ClientName }
-					>
-						<div class="entity-list-row">
-							<div>
-								<a href={ templ.URL("/reports/" + row.ID) } class="entity-list-name">{ row.Title }</a>
-								<div class="page-subtitle">
-									if row.AssetTitle.Valid {
-										{ row.AssetTitle.String }
-									} else {
-										{ row.AssetReferenceCode }
-									}
-									if row.AuthorName.Valid {
-										· { row.AuthorName.String }
-									}
-								</div>
+		if len(rows) == 0 {
+			<p class="empty-state">No reports yet.</p>
+		}
+		<ul class="entity-list" data-el-list>
+			for _, row := range rows {
+				<li
+					data-el-row
+					data-el-search={ reportSearchHaystack(row) }
+					data-el-status={ row.Status }
+					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
+					data-el-group-client={ row.ClientName }
+				>
+					<a href={ templ.URL("/reports/" + row.ID) } class="entity-list-row">
+						<div>
+							<span class="entity-list-name">{ row.Title }</span>
+							<div class="page-subtitle">
+								if row.AssetTitle.Valid {
+									{ row.AssetTitle.String }
+								} else {
+									{ row.AssetReferenceCode }
+								}
+								if row.AuthorName.Valid {
+									· { row.AuthorName.String }
+								}
 							</div>
+						</div>
+						<div class="row-actions">
 							if row.Status == "final" {
 								<span class="badge badge-green">Final</span>
 							} else {
 								<span class="badge badge-amber">Draft</span>
 							}
 						</div>
-					</li>
-				}
-			</ul>
-		}
+						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+					</a>
+				</li>
+			}
+		</ul>
 	</div>
 	<script src="/static/js/entity-list-filter.js" defer></script>
 }
@@ -220,7 +221,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 				@media.MediaGrid(attachments)
 				if report.Status != "final" {
 					<form method="post" action={ templ.URL("/reports/" + report.ID + "/attachments") } enctype="multipart/form-data" class="row-actions form-section">
-						<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+						@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 						<button type="submit" class="btn btn-secondary">
 							<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
 							Upload
@@ -310,9 +311,9 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 		<div class="report-layout-sidebar">
 			@web.Card() {
 				<h2 class="dashboard-heading">Client / Asset / Project info</h2>
-				@infoFieldList("Client", infoPanel.Client)
-				@infoFieldList("Asset", infoPanel.Asset)
-				@infoFieldList("Project", infoPanel.Project)
+				@infoFieldList("Client", "/clients/"+infoPanel.ClientID, infoPanel.Client)
+				@infoFieldList("Asset", "/assets/"+report.AssetID, infoPanel.Asset)
+				@infoFieldList("Project", "/projects/"+report.ProjectID, infoPanel.Project)
 				<p class="page-subtitle">Configurable in Settings → Features → Reportable fields.</p>
 			}
 			@web.Card() {
@@ -371,9 +372,11 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 	</div>
 }
 
-templ infoFieldList(label string, fields []InfoField) {
+templ infoFieldList(label, href string, fields []InfoField) {
 	if len(fields) > 0 {
-		<h3 class="form-section-title">{ label }</h3>
+		<h3 class="form-section-title">
+			<a href={ templ.URL(href) }>{ label }</a>
+		</h3>
 		<dl class="detail-dl">
 			for _, f := range fields {
 				<div>

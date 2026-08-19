@@ -2,6 +2,7 @@ package settings
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -35,6 +36,7 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("POST /settings/reportable", svc.Auth.RequireUser(svc.handleReportableUpdate))
 	mux.HandleFunc("GET /settings/users", svc.Auth.RequireAdmin(svc.handleUsers))
 	mux.HandleFunc("POST /settings/classifiers/{type}", svc.Auth.RequireUser(svc.handleClassifierCreate))
+	mux.HandleFunc("POST /settings/classifiers/{type}/find-or-create", svc.Auth.RequireUser(svc.handleClassifierFindOrCreate))
 	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/delete", svc.Auth.RequireUser(svc.handleClassifierDelete))
 	mux.HandleFunc("POST /settings/users/{id}/role", svc.Auth.RequireAdmin(svc.handleUpdateUserRole))
 }
@@ -153,6 +155,71 @@ func (svc *Service) handleClassifierCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+// handleClassifierFindOrCreate backs static/js/classifier-autocomplete.js: resolves a typed
+// title against existing classifiers of the type (case-insensitive), creating one on the spot if
+// nothing matches, so a ClassifierAutocomplete field never forces a trip to Settings first.
+func (svc *Service) handleClassifierFindOrCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	t := ClassifierType(r.PathValue("type"))
+	if !IsValidClassifierType(string(t)) {
+		http.NotFound(w, r)
+		return
+	}
+
+	var body struct {
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	title := strings.TrimSpace(body.Title)
+	if title == "" {
+		http.Error(w, "Title is required.", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	existing, err := GetClassifiers(ctx, svc.Pool, t)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for _, c := range existing {
+		if strings.EqualFold(c.Title, title) {
+			writeJSON(w, c)
+			return
+		}
+	}
+
+	code := slugify(title)
+	if code == "" {
+		http.Error(w, "Title is required.", http.StatusBadRequest)
+		return
+	}
+	count, err := CountClassifiers(ctx, svc.Pool, []ClassifierType{t})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	id, err := CreateClassifier(ctx, svc.Pool, ClassifierInput{
+		Type: t, Code: code, Title: title, Sequence: count, IsActive: true,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, Classifier{ID: id, Type: t, Code: code, Title: title})
+}
+
+func writeJSON(w http.ResponseWriter, c Classifier) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(struct {
+		ID    string `json:"id"`
+		Code  string `json:"code"`
+		Title string `json:"title"`
+	}{c.ID, c.Code, c.Title})
 }
 
 func (svc *Service) handleClassifierDelete(w http.ResponseWriter, r *http.Request, user *auth.User) {

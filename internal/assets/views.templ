@@ -27,43 +27,41 @@ templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []se
 			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
 			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "client", Label: "Client"}})
 		</div>
-		@web.Card() {
-			if len(rows) == 0 {
-				<p class="empty-state">No assets yet.</p>
-			}
-			<ul class="entity-list" data-el-list>
-				for _, row := range rows {
-					<li
-						data-el-row
-						data-el-search={ assetSearchHaystack(row) }
-						data-el-asset-type={ row.AssetTypeCode }
-						data-el-condition={ row.CurrentStateCondition.String }
-						data-el-group-client={ row.ClientName }
-					>
-						<a href={ templ.URL("/assets/" + row.ID) } class="entity-list-row">
-							@assetThumb(row)
-							<div>
-								<span class="entity-list-name">
-									if row.Title.Valid {
-										{ row.Title.String }
-									} else {
-										{ row.ReferenceCode }
-									}
-								</span>
-								<div class="page-subtitle">{ row.ReferenceCode } · { row.AssetTypeTitle } · owner: { row.ClientName }</div>
-							</div>
-							<div class="row-actions">
-								if row.CurrentStateCondition.Valid {
-									<span class="badge badge-amber">{ row.CurrentStateCondition.String }</span>
-								}
-								<span class="page-subtitle">{ strconv.Itoa(row.ProjectCount) } workflow(s)</span>
-							</div>
-							<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
-						</a>
-					</li>
-				}
-			</ul>
+		if len(rows) == 0 {
+			<p class="empty-state">No assets yet.</p>
 		}
+		<ul class="entity-list" data-el-list>
+			for _, row := range rows {
+				<li
+					data-el-row
+					data-el-search={ assetSearchHaystack(row) }
+					data-el-asset-type={ row.AssetTypeCode }
+					data-el-condition={ row.CurrentStateCondition.String }
+					data-el-group-client={ row.ClientName }
+				>
+					<a href={ templ.URL("/assets/" + row.ID) } class="entity-list-row">
+						@assetThumb(row)
+						<div>
+							<span class="entity-list-name">
+								if row.Title.Valid {
+									{ row.Title.String }
+								} else {
+									{ row.ReferenceCode }
+								}
+							</span>
+							<div class="page-subtitle">{ row.ReferenceCode } · { row.AssetTypeTitle } · owner: { row.ClientName }</div>
+						</div>
+						<div class="row-actions">
+							if row.CurrentStateCondition.Valid {
+								<span class="badge badge-amber">{ row.CurrentStateCondition.String }</span>
+							}
+							<span class="page-subtitle">{ strconv.Itoa(row.ProjectCount) } workflow(s)</span>
+						</div>
+						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+					</a>
+				</li>
+			}
+		</ul>
 	</div>
 	<script src="/static/js/entity-list-filter.js" defer></script>
 }
@@ -109,12 +107,7 @@ templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, pre
 					</select>
 				}
 				@web.Field("Asset type", "") {
-					<select class="input" name="assetTypeId" required>
-						<option value="" disabled selected>Select a type…</option>
-						for _, at := range assetTypes {
-							<option value={ at.ID }>{ settings.ClassifierLabel(at, locale) }</option>
-						}
-					</select>
+					@web.ClassifierAutocomplete("assetTypeId", "asset_type", "id", "", "Select a type…", settings.ClassifierAutocompleteOptions(assetTypes, locale))
 				}
 			</div>
 			@web.Field("Reference code", "unique identifier for this asset") {
@@ -175,6 +168,7 @@ templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, pre
 			<button type="submit" class="btn btn-primary">Create asset</button>
 		</form>
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 templ DetailPage(c web.Chrome, asset Asset, client *clients.Client, assetType *settings.Classifier,
@@ -413,9 +407,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 				</ul>
 				@web.Modal("modal-media", "Add: Media") {
 					<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media") } enctype="multipart/form-data" class="form-grid">
-						@web.Field("Photos / video", "On a phone this opens your camera directly.") {
-							<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-						}
+						@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
 						<button type="submit" class="btn btn-primary">
 							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
 							Upload

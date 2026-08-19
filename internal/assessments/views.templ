@@ -94,9 +94,7 @@ templ newBody(projects []ProjectOption, conditions []settings.Classifier, presel
 					</select>
 				}
 				@assessmentFields("", "", conditions, locale)
-				@web.Field("Photos", "On a phone this opens your camera directly.") {
-					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-				}
+				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
 					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
 					Save assessment
@@ -104,6 +102,7 @@ templ newBody(projects []ProjectOption, conditions []settings.Classifier, presel
 			</form>
 		}
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 templ DetailPage(c web.Chrome, assessment DetailRow, conditions []settings.Classifier, photos []media.ReferenceWithMedia) {
@@ -191,17 +190,14 @@ templ editBody(assessment Assessment, conditions []settings.Classifier, locale i
 			</div>
 		</form>
 	}
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
 
 // assessmentFields is the Condition/Description pair shared by the standalone new/edit forms and
 // AddModalBody below.
 templ assessmentFields(condition, description string, conditions []settings.Classifier, locale i18n.Locale) {
 	@web.Field("Condition", "") {
-		<select class="input" name="condition">
-			for _, cond := range conditions {
-				<option value={ cond.Code } selected?={ cond.Code == condition }>{ settings.ClassifierLabel(cond, locale) }</option>
-			}
-		</select>
+		@web.ClassifierAutocomplete("condition", "condition_state", "code", condition, "Select a condition…", settings.ClassifierAutocompleteOptions(conditions, locale))
 	}
 	@web.Field("Description", "") {
 		<textarea class="input" name="description" rows="3" required>{ description }</textarea>
@@ -226,12 +222,11 @@ templ AddModalBody(projectID string, projects []ProjectOption, conditions []sett
 			}
 		}
 		@assessmentFields("", "", conditions, locale)
-		@web.Field("Photos", "On a phone this opens your camera directly.") {
-			<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-		}
+		@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 		<button type="submit" class="btn btn-primary">
 			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
 			Save assessment
 		</button>
 	</form>
+	<script src="/static/js/classifier-autocomplete.js" defer></script>
 }
