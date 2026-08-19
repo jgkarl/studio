@@ -46,6 +46,8 @@ type ListRow struct {
 	AssetReferenceCode string
 	ClientName         string
 	AuthorName         sql.NullString
+	ProjectID          string
+	ProjectTitle       string
 }
 
 // ProjectOption is one entry in the "pick a project" select on the new-report form — every

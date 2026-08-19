@@ -229,8 +229,10 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		return
 	}
 
-	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, assetAssessments,
-		assessmentProjectOptions, projects, conditions, reports, reportProjectOptions, assetTreatments,
+	projectCards := BuildProjectCards(projects, assetAssessments, assetTreatments, reports)
+
+	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, projectCards,
+		assessmentProjectOptions, conditions, reportProjectOptions,
 		treatmentProjectOptions, treatmentMethodLabels, treatmentMethods, stageLabels, assetMedia))
 }
 

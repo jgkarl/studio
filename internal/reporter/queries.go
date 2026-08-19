@@ -35,15 +35,16 @@ func Unlink(ctx context.Context, q studiodb.Querier, id string) error {
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
-	err := rows.Scan(&r.ID, &r.Title, &r.Status, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName, &r.AuthorName)
+	err := rows.Scan(&r.ID, &r.Title, &r.Status, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName, &r.AuthorName, &r.ProjectID, &r.ProjectTitle)
 	return r, err
 }
 
 const reportListSelect = `
-	SELECT r.id, r.title, r.status, a.title, a.referenceCode, c.name, u.name
+	SELECT r.id, r.title, r.status, a.title, a.referenceCode, c.name, u.name, p.id, p.title
 	FROM Report r
 	JOIN Asset a ON a.id = r.assetId
 	JOIN Client c ON c.id = a.clientId
+	JOIN Project p ON p.id = r.projectId
 	LEFT JOIN User u ON u.id = r.authorId`
 
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {

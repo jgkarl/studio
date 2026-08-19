@@ -50,15 +50,16 @@ func GetDetailByID(ctx context.Context, q studiodb.Querier, id string) (*DetailR
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
-	err := rows.Scan(&r.ID, &r.Title, &r.Method, &r.PerformedAt, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName)
+	err := rows.Scan(&r.ID, &r.Title, &r.Method, &r.PerformedAt, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName, &r.ProjectID, &r.ProjectTitle)
 	return r, err
 }
 
 const treatmentListSelect = `
-	SELECT t.id, t.title, t.method, t.performedAt, a.title, a.referenceCode, c.name
+	SELECT t.id, t.title, t.method, t.performedAt, a.title, a.referenceCode, c.name, p.id, p.title
 	FROM Treatment t
 	JOIN Asset a ON a.id = t.assetId
-	JOIN Client c ON c.id = a.clientId`
+	JOIN Client c ON c.id = a.clientId
+	JOIN Project p ON p.id = t.projectId`
 
 // List is every Treatment across every Asset, newest-performed first — the module's landing
 // page.

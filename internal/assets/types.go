@@ -5,6 +5,10 @@ package assets
 import (
 	"database/sql"
 	"time"
+
+	"studio/internal/assessments"
+	"studio/internal/reporter"
+	"studio/internal/treatments"
 )
 
 type Asset struct {
@@ -53,4 +57,43 @@ type ProjectSummary struct {
 	ID    string
 	Title string
 	Stage string
+}
+
+// ProjectCard groups one of the Asset's Projects together with that Project's own Assessments/
+// Treatments/Reports — the Asset detail page's per-project section, replacing the old flat
+// all-projects-mixed-together lists.
+type ProjectCard struct {
+	Project     ProjectSummary
+	Assessments []assessments.ListRow
+	Treatments  []treatments.ListRow
+	Reports     []reporter.ListRow
+}
+
+// BuildProjectCards buckets the Asset's flat cross-project Assessment/Treatment/Report lists
+// (each row carries a ProjectID) into one ProjectCard per Project, preserving projects' existing
+// order. Rows are Asset-scoped queries so every ProjectID is expected to match one of projects;
+// any that doesn't (shouldn't happen given the FK) is silently dropped rather than erroring.
+func BuildProjectCards(projects []ProjectSummary, assessmentRows []assessments.ListRow, treatmentRows []treatments.ListRow, reportRows []reporter.ListRow) []ProjectCard {
+	cards := make([]ProjectCard, len(projects))
+	byID := make(map[string]*ProjectCard, len(projects))
+	for i, p := range projects {
+		cards[i] = ProjectCard{Project: p}
+		byID[p.ID] = &cards[i]
+	}
+	for _, a := range assessmentRows {
+		if c, ok := byID[a.ProjectID]; ok {
+			c.Assessments = append(c.Assessments, a)
+		}
+	}
+	for _, t := range treatmentRows {
+		if c, ok := byID[t.ProjectID]; ok {
+			c.Treatments = append(c.Treatments, t)
+		}
+	}
+	for _, rep := range reportRows {
+		if c, ok := byID[rep.ProjectID]; ok {
+			c.Reports = append(c.Reports, rep)
+		}
+	}
+	return cards
 }

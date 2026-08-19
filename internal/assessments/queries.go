@@ -49,15 +49,16 @@ func GetDetailByID(ctx context.Context, q studiodb.Querier, id string) (*DetailR
 
 func scanListRow(rows *sql.Rows) (ListRow, error) {
 	var r ListRow
-	err := rows.Scan(&r.ID, &r.Condition, &r.Description, &r.RecordedAt, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName)
+	err := rows.Scan(&r.ID, &r.Condition, &r.Description, &r.RecordedAt, &r.AssetTitle, &r.AssetReferenceCode, &r.ClientName, &r.ProjectID, &r.ProjectTitle)
 	return r, err
 }
 
 const assessmentListSelect = `
-	SELECT a.id, a."condition", a.description, a.recordedAt, ast.title, ast.referenceCode, c.name
+	SELECT a.id, a."condition", a.description, a.recordedAt, ast.title, ast.referenceCode, c.name, p.id, p.title
 	FROM Assessment a
 	JOIN Asset ast ON ast.id = a.assetId
-	JOIN Client c ON c.id = ast.clientId`
+	JOIN Client c ON c.id = ast.clientId
+	JOIN Project p ON p.id = a.projectId`
 
 // List is every Assessment across every Asset, newest-recorded first — the module's landing page.
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {

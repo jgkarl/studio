@@ -28,6 +28,8 @@ type ListRow struct {
 	AssetTitle         sql.NullString
 	AssetReferenceCode string
 	ClientName         string
+	ProjectID          string
+	ProjectTitle       string
 }
 
 type ProjectOption struct {
