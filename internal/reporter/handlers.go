@@ -7,8 +7,10 @@ import (
 
 	"github.com/a-h/templ"
 
+	"studio/internal/assessments"
 	"studio/internal/auth"
 	"studio/internal/media"
+	"studio/internal/treatments"
 	"studio/internal/web"
 )
 
@@ -27,6 +29,7 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("POST /reports/{id}/layout", svc.Auth.RequireUser(svc.handleUpdateLayout))
 	mux.HandleFunc("POST /reports/{id}/status", svc.Auth.RequireUser(svc.handleSetStatus))
 	mux.HandleFunc("POST /reports/{id}/attachments", svc.Auth.RequireUser(svc.handleAddAttachments))
+	mux.HandleFunc("POST /reports/{id}/media/{refId}/caption", svc.Auth.RequireUser(svc.handleSetCaption))
 	mux.HandleFunc("POST /reports/{id}/unlink", svc.Auth.RequireUser(svc.handleUnlink))
 }
 
@@ -50,18 +53,12 @@ func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *aut
 
 func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	ctx := r.Context()
-	assets, err := ListAssetOptions(ctx, svc.Pool)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	projects, err := ListProjectOptions(ctx, svc.Pool)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, NewPage(chromeFor(r, user, "/reports"), assets, projects,
-		r.URL.Query().Get("assetId"), r.URL.Query().Get("projectId")))
+	writeHTML(w, r, NewPage(chromeFor(r, user, "/reports"), projects, r.URL.Query().Get("projectId")))
 }
 
 func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -70,23 +67,19 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 		return
 	}
 	ctx := r.Context()
-	assetID := r.FormValue("assetId")
+	projectID := r.FormValue("projectId")
 	title := strings.TrimSpace(r.FormValue("title"))
-	if assetID == "" || title == "" {
-		http.Error(w, "Asset and title are required.", http.StatusBadRequest)
+	if projectID == "" || title == "" {
+		http.Error(w, "Project and title are required.", http.StatusBadRequest)
 		return
 	}
-	var projectID *string
-	if raw := r.FormValue("projectId"); raw != "" {
-		projectID = &raw
-	}
-	sections, err := BuildSuggestedOutline(ctx, svc.Pool, assetID)
+	sections, err := BuildSuggestedOutline(ctx, svc.Pool, projectID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	id, err := Create(ctx, svc.Pool, assetID, projectID, title, user.ID, sections)
+	id, err := Create(ctx, svc.Pool, projectID, title, user.ID, sections)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -111,7 +104,40 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, DetailPage(chromeFor(r, user, "/reports"), *report, refs))
+	projectAssessments, err := assessments.ListByProject(ctx, svc.Pool, report.ProjectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	projectTreatments, err := treatments.ListByProject(ctx, svc.Pool, report.ProjectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	gallery, err := BuildGallery(ctx, svc.Media, svc.Pool, report.ProjectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	infoPanel, err := BuildInfoPanel(ctx, svc.Pool, report.AssetID, report.ProjectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, r, DetailPage(chromeFor(r, user, "/reports"), *report, refs, projectAssessments, projectTreatments, gallery, infoPanel))
+}
+
+func (svc *Service) handleSetCaption(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id := r.PathValue("id")
+	if err := media.SetCaption(r.Context(), svc.Pool, r.PathValue("refId"), strings.TrimSpace(r.FormValue("caption"))); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
 }
 
 func (svc *Service) handleUpdateSections(w http.ResponseWriter, r *http.Request, user *auth.User) {

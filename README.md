@@ -65,13 +65,19 @@ cd e2e && npm install && npm test               # end-to-end (needs a server run
 ## Layout
 
 See the module list in git history / commit messages for build order. Each top-level package
-under `internal/` is one self-contained module (auth, clients, assets, treatments, workflows
-[routes as `/projects`], media, reporter [routes as `/reports`], export, settings, seed) with its
-own routes, templ views, and SQL — `internal/db` and `internal/web` are the only shared
+under `internal/` is one self-contained module (auth, clients, assets, assessments, treatments,
+workflows [routes as `/projects`], media, reporter [routes as `/reports`], export, settings, seed)
+with its own routes, templ views, and SQL — `internal/db` and `internal/web` are the only shared
 infrastructure every module builds on, and `internal/testutil` is test-only support (a real
 migrated SQLite database per test, no mocks). Commerce (Quote/Order/Invoice), Tags, and
 Materials-as-a-relation were removed in a later refactor to match the design artifact this app now
 follows — see `docs/tech-stack.md`.
+
+Project is the mandatory organizing unit: registering an Asset leads straight into creating its
+first Project, and Assessments (condition-status records, `internal/assessments` — renamed from
+the old `AssetState`/"condition status" concept), Treatments, Reports, and media are all recorded
+under a Project from there on, while staying filterable by Asset everywhere (every one of those
+denormalizes its own `assetId` alongside the required `projectId`).
 
 ## Known, disclosed differences from the original app
 

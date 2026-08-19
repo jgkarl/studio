@@ -88,43 +88,47 @@ templ newTreatmentLink() {
 	</a>
 }
 
-templ NewPage(c web.Chrome, options []AssetOption, methods []settings.Classifier, preselectedAssetID string) {
-	@web.AppLayout("New treatment", c, newBody(options, methods, preselectedAssetID, c.Locale))
+templ NewPage(c web.Chrome, projects []ProjectOption, methods []settings.Classifier, preselectedProjectID string) {
+	@web.AppLayout("New treatment", c, newBody(projects, methods, preselectedProjectID, c.Locale))
 }
 
-templ newBody(options []AssetOption, methods []settings.Classifier, preselectedAssetID string, locale i18n.Locale) {
+templ newBody(projects []ProjectOption, methods []settings.Classifier, preselectedProjectID string, locale i18n.Locale) {
 	@web.PageHeader("New treatment", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/treatments" enctype="multipart/form-data" class="form-grid">
-			@web.Field("Asset", "") {
-				<select class="input" name="assetId" required>
-					<option value="" disabled selected?={ preselectedAssetID == "" }>Select an asset…</option>
-					for _, a := range options {
-						<option value={ a.ID } selected?={ a.ID == preselectedAssetID }>{ assetOptionLabel(a) }</option>
-					}
-				</select>
-			}
-			@treatmentFields("", "", "", methods, locale)
-			@web.Field("Performed at", "") {
-				<input class="input" type="datetime-local" name="performedAt"/>
-			}
-			@web.Field("Photos", "On a phone this opens your camera directly.") {
-				<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-			}
-			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
-				Log treatment
-			</button>
-		</form>
+		if len(projects) == 0 {
+			<p class="empty-state">No projects yet — <a href="/projects/new">start one</a> first.</p>
+		} else {
+			<form method="post" action="/treatments" enctype="multipart/form-data" class="form-grid">
+				@web.Field("Project", "") {
+					<select class="input" name="projectId" required>
+						<option value="" disabled selected?={ preselectedProjectID == "" }>Select a project…</option>
+						for _, p := range projects {
+							<option value={ p.ID } selected?={ p.ID == preselectedProjectID }>{ projectOptionLabel(p) }</option>
+						}
+					</select>
+				}
+				@treatmentFields("", "", "", methods, locale)
+				@web.Field("Performed at", "") {
+					<input class="input" type="datetime-local" name="performedAt"/>
+				}
+				@web.Field("Photos", "On a phone this opens your camera directly.") {
+					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+				}
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Log treatment
+				</button>
+			</form>
+		}
 	}
 }
 
-func assetOptionLabel(a AssetOption) string {
-	name := a.ReferenceCode
-	if a.Title.Valid && a.Title.String != "" {
-		name = a.Title.String
+func projectOptionLabel(p ProjectOption) string {
+	name := p.AssetRef
+	if p.AssetTitle.Valid && p.AssetTitle.String != "" {
+		name = p.AssetTitle.String
 	}
-	return name + " — " + a.ClientName
+	return p.Title + " — " + name + " — " + p.ClientName
 }
 
 templ DetailPage(c web.Chrome, treatment DetailRow, methodLabels map[string]string, performedByName string, photos []media.ReferenceWithMedia) {
@@ -165,6 +169,10 @@ func methodLabel(labels map[string]string, code string) string {
 }
 
 templ detailActions(treatment DetailRow) {
+	<a class="btn btn-ghost" href={ templ.URL("/projects/" + treatment.ProjectID) }>
+		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+		View project
+	</a>
 	<a class="btn btn-ghost" href={ templ.URL("/assets/" + treatment.AssetID) }>
 		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
 		View asset
@@ -224,12 +232,23 @@ templ treatmentFields(method, title, notes string, methods []settings.Classifier
 	}
 }
 
-// AddModalBody is the asset detail page's "Treatments" section +Add content: the same fields as
-// the full new-treatment form, minus the asset picker (assetId is preset via a hidden input,
-// since this modal only ever creates a treatment for the asset it's opened from).
-templ AddModalBody(assetID string, methods []settings.Classifier, locale i18n.Locale) {
+// AddModalBody is the Asset/Project detail pages' "Treatments" section +Add content. When opened
+// from a Project page projectID is preset (hidden input, no picker); when opened from an Asset
+// page (which may have several projects) projects lists just that asset's own projects.
+templ AddModalBody(projectID string, projects []ProjectOption, methods []settings.Classifier, locale i18n.Locale) {
 	<form method="post" action="/treatments" enctype="multipart/form-data" class="form-grid">
-		<input type="hidden" name="assetId" value={ assetID }/>
+		if projectID != "" {
+			<input type="hidden" name="projectId" value={ projectID }/>
+		} else {
+			@web.Field("Project", "") {
+				<select class="input" name="projectId" required>
+					<option value="" disabled selected>Select a project…</option>
+					for _, p := range projects {
+						<option value={ p.ID }>{ p.Title }</option>
+					}
+				</select>
+			}
+		}
 		@treatmentFields("", "", "", methods, locale)
 		@web.Field("Photos", "On a phone this opens your camera directly.") {
 			<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>

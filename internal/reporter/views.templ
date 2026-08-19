@@ -3,7 +3,9 @@ package reporter
 import (
 	"database/sql"
 
+	"studio/internal/assessments"
 	"studio/internal/media"
+	"studio/internal/treatments"
 	"studio/internal/web"
 )
 
@@ -82,47 +84,54 @@ templ newReportLink() {
 	</a>
 }
 
-templ NewPage(c web.Chrome, assets []AssetOption, projects []ProjectOption, preselectedAssetID, preselectedProjectID string) {
-	@web.AppLayout("New report", c, newBody(assets, projects, preselectedAssetID, preselectedProjectID))
+templ NewPage(c web.Chrome, projects []ProjectOption, preselectedProjectID string) {
+	@web.AppLayout("New report", c, newBody(projects, preselectedProjectID))
 }
 
-templ newBody(assets []AssetOption, projects []ProjectOption, preselectedAssetID, preselectedProjectID string) {
+templ newBody(projects []ProjectOption, preselectedProjectID string) {
 	@web.PageHeader("New report", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/reports" class="form-grid">
-			@web.Field("Asset", "pre-fills condition findings and treatment performed from this asset's history") {
-				<select class="input" name="assetId" required>
-					<option value="" disabled selected?={ preselectedAssetID == "" }>Select an asset…</option>
-					for _, a := range assets {
-						<option value={ a.ID } selected?={ a.ID == preselectedAssetID }>{ assetOptionLabel(a) }</option>
-					}
-				</select>
-			}
-			@web.Field("Project", "optional — links this report to a project") {
-				<select class="input" name="projectId">
-					<option value="" selected?={ preselectedProjectID == "" }>No project</option>
-					for _, p := range projects {
-						<option value={ p.ID } selected?={ p.ID == preselectedProjectID }>{ p.Title }</option>
-					}
-				</select>
-			}
-			@web.Field("Title", "") {
-				<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
-			}
-			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
-				Create report
-			</button>
-		</form>
+		if len(projects) == 0 {
+			<p class="empty-state">No projects yet — <a href="/projects/new">start one</a> first.</p>
+		} else {
+			<form method="post" action="/reports" class="form-grid">
+				@web.Field("Project", "pre-fills condition findings and treatment performed from this project's records") {
+					<select class="input" name="projectId" required>
+						<option value="" disabled selected?={ preselectedProjectID == "" }>Select a project…</option>
+						for _, p := range projects {
+							<option value={ p.ID } selected?={ p.ID == preselectedProjectID }>{ projectOptionLabel(p) }</option>
+						}
+					</select>
+				}
+				@web.Field("Title", "") {
+					<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
+				}
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Create report
+				</button>
+			</form>
+		}
 	}
 }
 
-// AddModalBody is the asset detail page's "Reports" section +Add content: title only, assetId
-// preset via a hidden input (no project picker — a report created this way just gets blank
-// suggested sections, same as picking "No project" on the full form).
-templ AddModalBody(assetID string) {
+// AddModalBody is the Asset/Project detail pages' "Reports" section +Add content. When opened
+// from a Project page projectID is preset (hidden input, no picker); when opened from an Asset
+// page (which may have several projects) projects lists just that asset's own projects.
+templ AddModalBody(projectID string, projects []ProjectOption) {
 	<form method="post" action="/reports" class="form-grid">
-		<input type="hidden" name="assetId" value={ assetID }/>
+		if projectID != "" {
+			<input type="hidden" name="projectId" value={ projectID }/>
+		} else {
+			@web.Field("Project", "") {
+				<select class="input" name="projectId" required>
+					<option value="" disabled selected>Select a project…</option>
+					for _, p := range projects {
+						<option value={ p.ID }>{ p.Title }</option>
+					}
+				</select>
+			}
+		}
 		@web.Field("Title", "") {
 			<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
 		}
@@ -133,19 +142,23 @@ templ AddModalBody(assetID string) {
 	</form>
 }
 
-func assetOptionLabel(a AssetOption) string {
-	name := a.ReferenceCode
-	if a.Title.Valid && a.Title.String != "" {
-		name = a.Title.String
+func projectOptionLabel(p ProjectOption) string {
+	name := p.AssetRef
+	if p.AssetTitle.Valid && p.AssetTitle.String != "" {
+		name = p.AssetTitle.String
 	}
-	return name + " — " + a.ClientName
+	return p.Title + " — " + name + " — " + p.ClientName
 }
 
-templ DetailPage(c web.Chrome, report Report, attachments []media.ReferenceWithMedia) {
-	@web.AppLayout(report.Title, c, detailBody(report, attachments))
+templ DetailPage(c web.Chrome, report Report, attachments []media.ReferenceWithMedia,
+	projectAssessments []assessments.ListRow, projectTreatments []treatments.ListRow,
+	gallery []GalleryItem, infoPanel InfoPanel) {
+	@web.AppLayout(report.Title, c, detailBody(report, attachments, projectAssessments, projectTreatments, gallery, infoPanel))
 }
 
-templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
+templ detailBody(report Report, attachments []media.ReferenceWithMedia,
+	projectAssessments []assessments.ListRow, projectTreatments []treatments.ListRow,
+	gallery []GalleryItem, infoPanel InfoPanel) {
 	@web.PageHeader(report.Title, "", templ.NopComponent)
 	<div class="row-actions" style="margin-bottom: 1rem;">
 		@web.ExportLinks("report", report.ID)
@@ -215,8 +228,93 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 					</form>
 				}
 			}
+			@web.Card() {
+				<h2 class="dashboard-heading">Assessments</h2>
+				if len(projectAssessments) == 0 {
+					<p class="empty-state">No assessments recorded for this project.</p>
+				} else {
+					<div class="table-wrap">
+						<table class="table">
+							<thead>
+								<tr>
+									<th>Date</th>
+									<th>Condition</th>
+									<th>Description</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, a := range projectAssessments {
+									<tr>
+										<td>{ a.RecordedAt.Format("2006-01-02") }</td>
+										<td><a href={ templ.URL("/assessments/" + a.ID) }>{ a.Condition }</a></td>
+										<td>{ a.Description }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			}
+			@web.Card() {
+				<h2 class="dashboard-heading">Treatments</h2>
+				if len(projectTreatments) == 0 {
+					<p class="empty-state">No treatments logged for this project.</p>
+				} else {
+					<div class="table-wrap">
+						<table class="table">
+							<thead>
+								<tr>
+									<th>Date</th>
+									<th>Method</th>
+									<th>Title</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, t := range projectTreatments {
+									<tr>
+										<td>{ t.PerformedAt.Format("2006-01-02") }</td>
+										<td>{ t.Method }</td>
+										<td><a href={ templ.URL("/treatments/" + t.ID) }>{ t.Title }</a></td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			}
+			@web.Card() {
+				<h2 class="dashboard-heading">Image gallery <span class="page-subtitle">(ordered by timestamp)</span></h2>
+				if len(gallery) == 0 {
+					<p class="empty-state">No images yet for this project.</p>
+				}
+				<div class="gallery-grid">
+					for _, item := range gallery {
+						<div class="gallery-item">
+							<a href={ templ.URL("/media/view/" + item.MediaID) }>
+								<img class="entity-thumb" src={ "/api/media/" + item.MediaID } alt=""/>
+							</a>
+							<span class="page-subtitle">{ item.CreatedAt.Format("2006-01-02 15:04") }</span>
+							<form method="post" action={ templ.URL("/reports/" + report.ID + "/media/" + item.ID + "/caption") } class="row-actions">
+								<input class="input" type="text" name="caption" placeholder="Description…" value={ item.Caption.String } readonly?={ report.Status == "final" }/>
+								if report.Status != "final" {
+									<button type="submit" class="btn btn-ghost" title="Save">
+										<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+									</button>
+								}
+							</form>
+						</div>
+					}
+				</div>
+			}
 		</div>
 		<div class="report-layout-sidebar">
+			@web.Card() {
+				<h2 class="dashboard-heading">Client / Asset / Project info</h2>
+				@infoFieldList("Client", infoPanel.Client)
+				@infoFieldList("Asset", infoPanel.Asset)
+				@infoFieldList("Project", infoPanel.Project)
+				<p class="page-subtitle">Configurable in Settings → Features → Reportable fields.</p>
+			}
 			@web.Card() {
 				<h2 class="dashboard-heading">Customize layout</h2>
 				<form method="post" action={ templ.URL("/reports/" + report.ID + "/layout") } class="form-grid">
@@ -271,6 +369,20 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia) {
 			}
 		</div>
 	</div>
+}
+
+templ infoFieldList(label string, fields []InfoField) {
+	if len(fields) > 0 {
+		<h3 class="form-section-title">{ label }</h3>
+		<dl class="detail-dl">
+			for _, f := range fields {
+				<div>
+					<dt class="detail-dt">{ f.Label }</dt>
+					<dd class="detail-dd">{ f.Value }</dd>
+				</div>
+			}
+		</dl>
+	}
 }
 
 func layoutStyleLabel(style string) string {

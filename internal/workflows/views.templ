@@ -3,10 +3,14 @@ package workflows
 import (
 	"strconv"
 
+	"studio/internal/assessments"
 	"studio/internal/assets"
 	"studio/internal/clients"
 	"studio/internal/i18n"
+	"studio/internal/media"
+	"studio/internal/reporter"
 	"studio/internal/settings"
+	"studio/internal/treatments"
 	"studio/internal/web"
 )
 
@@ -86,14 +90,14 @@ templ newWorkflowLink() {
 	</a>
 }
 
-templ NewPage(c web.Chrome, options []AssetOption, preselectedAssetID string) {
-	@web.AppLayout("New project", c, newBody(options, preselectedAssetID))
+templ NewPage(c web.Chrome, options []AssetOption, conditions []settings.Classifier, preselectedAssetID string) {
+	@web.AppLayout("New project", c, newBody(options, conditions, preselectedAssetID, c.Locale))
 }
 
-templ newBody(options []AssetOption, preselectedAssetID string) {
+templ newBody(options []AssetOption, conditions []settings.Classifier, preselectedAssetID string, locale i18n.Locale) {
 	@web.PageHeader("New project", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/projects" class="form-grid">
+		<form method="post" action="/projects" enctype="multipart/form-data" class="form-grid">
 			@web.Field("Asset", "") {
 				<select class="input" name="assetId" required>
 					<option value="" disabled selected?={ preselectedAssetID == "" }>Select an asset…</option>
@@ -105,6 +109,23 @@ templ newBody(options []AssetOption, preselectedAssetID string) {
 			@web.Field("Title", "e.g. \"Cleaning and varnish removal\"") {
 				<input class="input" name="title" required/>
 			}
+			<div class="form-section">
+				<p class="form-section-title">Initial assessment <span class="page-subtitle">(optional)</span></p>
+				@web.Field("Condition", "") {
+					<select class="input" name="assessmentCondition">
+						<option value="">Select…</option>
+						for _, cond := range conditions {
+							<option value={ cond.Code }>{ settings.ClassifierLabel(cond, locale) }</option>
+						}
+					</select>
+				}
+				@web.Field("Description", "") {
+					<textarea class="input" name="assessmentDescription" rows="2" placeholder="Condition on arrival…"></textarea>
+				}
+				@web.Field("Photos", "On a phone this opens your camera directly.") {
+					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+				}
+			</div>
 			<button type="submit" class="btn btn-primary">
 				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
 				Create
@@ -121,35 +142,209 @@ func assetOptionLabel(a AssetOption) string {
 	return name + " — " + a.ClientName
 }
 
-// DetailPage is intentionally minimal — Treatments (internal/treatments) is now the sole way to
-// record conservation work on an Asset; this page is just an anchor for the stage-advance
-// control, a link back to the Asset, and export.
-templ DetailPage(c web.Chrome, project Project, asset *assets.Asset, client *clients.Client, stages []settings.Classifier, assignedToName string) {
-	@web.AppLayout(project.Title, c, detailBody(project, asset, client, stages, assignedToName, c.Locale))
+// DetailPage is the Project hub: stage/priority overview, the Finish-project action, and
+// Assessments/Treatments/Reports/Media sections scoped to this Project — same "linked-record
+// hub" pattern internal/assets' DetailPage uses.
+templ DetailPage(c web.Chrome, project Project, asset *assets.Asset, client *clients.Client, stages []settings.Classifier, assignedToName string,
+	projectAssessments []assessments.ListRow, conditions []settings.Classifier,
+	projectTreatments []treatments.ListRow, treatmentMethodLabels map[string]string, treatmentMethods []settings.Classifier,
+	projectReports []reporter.ListRow, projectMedia []media.ReferenceWithMedia, damageMappingCount int) {
+	@web.AppLayout(project.Title, c, detailBody(project, asset, client, stages, assignedToName,
+		projectAssessments, conditions, projectTreatments, treatmentMethodLabels, treatmentMethods,
+		projectReports, projectMedia, damageMappingCount, c.Locale))
 }
 
-templ detailBody(project Project, asset *assets.Asset, client *clients.Client, stages []settings.Classifier, assignedToName string, locale i18n.Locale) {
+templ detailBody(project Project, asset *assets.Asset, client *clients.Client, stages []settings.Classifier, assignedToName string,
+	projectAssessments []assessments.ListRow, conditions []settings.Classifier,
+	projectTreatments []treatments.ListRow, treatmentMethodLabels map[string]string, treatmentMethods []settings.Classifier,
+	projectReports []reporter.ListRow, projectMedia []media.ReferenceWithMedia, damageMappingCount int, locale i18n.Locale) {
 	@web.PageHeader(project.Title, detailSubtitle(asset, client), detailActions(project, asset))
-	@web.Card() {
-		<dl class="detail-dl">
-			@detailField("Stage", stageTitle(stages, project.Stage, locale))
-			@detailField("Priority", project.Priority)
-			@detailField("Assigned to", assignedToName)
-		</dl>
-		<form method="post" action={ templ.URL("/projects/" + project.ID + "/stage") } class="inline-edit-form">
-			@web.Field("Move to stage", "") {
-				<select class="input" name="stage">
-					for _, stage := range stages {
-						<option value={ stage.Code } selected?={ stage.Code == project.Stage }>{ settings.ClassifierLabel(stage, locale) }</option>
-					}
-				</select>
+	<div class="report-layout">
+		<div class="report-layout-main">
+			@web.Card() {
+				<dl class="detail-dl">
+					@detailField("Stage", stageTitle(stages, project.Stage, locale))
+					@detailField("Priority", project.Priority)
+					@detailField("Assigned to", assignedToName)
+				</dl>
+				if project.Stage != "completed" {
+					<form method="post" action={ templ.URL("/projects/" + project.ID + "/stage") } class="inline-edit-form">
+						@web.Field("Move to stage", "") {
+							<select class="input" name="stage">
+								for _, stage := range stages {
+									if stage.Code != "completed" {
+										<option value={ stage.Code } selected?={ stage.Code == project.Stage }>{ settings.ClassifierLabel(stage, locale) }</option>
+									}
+								}
+							</select>
+						}
+						<button type="submit" class="btn btn-secondary">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+							Update stage
+						</button>
+					</form>
+					<form method="post" action={ templ.URL("/projects/" + project.ID + "/finish") } class="form-section" data-confirm="Finish this project? If it has no report yet, one will be drafted automatically for you to review.">
+						<button type="submit" class="btn btn-primary">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+							Finish project
+						</button>
+					</form>
+				} else {
+					@web.OpenBadge(true)
+				}
 			}
-			<button type="submit" class="btn btn-secondary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
-				Update stage
-			</button>
-		</form>
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Assessments</h2>
+					@web.ModalTrigger("modal-assessment", "Add")
+				</div>
+				if len(projectAssessments) == 0 {
+					<p class="empty-state">No assessments recorded yet.</p>
+				}
+				<ul class="entity-list">
+					for _, a := range projectAssessments {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
+							<div class="row-actions">
+								<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
+								<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-assessment", "Add: Assessment") {
+					@assessments.AddModalBody(project.ID, nil, conditions, locale)
+				}
+			}
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Treatments</h2>
+					@web.ModalTrigger("modal-treatment", "Add")
+				</div>
+				if len(projectTreatments) == 0 {
+					<p class="empty-state">No treatments logged yet.</p>
+				}
+				<ul class="entity-list">
+					for _, t := range projectTreatments {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
+							<div class="row-actions">
+								<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
+								<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+								<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-treatment", "Add: Treatments") {
+					@treatments.AddModalBody(project.ID, nil, treatmentMethods, locale)
+				}
+			}
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Reports</h2>
+					@web.ModalTrigger("modal-report", "Add")
+				</div>
+				if len(projectReports) == 0 {
+					<p class="empty-state">No reports yet for this project.</p>
+				}
+				<ul class="entity-list">
+					for _, rep := range projectReports {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
+							<div class="row-actions">
+								if rep.Status == "final" {
+									<span class="badge badge-green">Final</span>
+								} else {
+									<span class="badge badge-amber">Draft</span>
+								}
+								<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-report", "Add: Reports") {
+					@reporter.AddModalBody(project.ID, nil)
+				}
+			}
+			@web.Card() {
+				<div class="card-header-row">
+					<h2 class="dashboard-heading">Media</h2>
+					@web.ModalTrigger("modal-media", "Add")
+				</div>
+				<p class="page-subtitle">{ strconv.Itoa(damageMappingCount) } damage mapping(s) marked across this project's media.</p>
+				if len(projectMedia) == 0 {
+					<p class="empty-state">No media yet.</p>
+				}
+				<ul class="entity-list">
+					for _, ref := range projectMedia {
+						<li class="entity-list-row">
+							<a href={ mediaViewHref(ref) } class="entity-list-name">
+								<img class="entity-thumb" src={ "/api/media/" + ref.MediaID } alt="" style="width:2.5rem;height:2.5rem;display:inline-block;vertical-align:middle;margin-right:0.5rem;border-radius:4px;"/>
+								if ref.Role.Valid {
+									{ ref.Role.String }
+								} else {
+									{ string(ref.Media.Kind) }
+								}
+							</a>
+							<div class="row-actions">
+								<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+								<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
+									<button type="submit" class="row-action-icon" title="Unlink">
+										<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+									</button>
+								</form>
+							</div>
+						</li>
+					}
+				</ul>
+				@web.Modal("modal-media", "Add: Media") {
+					<form method="post" action={ templ.URL("/projects/" + project.ID + "/media") } enctype="multipart/form-data" class="form-grid">
+						@web.Field("Photos / video", "On a phone this opens your camera directly.") {
+							<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+						}
+						<button type="submit" class="btn btn-primary">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+							Upload
+						</button>
+					</form>
+				}
+			}
+		</div>
+	</div>
+	<script src="/static/js/modal.js" defer></script>
+	<script src="/static/js/confirm.js" defer></script>
+}
+
+func mediaViewHref(ref media.ReferenceWithMedia) templ.SafeURL {
+	if ref.Media.Kind == media.KindVideo {
+		return templ.URL("/api/media/" + ref.MediaID + "?variant=original")
 	}
+	return templ.URL("/media/view/" + ref.MediaID)
+}
+
+func conditionTitle(conditions []settings.Classifier, code string, locale i18n.Locale) string {
+	for _, c := range conditions {
+		if c.Code == code {
+			return settings.ClassifierLabel(c, locale)
+		}
+	}
+	return code
+}
+
+func treatmentMethodLabel(labels map[string]string, code string) string {
+	if label, ok := labels[code]; ok {
+		return label
+	}
+	return code
 }
 
 templ detailField(label, value string) {

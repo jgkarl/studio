@@ -62,7 +62,7 @@ func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *aut
 
 func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	ctx := r.Context()
-	options, err := ListAssetOptions(ctx, svc.Pool)
+	projects, err := ListProjectOptions(ctx, svc.Pool)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -72,7 +72,7 @@ func (svc *Service) handleNewForm(w http.ResponseWriter, r *http.Request, user *
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, NewPage(chromeFor(r, user, "/treatments"), options, methods, r.URL.Query().Get("assetId")))
+	writeHTML(w, r, NewPage(chromeFor(r, user, "/treatments"), projects, methods, r.URL.Query().Get("projectId")))
 }
 
 func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -80,12 +80,12 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	assetID := r.FormValue("assetId")
+	projectID := r.FormValue("projectId")
 	method := r.FormValue("method")
 	title := strings.TrimSpace(r.FormValue("title"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
-	if assetID == "" || method == "" || title == "" || notes == "" {
-		http.Error(w, "Asset, method, title, and notes are required.", http.StatusBadRequest)
+	if projectID == "" || method == "" || title == "" || notes == "" {
+		http.Error(w, "Project, method, title, and notes are required.", http.StatusBadRequest)
 		return
 	}
 	performedAt := time.Now()
@@ -97,7 +97,7 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 
 	ctx := r.Context()
 	id, err := Create(ctx, svc.Pool, Input{
-		AssetID: assetID, Method: method, Title: title, Notes: notes,
+		ProjectID: projectID, Method: method, Title: title, Notes: notes,
 		PerformedByUserID: user.ID, PerformedAt: performedAt,
 	})
 	if err != nil {

@@ -33,17 +33,17 @@ func scanListRow(rows *sql.Rows) (ListRow, error) {
 
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 	return studiodb.Query(ctx, q, `
-		SELECT a.id, a.title, a.referenceCode, at.code, at.title, c.name, cs.condition,
+		SELECT a.id, a.title, a.referenceCode, at.code, at.title, c.name, cs."condition",
 		       (SELECT COUNT(*) FROM Project p WHERE p.assetId = a.id AND p.deletedAt IS NULL) AS projectCount,
 		       (SELECT mr.mediaId FROM MediaReference mr
-		          JOIN AssetState ast ON ast.id = mr.referencingId AND mr.referencingType = 'AssetState'
+		          JOIN Assessment ast ON ast.id = mr.referencingId AND mr.referencingType = 'Assessment'
 		          JOIN Media m ON m.id = mr.mediaId AND m.kind = 'image'
 		          WHERE ast.assetId = a.id
 		          ORDER BY mr.createdAt DESC, mr.sortOrder ASC LIMIT 1) AS thumbnailMediaId
 		FROM Asset a
 		JOIN Classifier at ON at.id = a.assetTypeId
 		JOIN Client c ON c.id = a.clientId
-		LEFT JOIN AssetState cs ON cs.id = a.currentStateId
+		LEFT JOIN Assessment cs ON cs.id = a.currentStateId
 		ORDER BY a.createdAt DESC`, scanListRow)
 }
 
@@ -94,43 +94,6 @@ func UpdateProfile(ctx context.Context, q studiodb.Querier, id string, in Input)
 		nullIfEmpty(in.Description), nullIfEmpty(in.Medium), nullIfEmpty(in.SignatureMarks), nullIfEmpty(in.Weight),
 		nullIfEmpty(in.Provenance), in.AcquisitionDate, in.EstimatedValue, in.IsInsured, nullIfEmpty(in.LocationInStudio), time.Now(), id)
 	return err
-}
-
-// --- Condition states (AssetState) ------------------------------------------------------------
-
-func scanState(rows *sql.Rows) (State, error) {
-	var s State
-	err := rows.Scan(&s.ID, &s.Condition, &s.Description, &s.RecordedAt)
-	return s, err
-}
-
-func ListStates(ctx context.Context, q studiodb.Querier, assetID string) ([]State, error) {
-	return studiodb.Query(ctx, q, `SELECT id, "condition", description, recordedAt FROM AssetState WHERE assetId = ? ORDER BY recordedAt DESC`, scanState, assetID)
-}
-
-// RecordState inserts a condition snapshot and updates Asset.currentStateId - the Notebook's
-// "fixate state" concept, usable both directly from the Asset page (no project) and later from a
-// Workflow's activity log (module 8, which passes projectID/recordedViaActivityID).
-func RecordState(ctx context.Context, pool *sql.DB, assetID, condition, description string, projectID, recordedViaActivityID *string) (string, error) {
-	return studiodb.WithTransaction(ctx, pool, func(tx *sql.Tx) (string, error) {
-		id := studiodb.NewID()
-		if _, err := studiodb.Execute(ctx, tx,
-			`INSERT INTO AssetState (id, assetId, projectId, recordedViaActivityId, "condition", description) VALUES (?, ?, ?, ?, ?, ?)`,
-			id, assetID, ptrToAny(projectID), ptrToAny(recordedViaActivityID), condition, description); err != nil {
-			return "", err
-		}
-		if _, err := studiodb.Execute(ctx, tx, "UPDATE Asset SET currentStateId = ? WHERE id = ?", id, assetID); err != nil {
-			return "", err
-		}
-		return id, nil
-	})
-}
-
-func ptrToAny(s *string) any {
-	if s == nil {
-		return nil
-	}
-	return *s
 }
 
 // --- Projects summary ---------------------------------------------------------------------

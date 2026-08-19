@@ -49,13 +49,6 @@ type ListRow struct {
 	ThumbnailMediaID      sql.NullString
 }
 
-type State struct {
-	ID          string
-	Condition   string
-	Description string
-	RecordedAt  time.Time
-}
-
 type ProjectSummary struct {
 	ID    string
 	Title string

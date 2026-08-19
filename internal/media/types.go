@@ -66,9 +66,10 @@ type ReferencingType string
 
 const (
 	RefActivity   ReferencingType = "Activity"
-	RefAssetState ReferencingType = "AssetState"
+	RefAssessment ReferencingType = "Assessment" // was "AssetState" pre-Project-scope refactor
 	RefReport     ReferencingType = "Report"
 	RefAsset      ReferencingType = "Asset"
+	RefProject    ReferencingType = "Project"
 	RefTreatment  ReferencingType = "Treatment"
 )
 
@@ -79,6 +80,7 @@ type Reference struct {
 	ReferencingID   string
 	Role            sql.NullString
 	SortOrder       int
+	Caption         sql.NullString
 	CreatedAt       time.Time
 }
 

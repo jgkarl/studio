@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"studio/internal/assessments"
 	"studio/internal/assets"
 	"studio/internal/clients"
 	"studio/internal/i18n"
@@ -65,7 +66,7 @@ func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, er
 	}
 	client, _ := clients.GetByID(ctx, svc.Pool, asset.ClientID)
 	assetType, _ := settings.GetClassifierByID(ctx, svc.Pool, asset.AssetTypeID)
-	states, _ := assets.ListStates(ctx, svc.Pool, id) // DESC — reversed below for chronological order
+	states, _ := assessments.ListByAsset(ctx, svc.Pool, id) // DESC — reversed below for chronological order
 	states = reversed(states)
 	projects, _ := assets.ListProjectsForAsset(ctx, svc.Pool, id)
 	conditionLabels, _ := settings.GetClassifierLabelMap(ctx, svc.Pool, settings.ClassifierConditionState, exportLocale)
@@ -101,7 +102,7 @@ func (svc *Service) GetAssetExportData(ctx context.Context, id string) (*Doc, er
 		if label == "" {
 			label = state.Condition
 		}
-		images, videos := svc.mediaFor(ctx, media.RefAssetState, state.ID)
+		images, videos := svc.mediaFor(ctx, media.RefAssessment, state.ID)
 		sections = append(sections, Section{
 			Heading:    fmt.Sprintf("Condition: %s — %s", label, state.RecordedAt.Format("2006-01-02")),
 			Paragraphs: []string{state.Description},

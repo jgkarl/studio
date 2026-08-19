@@ -219,6 +219,31 @@ func UsedTypeOptions(regions []AnnotationRegion, opts []AnnotationTypeOption) []
 	return out
 }
 
+// CountRegionsForProject counts MediaAnnotationRegion rows ("damage mappings") across every
+// Media item reachable from a Project — directly uploaded to the Project, or attached to one of
+// its Assessments/Treatments/Reports. Used by the Project detail page's summary card; a plain
+// count rather than a full list since the Media album already has its own project-grouped browse
+// view (see internal/media/views.templ's AlbumPage).
+func CountRegionsForProject(ctx context.Context, q studiodb.Querier, projectID string) (int, error) {
+	n, err := studiodb.QueryOne(ctx, q, `
+		SELECT COUNT(*) AS n FROM MediaAnnotationRegion r
+		WHERE r.mediaId IN (
+			SELECT mr.mediaId FROM MediaReference mr WHERE mr.referencingType = 'Project' AND mr.referencingId = ?
+			UNION
+			SELECT mr.mediaId FROM MediaReference mr JOIN Assessment a ON a.id = mr.referencingId WHERE mr.referencingType = 'Assessment' AND a.projectId = ?
+			UNION
+			SELECT mr.mediaId FROM MediaReference mr JOIN Treatment t ON t.id = mr.referencingId WHERE mr.referencingType = 'Treatment' AND t.projectId = ?
+			UNION
+			SELECT mr.mediaId FROM MediaReference mr JOIN Report rp ON rp.id = mr.referencingId WHERE mr.referencingType = 'Report' AND rp.projectId = ?
+		)`,
+		func(rows *sql.Rows) (int, error) { var c int; scanErr := rows.Scan(&c); return c, scanErr },
+		projectID, projectID, projectID, projectID)
+	if err != nil || n == nil {
+		return 0, err
+	}
+	return *n, nil
+}
+
 // hatchAngle maps a HATCH_DIRECTIONS code (ported from the original app's lib/types.ts) to the
 // rotation applied to a single base horizontal-line SVG <pattern> — one pattern shape, four
 // directions, rather than four different line geometries.
