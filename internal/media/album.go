@@ -9,9 +9,9 @@ import (
 )
 
 // AlbumItem is one Media row annotated with which Asset/Project/Client it belongs to — every
-// photo/video/document uploaded anywhere in the app, in one place. Workflow (Project) grouping
-// works from day one here even though the Workflows module (8) hasn't landed yet - the schema
-// and MediaReference→Activity/AssetState resolution chain already fully support it.
+// photo/video/document uploaded anywhere in the app, in one place. Project is now a mandatory
+// parent for Assessment/Treatment/Report (see db/migrations/0015), so every one of those
+// resolves to a Project directly off its own row, not just Activity's historical projectId.
 type AlbumItem struct {
 	ID              string
 	Kind            Kind
@@ -43,9 +43,10 @@ type refRow struct {
 	Role                       sql.NullString
 }
 
-// GetAllMediaWithContext resolves MediaReference's polymorphic target (Activity/AssetState/
-// Report/Asset/Treatment) down to a concrete Asset/Project/Client via a few batched queries and
-// in-memory joins - there's no single JOINable FK for a polymorphic association like this.
+// GetAllMediaWithContext resolves MediaReference's polymorphic target (Activity/Assessment/
+// Report/Asset/Project/Treatment) down to a concrete Asset/Project/Client via a few batched
+// queries and in-memory joins - there's no single JOINable FK for a polymorphic association like
+// this.
 func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumItem, error) {
 	scanMediaU := func(rows *sql.Rows) (mediaWithUploader, error) {
 		var m mediaWithUploader
@@ -79,27 +80,26 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 		}
 	}
 
-	var assetStateIDs, activityIDs, reportIDs, treatmentIDs []string
+	var assessmentIDs, activityIDs, reportIDs, treatmentIDs, directProjectIDs []string
 	for _, r := range refs {
 		switch r.ReferencingType {
-		case RefAssetState:
-			assetStateIDs = append(assetStateIDs, r.ReferencingID)
+		case RefAssessment:
+			assessmentIDs = append(assessmentIDs, r.ReferencingID)
 		case RefActivity:
 			activityIDs = append(activityIDs, r.ReferencingID)
 		case RefReport:
 			reportIDs = append(reportIDs, r.ReferencingID)
 		case RefTreatment:
 			treatmentIDs = append(treatmentIDs, r.ReferencingID)
+		case RefProject:
+			directProjectIDs = append(directProjectIDs, r.ReferencingID)
 		}
 	}
 
-	type assetStateRow struct {
-		ID, AssetID string
-		ProjectID   sql.NullString
-	}
-	assetStates, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM AssetState", "id", assetStateIDs, "",
-		func(rows *sql.Rows) (assetStateRow, error) {
-			var s assetStateRow
+	type assessmentRow struct{ ID, AssetID, ProjectID string }
+	assessments, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM Assessment", "id", assessmentIDs, "AND deletedAt IS NULL",
+		func(rows *sql.Rows) (assessmentRow, error) {
+			var s assessmentRow
 			err := rows.Scan(&s.ID, &s.AssetID, &s.ProjectID)
 			return s, err
 		})
@@ -116,10 +116,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 	if err != nil {
 		return nil, err
 	}
-	type reportRow struct {
-		ID, AssetID string
-		ProjectID   sql.NullString
-	}
+	type reportRow struct{ ID, AssetID, ProjectID string }
 	reports, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM Report", "id", reportIDs, "AND deletedAt IS NULL",
 		func(rows *sql.Rows) (reportRow, error) {
 			var r reportRow
@@ -129,20 +126,20 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 	if err != nil {
 		return nil, err
 	}
-	type treatmentRow struct{ ID, AssetID string }
-	treatments, err := queryByIDs(ctx, q, "SELECT id, assetId FROM Treatment", "id", treatmentIDs, "AND deletedAt IS NULL",
+	type treatmentRow struct{ ID, AssetID, ProjectID string }
+	treatments, err := queryByIDs(ctx, q, "SELECT id, assetId, projectId FROM Treatment", "id", treatmentIDs, "AND deletedAt IS NULL",
 		func(rows *sql.Rows) (treatmentRow, error) {
 			var t treatmentRow
-			err := rows.Scan(&t.ID, &t.AssetID)
+			err := rows.Scan(&t.ID, &t.AssetID, &t.ProjectID)
 			return t, err
 		})
 	if err != nil {
 		return nil, err
 	}
 
-	assetStateByID := map[string]assetStateRow{}
-	for _, s := range assetStates {
-		assetStateByID[s.ID] = s
+	assessmentByID := map[string]assessmentRow{}
+	for _, s := range assessments {
+		assessmentByID[s.ID] = s
 	}
 	activityByID := map[string]activityRow{}
 	for _, a := range activities {
@@ -164,20 +161,22 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 			directAssetIDs = append(directAssetIDs, r.ReferencingID)
 		}
 	}
+	for _, id := range directProjectIDs {
+		projectIDSet[id] = true
+	}
 	for _, a := range activities {
 		if a.ProjectID != "" {
 			projectIDSet[a.ProjectID] = true
 		}
 	}
-	for _, s := range assetStates {
-		if s.ProjectID.Valid {
-			projectIDSet[s.ProjectID.String] = true
-		}
+	for _, s := range assessments {
+		projectIDSet[s.ProjectID] = true
 	}
 	for _, r := range reports {
-		if r.ProjectID.Valid {
-			projectIDSet[r.ProjectID.String] = true
-		}
+		projectIDSet[r.ProjectID] = true
+	}
+	for _, t := range treatments {
+		projectIDSet[t.ProjectID] = true
 	}
 	var allProjectIDs []string
 	for id := range projectIDSet {
@@ -203,7 +202,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 	for _, id := range directAssetIDs {
 		assetIDSet[id] = true
 	}
-	for _, s := range assetStates {
+	for _, s := range assessments {
 		assetIDSet[s.AssetID] = true
 	}
 	for _, r := range reports {
@@ -244,10 +243,15 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 			switch ref.ReferencingType {
 			case RefAsset:
 				aID = ref.ReferencingID
-			case RefAssetState:
-				if st, ok := assetStateByID[ref.ReferencingID]; ok {
+			case RefProject:
+				pID = ref.ReferencingID
+				if p, ok := projectByID[pID]; ok {
+					aID = p.AssetID
+				}
+			case RefAssessment:
+				if st, ok := assessmentByID[ref.ReferencingID]; ok {
 					aID = st.AssetID
-					pID = st.ProjectID.String
+					pID = st.ProjectID
 				}
 			case RefActivity:
 				if act, ok := activityByID[ref.ReferencingID]; ok {
@@ -259,11 +263,12 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 			case RefReport:
 				if rep, ok := reportByID[ref.ReferencingID]; ok {
 					aID = rep.AssetID
-					pID = rep.ProjectID.String
+					pID = rep.ProjectID
 				}
 			case RefTreatment:
 				if t, ok := treatmentByID[ref.ReferencingID]; ok {
 					aID = t.AssetID
+					pID = t.ProjectID
 				}
 			}
 		}

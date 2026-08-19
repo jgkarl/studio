@@ -64,13 +64,15 @@ needs it.
 - **SQLite quirks worth knowing if you touch a query:** `condition` and `Order` are reserved
   words needing double-quoting (`"condition"`, `"Order"`) as bare identifiers (the `Order` table
   itself was dropped along with the rest of Commerce — see below — but the reserved-word note
-  still applies to `condition`); foreign keys must be declared inline in `CREATE TABLE` (no
-  `ALTER TABLE ... ADD CONSTRAINT`) — the one circular reference (`Asset.currentStateId` <->
-  `AssetState.assetId`) relies on SQLite allowing a `REFERENCES` to a table that doesn't exist yet
-  at `CREATE TABLE` time. Adding a column with `ALTER TABLE ... ADD COLUMN` works fine even with a
-  `REFERENCES` clause (used for `Report.coverMediaId`); dropping or changing an existing column
-  doesn't (used for `Project`'s `0004`/`0006` migrations) — those go through the standard
-  create-new-table/copy-data/drop-old/rename dance instead.
+  still applies to `condition`, still used by `Assessment`, the renamed former `AssetState`);
+  foreign keys must be declared inline in `CREATE TABLE` (no `ALTER TABLE ... ADD CONSTRAINT`) —
+  the one circular reference (`Asset.currentStateId` <-> `Assessment.assetId`) relies on SQLite
+  allowing a `REFERENCES` to a table that doesn't exist yet at `CREATE TABLE` time. Adding a
+  column with `ALTER TABLE ... ADD COLUMN` works fine even with a `REFERENCES` clause (used for
+  `Report.coverMediaId`); dropping or changing an existing column doesn't (used for `Project`'s
+  `0004`/`0006` migrations and `0015`'s Project-scope rebuild of `Asset`/`Assessment`/`Treatment`/
+  `Report`) — those go through the standard create-new-table/copy-data/drop-old/rename dance
+  instead.
 
 ## Image processing: govips (cgo), thumbnails + a real IIIF Image API
 

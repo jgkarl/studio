@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"studio/internal/assessments"
 	"studio/internal/assets"
 	"studio/internal/auth"
 	"studio/internal/clients"
@@ -102,7 +103,8 @@ func main() {
 	assets.Mount(mux, &assets.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	media.Mount(mux, &media.HandlerService{Service: mediaSvc, Auth: authSvc})
 	treatments.Mount(mux, &treatments.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
-	workflows.Mount(mux, &workflows.Service{Pool: pool, Auth: authSvc})
+	assessments.Mount(mux, &assessments.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
+	workflows.Mount(mux, &workflows.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	reporter.Mount(mux, &reporter.Service{Pool: pool, Auth: authSvc, Media: mediaSvc})
 	export.Mount(mux, &export.Service{Pool: pool, Media: mediaSvc}, authSvc)
 	iiif.Mount(mux, &iiif.Service{Media: mediaSvc}, authSvc)

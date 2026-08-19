@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"strconv"
+
 	"studio/internal/auth"
 	"studio/internal/i18n"
 	"studio/internal/web"
@@ -12,6 +14,7 @@ import (
 templ tabNav(active string, showUsers bool) {
 	<div class="tab-nav">
 		<a href="/settings" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "classifiers") }>Classifiers</a>
+		<a href="/settings/features" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "features") }>Features</a>
 		if showUsers {
 			<a href="/settings/users" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "users") }>Users</a>
 		}
@@ -27,6 +30,56 @@ templ classifiersBody(groups []ClassifierGroup, isAdmin bool, locale i18n.Locale
 	@tabNav("classifiers", isAdmin)
 	for _, group := range groups {
 		@classifierGroupCard(group, locale)
+	}
+}
+
+// FeaturesPage holds the two admin-configurable behaviors that aren't a Classifier picklist: the
+// Dashboard's per-module list caps, and which Client/Asset/Project fields a generated Report's
+// info panel includes (see internal/settings/appsetting.go, features.go, reportable.go).
+templ FeaturesPage(c web.Chrome, limits []FeatureLimitValue, reportableGroups []ReportableGroup, isAdmin bool) {
+	@web.AppLayout("Settings", c, featuresBody(limits, reportableGroups, isAdmin))
+}
+
+templ featuresBody(limits []FeatureLimitValue, reportableGroups []ReportableGroup, isAdmin bool) {
+	@web.PageHeader("Settings", "Dashboard limits and report contents.", templ.NopComponent)
+	@tabNav("features", isAdmin)
+	@web.Card() {
+		<h2 class="dashboard-heading">Dashboard limits</h2>
+		<p class="page-subtitle">How many rows the Dashboard shows per list.</p>
+		<form method="post" action="/settings/features" class="form-grid">
+			for _, l := range limits {
+				@web.Field(l.Label, "") {
+					<input class="input" type="number" min="1" max="50" name={ l.Key } value={ strconv.Itoa(l.Value) }/>
+				}
+			}
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Save limits
+			</button>
+		</form>
+	}
+	@web.Card() {
+		<h2 class="dashboard-heading">Reportable fields</h2>
+		<p class="page-subtitle">Which fields show in a generated Report's Client/Asset/Project info panel.</p>
+		<form method="post" action="/settings/reportable" class="form-grid">
+			for _, group := range reportableGroups {
+				<div class="form-section">
+					<p class="form-section-title">{ group.Label }</p>
+					<div class="checkbox-grid">
+						for _, f := range group.Fields {
+							<label class="checkbox-field">
+								<input type="checkbox" name={ "reportable." + group.Model + "." + f.Field } checked?={ f.Enabled }/>
+								{ f.Label }
+							</label>
+						}
+					</div>
+				</div>
+			}
+			<button type="submit" class="btn btn-primary">
+				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				Save reportable fields
+			</button>
+		</form>
 	}
 }
 

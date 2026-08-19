@@ -40,40 +40,54 @@ func mustClassifierID(t *testing.T, q studiodb.Querier, classifierType, code str
 	return *id
 }
 
-func TestBuildSuggestedOutlineUnknownAsset(t *testing.T) {
+// mustProject creates a Client/Asset/Project fixture chain and returns the Project's id — every
+// Assessment/Treatment BuildSuggestedOutline reads is now Project-scoped.
+func mustProject(t *testing.T, q studiodb.Querier, refCode string) string {
+	t.Helper()
+	assetTypeID := mustClassifierID(t, q, "asset_type", "painting")
+
+	clientID := studiodb.NewID()
+	mustExec(t, q, "INSERT INTO Client (id, name, updatedAt) VALUES (?, ?, ?)", clientID, "Test Client", time.Now())
+
+	assetID := studiodb.NewID()
+	mustExec(t, q, "INSERT INTO Asset (id, clientId, referenceCode, assetTypeId, updatedAt) VALUES (?, ?, ?, ?, ?)",
+		assetID, clientID, refCode, assetTypeID, time.Now())
+
+	projectID := studiodb.NewID()
+	mustExec(t, q, "INSERT INTO Project (id, assetId, title, updatedAt) VALUES (?, ?, ?, ?)",
+		projectID, assetID, "Test project", time.Now())
+	return projectID
+}
+
+func TestBuildSuggestedOutlineUnknownProject(t *testing.T) {
 	pool := testutil.OpenTestDB(t)
 	sections, err := BuildSuggestedOutline(context.Background(), pool, "does-not-exist")
 	if err != nil {
 		t.Fatalf("BuildSuggestedOutline: %v", err)
 	}
 	if sections.ConditionFindings != "" || sections.TreatmentPerformed != "" {
-		t.Errorf("expected empty sections for an unknown asset, got %+v", sections)
+		t.Errorf("expected empty sections for an unknown project, got %+v", sections)
 	}
 }
 
 func TestBuildSuggestedOutline(t *testing.T) {
 	ctx := context.Background()
 	pool := testutil.OpenTestDB(t)
+	projectID := mustProject(t, pool, "A-0001")
 
-	assetTypeID := mustClassifierID(t, pool, "asset_type", "painting")
+	mustExec(t, pool, `INSERT INTO Assessment (id, projectId, assetId, "condition", description, recordedAt, updatedAt)
+		SELECT ?, id, assetId, ?, ?, ?, ? FROM Project WHERE id = ?`,
+		studiodb.NewID(), "fair", "Surface grime, minor tears at edges.", time.Now().Add(-2*time.Hour), time.Now(), projectID)
 
-	clientID := studiodb.NewID()
-	mustExec(t, pool, "INSERT INTO Client (id, name, updatedAt) VALUES (?, ?, ?)", clientID, "Test Client", time.Now())
+	mustExec(t, pool, `INSERT INTO Treatment (id, projectId, assetId, method, title, notes, performedAt, updatedAt)
+		SELECT ?, id, assetId, ?, ?, ?, ?, ? FROM Project WHERE id = ?`,
+		studiodb.NewID(), "surface_cleaning", "Surface cleaning", "Removed surface grime with dry sponge.", time.Now().Add(-time.Hour), time.Now(), projectID)
 
-	assetID := studiodb.NewID()
-	mustExec(t, pool, "INSERT INTO Asset (id, clientId, referenceCode, assetTypeId, updatedAt) VALUES (?, ?, ?, ?, ?)",
-		assetID, clientID, "A-0001", assetTypeID, time.Now())
+	mustExec(t, pool, `INSERT INTO Assessment (id, projectId, assetId, "condition", description, recordedAt, updatedAt)
+		SELECT ?, id, assetId, ?, ?, ?, ? FROM Project WHERE id = ?`,
+		studiodb.NewID(), "good", "Grime removed, tears stable.", time.Now(), time.Now(), projectID)
 
-	mustExec(t, pool, `INSERT INTO AssetState (id, assetId, "condition", description, recordedAt) VALUES (?, ?, ?, ?, ?)`,
-		studiodb.NewID(), assetID, "fair", "Surface grime, minor tears at edges.", time.Now().Add(-2*time.Hour))
-
-	mustExec(t, pool, "INSERT INTO Treatment (id, assetId, method, title, notes, performedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		studiodb.NewID(), assetID, "surface_cleaning", "Surface cleaning", "Removed surface grime with dry sponge.", time.Now().Add(-time.Hour), time.Now())
-
-	mustExec(t, pool, `INSERT INTO AssetState (id, assetId, "condition", description, recordedAt) VALUES (?, ?, ?, ?, ?)`,
-		studiodb.NewID(), assetID, "good", "Grime removed, tears stable.", time.Now())
-
-	sections, err := BuildSuggestedOutline(ctx, pool, assetID)
+	sections, err := BuildSuggestedOutline(ctx, pool, projectID)
 	if err != nil {
 		t.Fatalf("BuildSuggestedOutline: %v", err)
 	}
@@ -92,23 +106,18 @@ func TestBuildSuggestedOutline(t *testing.T) {
 func TestBuildSuggestedOutlineSingleStateHasNoMostRecentLine(t *testing.T) {
 	ctx := context.Background()
 	pool := testutil.OpenTestDB(t)
+	projectID := mustProject(t, pool, "A-0002")
 
-	assetTypeID := mustClassifierID(t, pool, "asset_type", "painting")
-	clientID := studiodb.NewID()
-	mustExec(t, pool, "INSERT INTO Client (id, name, updatedAt) VALUES (?, ?, ?)", clientID, "Test Client", time.Now())
-	assetID := studiodb.NewID()
-	mustExec(t, pool, "INSERT INTO Asset (id, clientId, referenceCode, assetTypeId, updatedAt) VALUES (?, ?, ?, ?, ?)",
-		assetID, clientID, "A-0002", assetTypeID, time.Now())
+	mustExec(t, pool, `INSERT INTO Assessment (id, projectId, assetId, "condition", description, recordedAt, updatedAt)
+		SELECT ?, id, assetId, ?, ?, ?, ? FROM Project WHERE id = ?`,
+		studiodb.NewID(), "good", "Only one state logged so far.", time.Now(), time.Now(), projectID)
 
-	mustExec(t, pool, `INSERT INTO AssetState (id, assetId, "condition", description, recordedAt) VALUES (?, ?, ?, ?, ?)`,
-		studiodb.NewID(), assetID, "good", "Only one state logged so far.", time.Now())
-
-	sections, err := BuildSuggestedOutline(ctx, pool, assetID)
+	sections, err := BuildSuggestedOutline(ctx, pool, projectID)
 	if err != nil {
 		t.Fatalf("BuildSuggestedOutline: %v", err)
 	}
 	if strings.Contains(sections.ConditionFindings, "Most recent:") {
-		t.Errorf("expected no 'Most recent:' line when only one AssetState is logged, got %q", sections.ConditionFindings)
+		t.Errorf("expected no 'Most recent:' line when only one Assessment is logged, got %q", sections.ConditionFindings)
 	}
 	if !strings.Contains(sections.ConditionFindings, "On arrival: Only one state logged so far.") {
 		t.Errorf("expected the single state as the 'On arrival' line, got %q", sections.ConditionFindings)

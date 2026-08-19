@@ -15,12 +15,15 @@ type navItem struct {
 // list. Settings is deliberately not part of it — on desktop it lives in the account-menu dropdown
 // only (see accountMenuTrigger/accountMenuPanel below); the drawer renders it as its own link
 // separately, right where this list used to append it, so drawer behavior is unchanged.
+// navItems is the top-level navbar: Clients, Assets, Projects, Reports (a shortcut into the
+// Project-scoped Reports list), and Media. Dashboard stays reachable via the logo/brand link
+// only; Assessments/Treatments/damage-mappings live inside a Project's own detail page (see
+// internal/workflows' DetailPage) rather than as top-level tabs, since every one of those is now
+// created under a Project, not browsed independently first.
 func navItems(c Chrome) []navItem {
 	return []navItem{
-		{"/", c.Dict.Nav.Dashboard, "home"},
 		{"/clients", c.Dict.Nav.Clients, "people"},
 		{"/assets", c.Dict.Nav.Assets, "folder"},
-		{"/treatments", c.Dict.Nav.Treatments, "check-circle"},
 		{"/projects", c.Dict.Nav.Projects, "history"},
 		{"/reports", c.Dict.Nav.Reports, "description"},
 		{"/media", c.Dict.Nav.Media, "image"},

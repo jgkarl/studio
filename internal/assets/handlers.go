@@ -8,6 +8,7 @@ import (
 
 	"github.com/a-h/templ"
 
+	"studio/internal/assessments"
 	"studio/internal/auth"
 	"studio/internal/clients"
 	"studio/internal/i18n"
@@ -31,7 +32,6 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /assets/{id}", svc.Auth.RequireUser(svc.handleDetail))
 	mux.HandleFunc("GET /assets/{id}/edit", svc.Auth.RequireUser(svc.handleEditForm))
 	mux.HandleFunc("POST /assets/{id}/update", svc.Auth.RequireUser(svc.handleUpdate))
-	mux.HandleFunc("POST /assets/{id}/states", svc.Auth.RequireUser(svc.handleRecordState))
 	mux.HandleFunc("POST /assets/{id}/media", svc.Auth.RequireUser(svc.handleAddMedia))
 	mux.HandleFunc("POST /assets/{id}/media/{refId}/unlink", svc.Auth.RequireUser(svc.handleUnlinkMedia))
 }
@@ -117,7 +117,7 @@ func formInput(r *http.Request) Input {
 }
 
 func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
@@ -136,19 +136,11 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 		return
 	}
 
-	if intake := strings.TrimSpace(r.FormValue("intakeDescription")); intake != "" {
-		stateID, err := RecordState(ctx, svc.Pool, id, "intake", intake, nil, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
+	// Registering an Asset leads straight into creating its first Project — Assessments,
+	// Treatments, Reports, and media are all recorded under a Project from here on (see
+	// internal/workflows' New Project form, which offers an "initial assessment" sub-block so
+	// this stays a one-step-feeling flow).
+	http.Redirect(w, r, "/projects/new?assetId="+id, http.StatusSeeOther)
 }
 
 func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -174,7 +166,7 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	states, err := ListStates(ctx, svc.Pool, id)
+	assetAssessments, err := assessments.ListByAsset(ctx, svc.Pool, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -184,24 +176,15 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	conditions, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierConditionState)
+	assessmentProjectOptions, err := assessments.ListProjectOptionsForAsset(ctx, svc.Pool, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	conditionByCode := map[string]settings.Classifier{}
-	for _, c := range conditions {
-		conditionByCode[c.Code] = c
-	}
-
-	stateMedia := map[string][]media.ReferenceWithMedia{}
-	for _, st := range states {
-		refs, err := svc.Media.GetReferencedMedia(ctx, media.RefAssetState, st.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		stateMedia[st.ID] = refs
+	conditions, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierConditionState)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	reports, err := reporter.ListByAsset(ctx, svc.Pool, id)
@@ -210,6 +193,16 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		return
 	}
 	assetTreatments, err := treatments.ListByAsset(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	treatmentProjectOptions, err := treatments.ListProjectOptionsForAsset(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	reportProjectOptions, err := reporter.ListProjectOptionsForAsset(ctx, svc.Pool, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -236,9 +229,9 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		return
 	}
 
-	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, states,
-		projects, conditions, conditionByCode, stateMedia, reports, assetTreatments, treatmentMethodLabels,
-		treatmentMethods, stageLabels, assetMedia))
+	writeHTML(w, r, DetailPage(chromeFor(r, user, "/assets"), *asset, client, assetType, assetAssessments,
+		assessmentProjectOptions, projects, conditions, reports, reportProjectOptions, assetTreatments,
+		treatmentProjectOptions, treatmentMethodLabels, treatmentMethods, stageLabels, assetMedia))
 }
 
 func (svc *Service) handleEditForm(w http.ResponseWriter, r *http.Request, user *auth.User) {
@@ -267,32 +260,9 @@ func (svc *Service) handleUpdate(w http.ResponseWriter, r *http.Request, user *a
 	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
 }
 
-func (svc *Service) handleRecordState(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	ctx := r.Context()
-	id := r.PathValue("id")
-	condition := r.FormValue("condition")
-	if condition == "" {
-		condition = "other"
-	}
-	description := strings.TrimSpace(r.FormValue("description"))
-	stateID, err := RecordState(ctx, svc.Pool, id, condition, description, nil, nil)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssetState, stateID, "photo"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/assets/"+id, http.StatusSeeOther)
-}
-
 // handleAddMedia attaches media directly to the asset itself (the asset detail view's Media
-// section's "+Add") — distinct from handleRecordState's photos, which attach to an AssetState.
+// section's "+Add") — distinct from an Assessment/Treatment/Report's own photo uploads, which
+// attach to that record instead.
 func (svc *Service) handleAddMedia(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)

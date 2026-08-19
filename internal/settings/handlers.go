@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -29,6 +30,9 @@ type Service struct {
 // access to any account.
 func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /settings", svc.Auth.RequireUser(svc.handleClassifiers))
+	mux.HandleFunc("GET /settings/features", svc.Auth.RequireUser(svc.handleFeatures))
+	mux.HandleFunc("POST /settings/features", svc.Auth.RequireUser(svc.handleFeaturesUpdate))
+	mux.HandleFunc("POST /settings/reportable", svc.Auth.RequireUser(svc.handleReportableUpdate))
 	mux.HandleFunc("GET /settings/users", svc.Auth.RequireAdmin(svc.handleUsers))
 	mux.HandleFunc("POST /settings/classifiers/{type}", svc.Auth.RequireUser(svc.handleClassifierCreate))
 	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/delete", svc.Auth.RequireUser(svc.handleClassifierDelete))
@@ -53,6 +57,49 @@ func (svc *Service) handleClassifiers(w http.ResponseWriter, r *http.Request, us
 	}
 
 	writeHTML(w, r, ClassifiersPage(chromeFor(r, user, "/settings"), groups, user.HasRole(auth.RoleAdmin)))
+}
+
+func (svc *Service) handleFeatures(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	ctx := r.Context()
+	limits := LoadDashboardLimits(ctx, svc.Pool)
+	reportableGroups := LoadReportableGroups(ctx, svc.Pool)
+	writeHTML(w, r, FeaturesPage(chromeFor(r, user, "/settings"), limits, reportableGroups, user.HasRole(auth.RoleAdmin)))
+}
+
+func (svc *Service) handleFeaturesUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	ctx := r.Context()
+	for _, l := range DashboardLimits {
+		raw := strings.TrimSpace(r.FormValue(l.Key))
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			continue // leave unset/invalid values at their current (default-falling-back) value
+		}
+		if err := SetInt(ctx, svc.Pool, l.Key, n); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	http.Redirect(w, r, "/settings/features", http.StatusSeeOther)
+}
+
+func (svc *Service) handleReportableUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	ctx := r.Context()
+	for _, f := range ReportableFields {
+		enabled := r.FormValue("reportable."+f.Model+"."+f.Field) == "on"
+		if err := SetReportable(ctx, svc.Pool, f.Model, f.Field, enabled); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	http.Redirect(w, r, "/settings/features", http.StatusSeeOther)
 }
 
 func (svc *Service) handleUsers(w http.ResponseWriter, r *http.Request, user *auth.User) {

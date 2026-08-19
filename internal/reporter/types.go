@@ -12,7 +12,7 @@ import (
 
 type Report struct {
 	ID        string
-	ProjectID sql.NullString
+	ProjectID string
 	AssetID   string
 	Title     string
 	Content   string // raw TipTap JSON doc from before the structured-sections rework — opaque, unused by new reports
@@ -48,16 +48,14 @@ type ListRow struct {
 	AuthorName         sql.NullString
 }
 
-type AssetOption struct {
-	ID            string
-	Title         sql.NullString
-	ReferenceCode string
-	ClientName    string
-}
-
+// ProjectOption is one entry in the "pick a project" select on the new-report form — every
+// Project pins exactly one Asset, so this doubles as the asset picker.
 type ProjectOption struct {
-	ID    string
-	Title string
+	ID         string
+	Title      string
+	AssetTitle sql.NullString
+	AssetRef   string
+	ClientName string
 }
 
 // SectionsInput is the five structured-section textareas, saved together as one form post.

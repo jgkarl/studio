@@ -2,9 +2,9 @@ package assets
 
 import (
 	"database/sql"
-	"encoding/json"
 	"strconv"
 
+	"studio/internal/assessments"
 	"studio/internal/clients"
 	"studio/internal/i18n"
 	"studio/internal/media"
@@ -98,7 +98,7 @@ templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes []settings.C
 templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string, locale i18n.Locale) {
 	@web.PageHeader("New asset", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/assets" enctype="multipart/form-data" class="form-grid">
+		<form method="post" action="/assets" class="form-grid">
 			<div class="form-row-2">
 				@web.Field("Client", "") {
 					<select class="input" name="clientId" required>
@@ -171,33 +171,28 @@ templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, pre
 			@web.Field("Location in studio", "") {
 				<input class="input" name="locationInStudio" placeholder="e.g. Shelf B3, Wet Room"/>
 			}
-			<div class="form-section">
-				<p class="form-section-title">Intake condition</p>
-				@web.Field("Notes", "") {
-					<textarea class="input" name="intakeDescription" rows="2" placeholder="Condition on arrival…"></textarea>
-				}
-				@web.Field("Photos", "On a phone this opens your camera directly.") {
-					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-				}
-			</div>
+			<p class="hint">Next you'll start this asset's first project — that's where its intake condition gets recorded.</p>
 			<button type="submit" class="btn btn-primary">Create asset</button>
 		</form>
 	}
 }
 
 templ DetailPage(c web.Chrome, asset Asset, client *clients.Client, assetType *settings.Classifier,
-	states []State, projects []ProjectSummary,
-	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia,
-	reports []reporter.ListRow, assetTreatments []treatments.ListRow, treatmentMethodLabels map[string]string,
+	assetAssessments []assessments.ListRow, assessmentProjects []assessments.ProjectOption, projects []ProjectSummary,
+	conditions []settings.Classifier,
+	reports []reporter.ListRow, reportProjects []reporter.ProjectOption,
+	assetTreatments []treatments.ListRow, treatmentProjects []treatments.ProjectOption, treatmentMethodLabels map[string]string,
 	treatmentMethods []settings.Classifier, stageLabels map[string]string, assetMedia []media.ReferenceWithMedia) {
-	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, states, projects, conditions, conditionByCode,
-		stateMedia, reports, assetTreatments, treatmentMethodLabels, treatmentMethods, stageLabels, assetMedia, c.Locale))
+	@web.AppLayout(asset.DisplayName(), c, detailBody(asset, client, assetType, assetAssessments, assessmentProjects, projects,
+		conditions, reports, reportProjects, assetTreatments, treatmentProjects, treatmentMethodLabels, treatmentMethods,
+		stageLabels, assetMedia, c.Locale))
 }
 
 templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classifier,
-	states []State, projects []ProjectSummary,
-	conditions []settings.Classifier, conditionByCode map[string]settings.Classifier, stateMedia map[string][]media.ReferenceWithMedia,
-	reports []reporter.ListRow, assetTreatments []treatments.ListRow, treatmentMethodLabels map[string]string,
+	assetAssessments []assessments.ListRow, assessmentProjects []assessments.ProjectOption, projects []ProjectSummary,
+	conditions []settings.Classifier,
+	reports []reporter.ListRow, reportProjects []reporter.ProjectOption,
+	assetTreatments []treatments.ListRow, treatmentProjects []treatments.ProjectOption, treatmentMethodLabels map[string]string,
 	treatmentMethods []settings.Classifier, stageLabels map[string]string, assetMedia []media.ReferenceWithMedia, locale i18n.Locale) {
 	@web.PageHeader(asset.DisplayName(), asset.ReferenceCode+" · "+assetTypeTitle(assetType, locale), assetActions(asset))
 	if client != nil {
@@ -230,54 +225,50 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 			}
 			@web.Card() {
 				<div class="card-header-row">
-					<h2 class="dashboard-heading">Latest condition report</h2>
-					@web.ModalTrigger("modal-condition", "Add")
-				</div>
-				if len(states) == 0 {
-					<p class="empty-state">No condition records yet.</p>
-				} else {
-					@conditionEntry(states[0], conditionByCode, stateMedia[states[0].ID], locale)
-					if len(states) > 1 {
-						<details class="form-section">
-							<summary class="form-section-title" style="cursor:pointer;">View full history</summary>
-							<ul class="condition-list">
-								for _, s := range states[1:] {
-									<li class="condition-item">
-										@conditionEntry(s, conditionByCode, stateMedia[s.ID], locale)
-									</li>
-								}
-							</ul>
-						</details>
+					<h2 class="dashboard-heading">Assessments</h2>
+					if len(assessmentProjects) > 0 {
+						@web.ModalTrigger("modal-assessment", "Add")
 					}
+				</div>
+				if len(assessmentProjects) == 0 {
+					<p class="empty-state">
+						No projects yet — <a href={ templ.URL("/projects/new?assetId=" + asset.ID) }>start one</a> to record an assessment.
+					</p>
+				} else if len(assetAssessments) == 0 {
+					<p class="empty-state">No assessments recorded yet.</p>
 				}
-				@web.Modal("modal-condition", "Add: Latest condition report") {
-					<form method="post" action={ templ.URL("/assets/" + asset.ID + "/states") } enctype="multipart/form-data" class="form-grid">
-						@web.Field("Condition", "") {
-							<select class="input" name="condition">
-								for _, cond := range conditions {
-									<option value={ cond.Code }>{ settings.ClassifierLabel(cond, locale) }</option>
-								}
-							</select>
-						}
-						@web.Field("Description", "") {
-							<textarea class="input" name="description" rows="2" required></textarea>
-						}
-						@web.Field("Photos", "On a phone this opens your camera directly.") {
-							<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
-						}
-						<button type="submit" class="btn btn-primary">
-							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
-							Save record
-						</button>
-					</form>
+				<ul class="entity-list">
+					for _, a := range assetAssessments {
+						<li class="entity-list-row">
+							<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
+							<div class="row-actions">
+								<span class="page-subtitle">{ a.Description }</span>
+								<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
+								<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
+									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+								</a>
+							</div>
+						</li>
+					}
+				</ul>
+				if len(assessmentProjects) > 0 {
+					@web.Modal("modal-assessment", "Add: Assessment") {
+						@assessments.AddModalBody("", assessmentProjects, conditions, locale)
+					}
 				}
 			}
 			@web.Card() {
 				<div class="card-header-row">
 					<h2 class="dashboard-heading">Treatments</h2>
-					@web.ModalTrigger("modal-treatment", "Add")
+					if len(treatmentProjects) > 0 {
+						@web.ModalTrigger("modal-treatment", "Add")
+					}
 				</div>
-				if len(assetTreatments) == 0 {
+				if len(treatmentProjects) == 0 {
+					<p class="empty-state">
+						No projects yet — <a href={ templ.URL("/projects/new?assetId=" + asset.ID) }>start one</a> to log a treatment.
+					</p>
+				} else if len(assetTreatments) == 0 {
 					<p class="empty-state">No treatments logged yet.</p>
 				}
 				<ul class="entity-list">
@@ -302,16 +293,24 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 						</li>
 					}
 				</ul>
-				@web.Modal("modal-treatment", "Add: Treatments") {
-					@treatments.AddModalBody(asset.ID, treatmentMethods, locale)
+				if len(treatmentProjects) > 0 {
+					@web.Modal("modal-treatment", "Add: Treatments") {
+						@treatments.AddModalBody("", treatmentProjects, treatmentMethods, locale)
+					}
 				}
 			}
 			@web.Card() {
 				<div class="card-header-row">
 					<h2 class="dashboard-heading">Reports</h2>
-					@web.ModalTrigger("modal-report", "Add")
+					if len(reportProjects) > 0 {
+						@web.ModalTrigger("modal-report", "Add")
+					}
 				</div>
-				if len(reports) == 0 {
+				if len(reportProjects) == 0 {
+					<p class="empty-state">
+						No projects yet — <a href={ templ.URL("/projects/new?assetId=" + asset.ID) }>start one</a> to create a report.
+					</p>
+				} else if len(reports) == 0 {
 					<p class="empty-state">No reports yet for this object.</p>
 				}
 				<ul class="entity-list">
@@ -332,8 +331,10 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 						</li>
 					}
 				</ul>
-				@web.Modal("modal-report", "Add: Reports") {
-					@reporter.AddModalBody(asset.ID)
+				if len(reportProjects) > 0 {
+					@web.Modal("modal-report", "Add: Reports") {
+						@reporter.AddModalBody("", reportProjects)
+					}
 				}
 			}
 			@web.Card() {
@@ -444,17 +445,6 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 		</div>
 	</div>
 	<script src="/static/js/modal.js" defer></script>
-}
-
-// conditionEntry renders one AssetState's badge/description/media — shared by the "Latest
-// condition report" card's headline entry and its "View full history" disclosure.
-templ conditionEntry(s State, conditionByCode map[string]settings.Classifier, refs []media.ReferenceWithMedia, locale i18n.Locale) {
-	<div class="row-actions">
-		<span class={ "badge", severityToneClass(conditionByCode, s.Condition) }>{ conditionTitle(conditionByCode, s.Condition, locale) }</span>
-		<span class="page-subtitle">{ s.RecordedAt.Format("2006-01-02 15:04") }</span>
-	</div>
-	<p class="detail-paragraph">{ s.Description }</p>
-	@media.MediaGrid(refs)
 }
 
 // activeProjects filters to non-completed projects — the "Current status" card's content, distinct
@@ -618,9 +608,11 @@ func acquisitionDateInputValue(asset Asset) string {
 	return asset.AcquisitionDate.Time.Format("2006-01-02")
 }
 
-func conditionTitle(byCode map[string]settings.Classifier, code string, locale i18n.Locale) string {
-	if c, ok := byCode[code]; ok {
-		return settings.ClassifierLabel(c, locale)
+func conditionTitle(conditions []settings.Classifier, code string, locale i18n.Locale) string {
+	for _, c := range conditions {
+		if c.Code == code {
+			return settings.ClassifierLabel(c, locale)
+		}
 	}
 	return code
 }
@@ -630,25 +622,4 @@ func treatmentMethodLabel(labels map[string]string, code string) string {
 		return label
 	}
 	return code
-}
-
-func severityToneClass(byCode map[string]settings.Classifier, code string) string {
-	c, ok := byCode[code]
-	if !ok || !c.Data.Valid {
-		return ""
-	}
-	var data struct {
-		Severity *int `json:"severity"`
-	}
-	if err := json.Unmarshal([]byte(c.Data.String), &data); err != nil || data.Severity == nil {
-		return ""
-	}
-	switch {
-	case *data.Severity <= 1:
-		return "badge-green"
-	case *data.Severity <= 3:
-		return "badge-amber"
-	default:
-		return "badge-red"
-	}
 }

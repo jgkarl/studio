@@ -1,0 +1,237 @@
+package assessments
+
+import (
+	"database/sql"
+
+	"studio/internal/i18n"
+	"studio/internal/media"
+	"studio/internal/settings"
+	"studio/internal/web"
+)
+
+templ ListPage(c web.Chrome, rows []ListRow, conditions []settings.Classifier) {
+	@web.AppLayout("Assessments", c, listBody(rows, conditions, c.Locale))
+}
+
+templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Locale) {
+	@web.PageHeader("Assessments", "Condition-status records, per object.", newAssessmentLink())
+	<div data-el-root>
+		<div class="list-toolbar">
+			@web.EntityListSearchInput("Search by asset, client…")
+			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
+			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+		</div>
+		@web.Card() {
+			if len(rows) == 0 {
+				<p class="empty-state">No assessments recorded yet.</p>
+			}
+			<ul class="entity-list" data-el-list>
+				for _, row := range rows {
+					<li
+						data-el-row
+						data-el-search={ assessmentSearchHaystack(row) }
+						data-el-condition={ row.Condition }
+						data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
+						data-el-group-client={ row.ClientName }
+					>
+						<a href={ templ.URL("/assessments/" + row.ID) } class="entity-list-row">
+							<div>
+								<span class="entity-list-name">{ assetLabel(row.AssetTitle, row.AssetReferenceCode) }</span>
+								<div class="page-subtitle">{ row.Description } · owner: { row.ClientName }</div>
+							</div>
+							<div class="row-actions">
+								<span class="badge">{ row.Condition }</span>
+								<span class="page-subtitle">{ row.RecordedAt.Format("2006-01-02") }</span>
+							</div>
+						</a>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+	<script src="/static/js/entity-list-filter.js" defer></script>
+}
+
+func assetLabel(title sql.NullString, referenceCode string) string {
+	if title.Valid && title.String != "" {
+		return title.String
+	}
+	return referenceCode
+}
+
+func assessmentSearchHaystack(row ListRow) string {
+	return assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + row.Description
+}
+
+templ newAssessmentLink() {
+	<a class="btn btn-primary" href="/assessments/new">
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		New assessment
+	</a>
+}
+
+func projectOptionLabel(p ProjectOption) string {
+	return p.Title + " — " + assetLabel(p.AssetTitle, p.AssetRef) + " — " + p.ClientName
+}
+
+templ NewPage(c web.Chrome, projects []ProjectOption, conditions []settings.Classifier, preselectedProjectID string) {
+	@web.AppLayout("New assessment", c, newBody(projects, conditions, preselectedProjectID, c.Locale))
+}
+
+templ newBody(projects []ProjectOption, conditions []settings.Classifier, preselectedProjectID string, locale i18n.Locale) {
+	@web.PageHeader("New assessment", "", templ.NopComponent)
+	@web.Card() {
+		if len(projects) == 0 {
+			<p class="empty-state">No projects yet — <a href="/projects/new">start one</a> first.</p>
+		} else {
+			<form method="post" action="/assessments" enctype="multipart/form-data" class="form-grid">
+				@web.Field("Project", "") {
+					<select class="input" name="projectId" required>
+						<option value="" disabled selected?={ preselectedProjectID == "" }>Select a project…</option>
+						for _, p := range projects {
+							<option value={ p.ID } selected?={ p.ID == preselectedProjectID }>{ projectOptionLabel(p) }</option>
+						}
+					</select>
+				}
+				@assessmentFields("", "", conditions, locale)
+				@web.Field("Photos", "On a phone this opens your camera directly.") {
+					<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+				}
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Save assessment
+				</button>
+			</form>
+		}
+	}
+}
+
+templ DetailPage(c web.Chrome, assessment DetailRow, conditions []settings.Classifier, photos []media.ReferenceWithMedia) {
+	@web.AppLayout(detailTitle(assessment), c, detailBody(assessment, conditions, photos, c.Locale))
+}
+
+templ detailBody(assessment DetailRow, conditions []settings.Classifier, photos []media.ReferenceWithMedia, locale i18n.Locale) {
+	@web.PageHeader(detailTitle(assessment), detailSubtitle(assessment), detailActions(assessment))
+	@web.Card() {
+		<dl class="detail-dl">
+			@detailField("Condition", conditionTitle(conditions, assessment.Condition, locale))
+			@detailField("Recorded at", assessment.RecordedAt.Format("2006-01-02 15:04"))
+			@detailField("Project", assessment.ProjectTitle)
+		</dl>
+		<p class="detail-paragraph">{ assessment.Description }</p>
+		@media.MediaGrid(photos)
+	}
+}
+
+func detailTitle(assessment DetailRow) string {
+	return assetLabel(assessment.AssetTitle, assessment.AssetReferenceCode) + " — assessment"
+}
+
+func detailSubtitle(assessment DetailRow) string {
+	return assessment.ProjectTitle + " · owner: " + assessment.ClientName
+}
+
+templ detailField(label, value string) {
+	<div>
+		<dt class="detail-dt">{ label }</dt>
+		<dd class="detail-dd">
+			if value == "" {
+				—
+			} else {
+				{ value }
+			}
+		</dd>
+	</div>
+}
+
+func conditionTitle(conditions []settings.Classifier, code string, locale i18n.Locale) string {
+	for _, c := range conditions {
+		if c.Code == code {
+			return settings.ClassifierLabel(c, locale)
+		}
+	}
+	return code
+}
+
+templ detailActions(assessment DetailRow) {
+	<a class="btn btn-ghost" href={ templ.URL("/projects/" + assessment.ProjectID) }>
+		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+		View project
+	</a>
+	<a class="btn btn-secondary" href={ templ.URL("/assessments/" + assessment.ID + "/edit") }>
+		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		Edit
+	</a>
+	<form method="post" action={ templ.URL("/assessments/" + assessment.ID + "/unlink") } data-confirm="Unlink this assessment? It stays in the database but won't show here anymore.">
+		<button type="submit" class="btn btn-ghost">
+			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+			Unlink
+		</button>
+	</form>
+}
+
+templ EditPage(c web.Chrome, assessment Assessment, conditions []settings.Classifier) {
+	@web.AppLayout("Edit assessment", c, editBody(assessment, conditions, c.Locale))
+}
+
+templ editBody(assessment Assessment, conditions []settings.Classifier, locale i18n.Locale) {
+	@web.PageHeader("Edit assessment", "", templ.NopComponent)
+	@web.Card() {
+		<form method="post" action={ templ.URL("/assessments/" + assessment.ID + "/update") } class="form-grid">
+			@assessmentFields(assessment.Condition, assessment.Description, conditions, locale)
+			<div class="form-actions">
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Save
+				</button>
+				<a class="btn btn-ghost" href={ templ.URL("/assessments/" + assessment.ID) }>
+					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					Cancel
+				</a>
+			</div>
+		</form>
+	}
+}
+
+// assessmentFields is the Condition/Description pair shared by the standalone new/edit forms and
+// AddModalBody below.
+templ assessmentFields(condition, description string, conditions []settings.Classifier, locale i18n.Locale) {
+	@web.Field("Condition", "") {
+		<select class="input" name="condition">
+			for _, cond := range conditions {
+				<option value={ cond.Code } selected?={ cond.Code == condition }>{ settings.ClassifierLabel(cond, locale) }</option>
+			}
+		</select>
+	}
+	@web.Field("Description", "") {
+		<textarea class="input" name="description" rows="3" required>{ description }</textarea>
+	}
+}
+
+// AddModalBody is the Asset/Project detail pages' "Assessments" section +Add content. When
+// opened from a Project page projectID is preset (hidden input, no picker); when opened from an
+// Asset page (which may have several projects) projects lists just that asset's own projects.
+templ AddModalBody(projectID string, projects []ProjectOption, conditions []settings.Classifier, locale i18n.Locale) {
+	<form method="post" action="/assessments" enctype="multipart/form-data" class="form-grid">
+		if projectID != "" {
+			<input type="hidden" name="projectId" value={ projectID }/>
+		} else {
+			@web.Field("Project", "") {
+				<select class="input" name="projectId" required>
+					<option value="" disabled selected>Select a project…</option>
+					for _, p := range projects {
+						<option value={ p.ID }>{ p.Title }</option>
+					}
+				</select>
+			}
+		}
+		@assessmentFields("", "", conditions, locale)
+		@web.Field("Photos", "On a phone this opens your camera directly.") {
+			<input type="file" name="photos" multiple accept="image/*,video/*" capture="environment"/>
+		}
+		<button type="submit" class="btn btn-primary">
+			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			Save assessment
+		</button>
+	</form>
+}

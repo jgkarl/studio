@@ -1,4 +1,4 @@
-// Screenshots the two pages with the widest responsive grids (Dashboard's 5 stat cards, Projects'
+// Screenshots the two pages with the widest responsive grids (Dashboard's 4 stat cards, Projects'
 // 5-column kanban board) at each of this app's standard CSS breakpoints (see static/css/app.css:
 // 640/768/1024, plus a below-640 "mobile" width and a well-above-1024 "wide desktop" width) — a
 // permanent regression check for the grid math, not just a one-off visual spot check. Self-
@@ -72,10 +72,10 @@ test.describe("Responsive breakpoints", () => {
     test(`dashboard stat grid at ${bp.name}`, async () => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await page.goto("/");
-      // 5 stat cards must never leave a lone card orphaned on its own row: the grid's column
-      // count times its row count must always equal or just exceed 5, with no more than one
-      // partially-empty row.
-      await expect(page.locator(".stat-card")).toHaveCount(5);
+      // 4 stat cards (Clients, Assets, Projects, Reports — active/all or draft/final) must never
+      // leave a lone card orphaned on its own row: the grid's column count times its row count
+      // must always equal or just exceed 4, with no more than one partially-empty row.
+      await expect(page.locator(".stat-card")).toHaveCount(4);
       await shoot(page, `breakpoint-${bp.name}-dashboard.png`);
     });
 

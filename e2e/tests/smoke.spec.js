@@ -1,8 +1,10 @@
 // End-to-end walk through the app's golden path, module by module, against a live server
 // (Docker container running the real Debian/libvips build — see e2e/README.md). Serial: each
-// step builds on state the previous one created (client -> asset -> treatment -> project ->
-// report), same as a real conservator's session would. Screenshots land in docs/screenshots/,
-// numbered in the order a first-time user would actually see these pages.
+// step builds on state the previous one created (client -> asset -> project -> assessment ->
+// treatment -> report), same as a real conservator's session would — Project is now the
+// mandatory parent for Assessments/Treatments/Reports, so an Asset's first Project always comes
+// right after creating it. Screenshots land in docs/screenshots/, numbered in the order a
+// first-time user would actually see these pages.
 const { test, expect } = require("@playwright/test");
 const path = require("path");
 
@@ -20,12 +22,12 @@ async function shoot(page, name) {
 
 test.describe.configure({ mode: "serial" });
 
-let clientId, assetId, treatmentId, projectId, reportId;
+let clientId, assetId, projectId, treatmentId, reportId;
 
 // A single shared page/context across every test in this file (rather than each test's own
 // `page` fixture, which starts a fresh, unauthenticated context) — the whole point of this suite
 // is one continuous session through the app, logging in once and carrying that session's cookie
-// through client -> asset -> treatment -> project -> report.
+// through client -> asset -> project -> treatment -> report.
 let page;
 
 test.beforeAll(async ({ browser }) => {
@@ -50,7 +52,7 @@ test.describe("Studio golden path", () => {
     await shoot(page, "02-dashboard.png");
   });
 
-  test("Settings is one flat screen with the seeded classifier groups", async () => {
+  test("Settings Classifiers tab lists the seeded classifier groups", async () => {
     await page.goto("/settings");
     await expect(page.getByRole("heading", { name: "Asset Types" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Treatment Methods" })).toBeVisible();
@@ -74,7 +76,7 @@ test.describe("Studio golden path", () => {
     await shoot(page, "05-client-detail.png");
   });
 
-  test("create an asset with an intake condition state and photo", async () => {
+  test("create an asset, which leads straight into starting its first project", async () => {
     await page.goto("/assets/new");
     await page.selectOption('select[name="clientId"]', clientId);
     await page.selectOption('select[name="assetTypeId"]', { label: "Painting" });
@@ -82,46 +84,52 @@ test.describe("Studio golden path", () => {
     await page.fill('input[name="title"]', "Sunset over the Bay");
     await page.fill('input[name="artist"]', "J. Doe");
     await page.fill('input[name="dimensions"]', "60x80cm");
-    await page.fill('textarea[name="intakeDescription"]', "Minor surface grime, otherwise stable.");
-    await page.setInputFiles('input[name="photos"]', TEST_PHOTO);
     await shoot(page, "06-asset-new.png");
     await page.click('form[action="/assets"] button[type="submit"]');
 
-    await expect(page).toHaveURL(/\/assets\/[a-f0-9-]+$/);
-    assetId = page.url().split("/assets/")[1];
-    await expect(page.locator("h1")).toContainText("Sunset over the Bay");
-    await shoot(page, "07-asset-detail.png");
+    // Registering an Asset redirects into New Project (Project is now the mandatory scope for
+    // Assessments/Treatments/Reports) with the asset preselected.
+    await expect(page).toHaveURL(/\/projects\/new\?assetId=/);
+    assetId = new URL(page.url()).searchParams.get("assetId");
+
+    await page.fill('input[name="title"]', "Conservation of Sunset over the Bay");
+    // The New Project form's optional "Initial assessment" sub-block records the intake
+    // condition as this project's first Assessment, right after the project itself is created.
+    await page.selectOption('select[name="assessmentCondition"]', { index: 1 });
+    await page.fill('textarea[name="assessmentDescription"]', "Minor surface grime, otherwise stable.");
+    await page.setInputFiles('input[name="photos"]', TEST_PHOTO);
+    await shoot(page, "07-project-new-with-assessment.png");
+    await page.click('form[action="/projects"] button[type="submit"]');
+
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
+    projectId = page.url().split("/projects/")[1];
+    await expect(page.locator("h1")).toContainText("Conservation of Sunset over the Bay");
+    await shoot(page, "08-project-detail-with-assessment.png");
   });
 
-  test("log a treatment on the asset", async () => {
-    await page.goto(`/treatments/new?assetId=${assetId}`);
+  test("log a treatment on the project", async () => {
+    await page.goto(`/treatments/new?projectId=${projectId}`);
     await page.selectOption('select[name="method"]', { label: "Surface cleaning" });
     await page.fill('input[name="title"]', "Surface cleaning of top layer");
     await page.fill('textarea[name="notes"]', "Removed surface grime with a dry sponge.");
-    await shoot(page, "08-treatment-new.png");
+    await shoot(page, "09-treatment-new.png");
     await page.click('form[action="/treatments"] button[type="submit"]');
 
     await expect(page).toHaveURL(/\/treatments\/[a-f0-9-]+$/);
     treatmentId = page.url().split("/treatments/")[1];
     await expect(page.getByText("Removed surface grime")).toBeVisible();
-    await shoot(page, "09-treatment-detail.png");
+    await shoot(page, "10-treatment-detail.png");
   });
 
-  test("start a project and move it across the kanban board", async () => {
-    await page.goto(`/projects/new?assetId=${assetId}`);
-    await page.fill('input[name="title"]', "Conservation of Sunset over the Bay");
-    await page.click('form[action="/projects"] button[type="submit"]');
-
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
-    projectId = page.url().split("/projects/")[1];
-    await shoot(page, "10-project-detail.png");
-
+  test("move the project across the kanban board", async () => {
     await page.goto("/projects");
     await expect(page.locator('.kanban-column[data-status="inquiry"]')).toBeVisible();
     await shoot(page, "11-projects-kanban.png");
 
     // Move the project to "working" via the detail page's stage-advance select (exercises the
-    // same POST /projects/{id}/stage the kanban board's drag-and-drop uses).
+    // same POST /projects/{id}/stage the kanban board's drag-and-drop uses). "completed" is
+    // deliberately not an option here — finishing a project goes through its own
+    // POST /projects/{id}/finish action instead (see the next test).
     await page.goto(`/projects/${projectId}`);
     await page.selectOption('form[action$="/stage"] select[name="stage"]', "working");
     await page.click('form[action$="/stage"] button[type="submit"]');
@@ -130,15 +138,21 @@ test.describe("Studio golden path", () => {
   });
 
   test("write a report with structured sections and customize its layout", async () => {
-    await page.goto(`/reports/new?assetId=${assetId}&projectId=${projectId}`);
+    await page.goto(`/reports/new?projectId=${projectId}`);
     await page.fill('input[name="title"]', "Conservation Report 2026-001");
     await page.click('form[action="/reports"] button[type="submit"]');
 
     await expect(page).toHaveURL(/\/reports\/[a-f0-9-]+$/);
     reportId = page.url().split("/reports/")[1];
-    // The suggested outline pre-fills condition findings/treatment performed from the asset's
-    // existing AssetState/Treatment history.
+    // The suggested outline pre-fills condition findings/treatment performed from the project's
+    // own Assessment/Treatment records.
     await expect(page.locator('textarea[name="conditionFindings"]')).not.toBeEmpty();
+    // The Assessments/Treatments tables and the timestamp-ordered image gallery are rendered
+    // live from the project, not copied into the report.
+    await expect(page.getByRole("heading", { name: "Assessments" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Treatments" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Image gallery" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Client / Asset / Project info" })).toBeVisible();
     await shoot(page, "13-report-detail.png");
 
     await page.fill('textarea[name="summary"]', "Painting arrived with surface grime; cleaned and stabilized.");
@@ -171,6 +185,16 @@ test.describe("Studio golden path", () => {
     expect(pdfResponse.headers()["content-type"]).toBe("application/pdf");
   });
 
+  test("finishing a project that already has a report does not draft a second one", async () => {
+    await page.goto(`/projects/${projectId}`);
+    await page.click('form[action$="/finish"] button[type="submit"]');
+    // A Report already exists (created above), so finishing just marks the project completed and
+    // returns to its own detail page rather than drafting/redirecting to a new report.
+    await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
+    await expect(page.getByText("Completed")).toBeVisible();
+    await shoot(page, "16b-project-finished.png");
+  });
+
   test("media grid shows uploaded photos and the lightbox opens", async () => {
     await page.goto("/media");
     await shoot(page, "17-media-grid.png");
@@ -189,11 +213,18 @@ test.describe("Studio golden path", () => {
   });
 
   test("Settings Users table lists accounts", async () => {
-    // Users now has its own tab (/settings/users) alongside Classifiers (/settings) — see
-    // internal/settings/views.templ's tabNav.
+    // Users has its own tab (/settings/users) alongside Classifiers (/settings) and Features
+    // (/settings/features) — see internal/settings/views.templ's tabNav.
     await page.goto("/settings/users");
     await expect(page.getByText(ADMIN_EMAIL)).toBeVisible();
     await shoot(page, "19-settings-users.png");
+  });
+
+  test("Settings Features tab configures dashboard limits and reportable fields", async () => {
+    await page.goto("/settings/features");
+    await expect(page.getByRole("heading", { name: "Dashboard limits" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Reportable fields" })).toBeVisible();
+    await shoot(page, "19b-settings-features.png");
   });
 
   test("mobile viewport renders the single-column layout", async () => {

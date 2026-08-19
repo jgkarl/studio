@@ -8,11 +8,11 @@ import (
 	studiodb "studio/internal/db"
 )
 
-const treatmentColumns = "id, assetId, method, title, notes, performedByUserId, performedAt, createdAt, updatedAt, deletedAt"
+const treatmentColumns = "id, projectId, assetId, method, title, notes, performedByUserId, performedAt, createdAt, updatedAt, deletedAt"
 
 func scanTreatment(rows *sql.Rows) (Treatment, error) {
 	var t Treatment
-	err := rows.Scan(&t.ID, &t.AssetID, &t.Method, &t.Title, &t.Notes, &t.PerformedByUserID,
+	err := rows.Scan(&t.ID, &t.ProjectID, &t.AssetID, &t.Method, &t.Title, &t.Notes, &t.PerformedByUserID,
 		&t.PerformedAt, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt)
 	return t, err
 }
@@ -30,18 +30,19 @@ func Unlink(ctx context.Context, q studiodb.Querier, id string) error {
 
 func scanDetailRow(rows *sql.Rows) (DetailRow, error) {
 	var d DetailRow
-	err := rows.Scan(&d.ID, &d.AssetID, &d.Method, &d.Title, &d.Notes, &d.PerformedByUserID,
-		&d.PerformedAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt, &d.AssetTitle, &d.AssetReferenceCode, &d.ClientID, &d.ClientName)
+	err := rows.Scan(&d.ID, &d.ProjectID, &d.AssetID, &d.Method, &d.Title, &d.Notes, &d.PerformedByUserID,
+		&d.PerformedAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt, &d.ProjectTitle, &d.AssetTitle, &d.AssetReferenceCode, &d.ClientID, &d.ClientName)
 	return d, err
 }
 
-const treatmentDetailColumns = `t.id, t.assetId, t.method, t.title, t.notes, t.performedByUserId, t.performedAt,
+const treatmentDetailColumns = `t.id, t.projectId, t.assetId, t.method, t.title, t.notes, t.performedByUserId, t.performedAt,
 	t.createdAt, t.updatedAt, t.deletedAt`
 
 func GetDetailByID(ctx context.Context, q studiodb.Querier, id string) (*DetailRow, error) {
 	return studiodb.QueryOne(ctx, q, `
-		SELECT `+treatmentDetailColumns+`, a.title, a.referenceCode, c.id, c.name
+		SELECT `+treatmentDetailColumns+`, p.title, a.title, a.referenceCode, c.id, c.name
 		FROM Treatment t
+		JOIN Project p ON p.id = t.projectId
 		JOIN Asset a ON a.id = t.assetId
 		JOIN Client c ON c.id = a.clientId
 		WHERE t.id = ? AND t.deletedAt IS NULL`, scanDetailRow, id)
@@ -53,46 +54,63 @@ func scanListRow(rows *sql.Rows) (ListRow, error) {
 	return r, err
 }
 
+const treatmentListSelect = `
+	SELECT t.id, t.title, t.method, t.performedAt, a.title, a.referenceCode, c.name
+	FROM Treatment t
+	JOIN Asset a ON a.id = t.assetId
+	JOIN Client c ON c.id = a.clientId`
+
 // List is every Treatment across every Asset, newest-performed first — the module's landing
 // page.
 func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
-	return studiodb.Query(ctx, q, `
-		SELECT t.id, t.title, t.method, t.performedAt, a.title, a.referenceCode, c.name
-		FROM Treatment t
-		JOIN Asset a ON a.id = t.assetId
-		JOIN Client c ON c.id = a.clientId
-		WHERE t.deletedAt IS NULL
-		ORDER BY t.performedAt DESC`, scanListRow)
+	return studiodb.Query(ctx, q, treatmentListSelect+` WHERE t.deletedAt IS NULL ORDER BY t.performedAt DESC`, scanListRow)
 }
 
-// ListByAsset is every Treatment for one Asset, newest-performed first — the Asset detail
-// page's "Treatments" section.
+// ListByAsset is every Treatment for one Asset across all its Projects, newest-performed first —
+// the Asset detail page's "Treatments" section.
 func ListByAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]ListRow, error) {
-	return studiodb.Query(ctx, q, `
-		SELECT t.id, t.title, t.method, t.performedAt, a.title, a.referenceCode, c.name
-		FROM Treatment t
-		JOIN Asset a ON a.id = t.assetId
-		JOIN Client c ON c.id = a.clientId
-		WHERE t.assetId = ? AND t.deletedAt IS NULL
-		ORDER BY t.performedAt DESC`, scanListRow, assetID)
+	return studiodb.Query(ctx, q, treatmentListSelect+` WHERE t.assetId = ? AND t.deletedAt IS NULL ORDER BY t.performedAt DESC`, scanListRow, assetID)
 }
 
-func scanAssetOption(rows *sql.Rows) (AssetOption, error) {
-	var a AssetOption
-	err := rows.Scan(&a.ID, &a.Title, &a.ReferenceCode, &a.ClientName)
-	return a, err
+// ListByProject is every Treatment for one Project, newest-performed first — the Project detail
+// page's "Treatments" section.
+func ListByProject(ctx context.Context, q studiodb.Querier, projectID string) ([]ListRow, error) {
+	return studiodb.Query(ctx, q, treatmentListSelect+` WHERE t.projectId = ? AND t.deletedAt IS NULL ORDER BY t.performedAt DESC`, scanListRow, projectID)
 }
 
-// ListAssetOptions is every Asset (with owning client name), newest first — the "pick an asset"
-// select on the new-treatment form.
-func ListAssetOptions(ctx context.Context, q studiodb.Querier) ([]AssetOption, error) {
-	return studiodb.Query(ctx, q, `
-		SELECT a.id, a.title, a.referenceCode, c.name FROM Asset a JOIN Client c ON c.id = a.clientId
-		ORDER BY a.createdAt DESC`, scanAssetOption)
+// ListByProjectLimit is ListByProject capped to the N most recent — the Dashboard's active-project
+// cards.
+func ListByProjectLimit(ctx context.Context, q studiodb.Querier, projectID string, limit int) ([]ListRow, error) {
+	return studiodb.Query(ctx, q, treatmentListSelect+` WHERE t.projectId = ? AND t.deletedAt IS NULL ORDER BY t.performedAt DESC LIMIT ?`, scanListRow, projectID, limit)
+}
+
+func scanProjectOption(rows *sql.Rows) (ProjectOption, error) {
+	var p ProjectOption
+	err := rows.Scan(&p.ID, &p.Title, &p.AssetTitle, &p.AssetRef, &p.ClientName)
+	return p, err
+}
+
+const projectOptionSelect = `
+	SELECT p.id, p.title, a.title, a.referenceCode, c.name
+	FROM Project p
+	JOIN Asset a ON a.id = p.assetId
+	JOIN Client c ON c.id = a.clientId
+	WHERE p.deletedAt IS NULL`
+
+// ListProjectOptions is every open Project (with owning asset/client display fields), newest
+// first — the "pick a project" select on the standalone new-treatment form.
+func ListProjectOptions(ctx context.Context, q studiodb.Querier) ([]ProjectOption, error) {
+	return studiodb.Query(ctx, q, projectOptionSelect+` ORDER BY p.createdAt DESC`, scanProjectOption)
+}
+
+// ListProjectOptionsForAsset scopes ListProjectOptions to one Asset's own Projects — the Asset
+// detail page's "+Add" modal, where the project picker shouldn't offer every project in the app.
+func ListProjectOptionsForAsset(ctx context.Context, q studiodb.Querier, assetID string) ([]ProjectOption, error) {
+	return studiodb.Query(ctx, q, projectOptionSelect+` AND p.assetId = ? ORDER BY p.createdAt DESC`, scanProjectOption, assetID)
 }
 
 type Input struct {
-	AssetID           string
+	ProjectID         string
 	Method            string
 	Title             string
 	Notes             string
@@ -107,6 +125,8 @@ func nullIfEmpty(s string) any {
 	return s
 }
 
+// Create inserts a Treatment (AssetID resolved server-side from the Project via a subquery —
+// every Project pins exactly one Asset, so the form only ever asks for a Project).
 func Create(ctx context.Context, q studiodb.Querier, in Input) (string, error) {
 	id := studiodb.NewID()
 	now := time.Now()
@@ -115,9 +135,9 @@ func Create(ctx context.Context, q studiodb.Querier, in Input) (string, error) {
 		performedAt = now
 	}
 	_, err := studiodb.Execute(ctx, q, `
-		INSERT INTO Treatment (id, assetId, method, title, notes, performedByUserId, performedAt, updatedAt)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, in.AssetID, in.Method, in.Title, in.Notes, nullIfEmpty(in.PerformedByUserID), performedAt, now)
+		INSERT INTO Treatment (id, projectId, assetId, method, title, notes, performedByUserId, performedAt, updatedAt)
+		SELECT ?, p.id, p.assetId, ?, ?, ?, ?, ?, ? FROM Project p WHERE p.id = ?`,
+		id, in.Method, in.Title, in.Notes, nullIfEmpty(in.PerformedByUserID), performedAt, now, in.ProjectID)
 	return id, err
 }
 

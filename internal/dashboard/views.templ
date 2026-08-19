@@ -6,61 +6,34 @@ import (
 	"studio/internal/web"
 )
 
-templ Page(c web.Chrome, clientCount, assetCount, treatmentCount int, activeProjects []activeProject, draftReportRows []draftReport, draftReports int) {
-	@web.AppLayout(c.Dict.Dashboard.Title, c, pageBody(c, clientCount, assetCount, treatmentCount, activeProjects, draftReportRows, draftReports))
+templ Page(c web.Chrome,
+	clientActive, clientAll, assetActive, assetAll, projectActive, projectAll, reportDraft, reportFinal int,
+	cards []projectCard) {
+	@web.AppLayout(c.Dict.Dashboard.Title, c, pageBody(c, clientActive, clientAll, assetActive, assetAll,
+		projectActive, projectAll, reportDraft, reportFinal, cards))
 }
 
-templ pageBody(c web.Chrome, clientCount, assetCount, treatmentCount int, activeProjects []activeProject, draftReportRows []draftReport, draftReports int) {
+templ pageBody(c web.Chrome,
+	clientActive, clientAll, assetActive, assetAll, projectActive, projectAll, reportDraft, reportFinal int,
+	cards []projectCard) {
 	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, newIntakeLink())
 	<div class="stat-grid">
-		@statCard(strconv.Itoa(clientCount), c.Dict.Dashboard.Clients, "/clients")
-		@statCard(strconv.Itoa(assetCount), c.Dict.Dashboard.Assets, "/assets")
-		@statCard(strconv.Itoa(treatmentCount), c.Dict.Dashboard.Treatments, "/treatments")
-		@statCard(strconv.Itoa(len(activeProjects)), c.Dict.Dashboard.ActiveProjects, "/projects")
-		@statCard(strconv.Itoa(draftReports), c.Dict.Dashboard.DraftReports, "/reports")
+		@dualStatCard(clientActive, clientAll, c.Dict.Dashboard.ClientsLabel, c.Dict.Dashboard.ActiveLabel, c.Dict.Dashboard.AllLabel, "/clients")
+		@dualStatCard(assetActive, assetAll, c.Dict.Dashboard.AssetsLabel, c.Dict.Dashboard.ActiveLabel, c.Dict.Dashboard.AllLabel, "/assets")
+		@dualStatCard(projectActive, projectAll, c.Dict.Dashboard.ProjectsLabel, c.Dict.Dashboard.ActiveLabel, c.Dict.Dashboard.AllLabel, "/projects")
+		@dualStatCard(reportDraft, reportFinal, c.Dict.Dashboard.ReportsLabel, c.Dict.Dashboard.DraftLabel, c.Dict.Dashboard.FinalLabel, "/reports")
 	</div>
-	<div class="dashboard-columns">
-		@web.Card() {
-			<h2 class="dashboard-heading">{ c.Dict.Dashboard.ActiveProjectsHeading }</h2>
-			if len(activeProjects) == 0 {
-				<p class="empty-state">{ c.Dict.Dashboard.NothingInProgress }</p>
-			}
-			<ul class="dashboard-list">
-				for _, p := range activeProjects {
-					<li>
-						<a href={ templ.URL("/projects/" + p.ID) }>{ p.Title }</a>
-						<div class="page-subtitle">
-							if p.AssetTitle != "" {
-								{ p.AssetTitle }
-							} else {
-								{ p.AssetReferenceCode }
-							}
-						</div>
-					</li>
-				}
-			</ul>
+	@web.Card() {
+		<h2 class="dashboard-heading">{ c.Dict.Dashboard.ActiveProjectsHeading }</h2>
+		if len(cards) == 0 {
+			<p class="empty-state">{ c.Dict.Dashboard.NothingInProgress }</p>
 		}
-		@web.Card() {
-			<h2 class="dashboard-heading">{ c.Dict.Dashboard.DraftReportsHeading }</h2>
-			if len(draftReportRows) == 0 {
-				<p class="empty-state">{ c.Dict.Dashboard.NoDraftReports }</p>
+		<div class="dashboard-project-cards">
+			for _, card := range cards {
+				@projectCardView(card, c)
 			}
-			<ul class="dashboard-list">
-				for _, rep := range draftReportRows {
-					<li>
-						<a href={ templ.URL("/reports/" + rep.ID) }>{ rep.Title }</a>
-						<div class="page-subtitle">
-							if rep.AssetTitle != "" {
-								{ rep.AssetTitle }
-							} else {
-								{ rep.AssetReferenceCode }
-							}
-						</div>
-					</li>
-				}
-			</ul>
-		}
-	</div>
+		</div>
+	}
 }
 
 templ newIntakeLink() {
@@ -70,9 +43,53 @@ templ newIntakeLink() {
 	</a>
 }
 
-templ statCard(value, label, href string) {
+templ dualStatCard(primary, secondary int, label, primaryLabel, secondaryLabel, href string) {
 	<a href={ templ.URL(href) } class="stat-card">
-		<div class="stat-value">{ value }</div>
+		<div class="stat-value">
+			{ strconv.Itoa(primary) }
+			<span class="page-subtitle">/ { strconv.Itoa(secondary) }</span>
+		</div>
 		<div class="stat-label">{ label }</div>
+		<div class="page-subtitle">{ primaryLabel } / { secondaryLabel }</div>
 	</a>
+}
+
+templ projectCardView(card projectCard, c web.Chrome) {
+	<div class="card dashboard-project-card">
+		<a href={ templ.URL("/projects/" + card.Project.ID) } class="entity-list-name">{ card.Project.Title }</a>
+		<div class="page-subtitle">
+			if card.Project.AssetTitle != "" {
+				{ card.Project.AssetTitle }
+			} else {
+				{ card.Project.AssetReferenceCode }
+			}
+		</div>
+		@projectCardSection(c.Dict.Dashboard.AssessmentsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Assessments))
+		<ul class="dashboard-list">
+			for _, a := range card.Assessments {
+				<li><a href={ templ.URL("/assessments/" + a.ID) }>{ a.Condition } — { a.RecordedAt.Format("2006-01-02") }</a></li>
+			}
+		</ul>
+		@projectCardSection(c.Dict.Dashboard.TreatmentsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Treatments))
+		<ul class="dashboard-list">
+			for _, t := range card.Treatments {
+				<li><a href={ templ.URL("/treatments/" + t.ID) }>{ t.Title }</a></li>
+			}
+		</ul>
+		@projectCardSection(c.Dict.Dashboard.ReportsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Reports))
+		<ul class="dashboard-list">
+			for _, rep := range card.Reports {
+				<li><a href={ templ.URL("/reports/" + rep.ID) }>{ rep.Title }</a></li>
+			}
+		</ul>
+	</div>
+}
+
+templ projectCardSection(label, emptyLabel string, count int) {
+	<div class="dashboard-project-card-heading">
+		<span class="page-subtitle">{ label }</span>
+		if count == 0 {
+			<span class="page-subtitle">{ emptyLabel }</span>
+		}
+	</div>
 }

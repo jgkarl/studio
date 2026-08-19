@@ -11,6 +11,7 @@ import (
 
 type Treatment struct {
 	ID                string
+	ProjectID         string
 	AssetID           string
 	Method            string
 	Title             string
@@ -32,11 +33,14 @@ type ListRow struct {
 	ClientName         string
 }
 
-type AssetOption struct {
-	ID            string
-	Title         sql.NullString
-	ReferenceCode string
-	ClientName    string
+// ProjectOption is one entry in the "pick a project" select on the new-treatment form — every
+// Project pins exactly one Asset, so this doubles as the asset picker.
+type ProjectOption struct {
+	ID         string
+	Title      string
+	AssetTitle sql.NullString
+	AssetRef   string
+	ClientName string
 }
 
 // DetailRow is a Treatment plus its owning Asset/Client's display fields, denormalized via a
@@ -45,6 +49,7 @@ type AssetOption struct {
 // import back without a cycle.
 type DetailRow struct {
 	Treatment
+	ProjectTitle       string
 	AssetTitle         sql.NullString
 	AssetReferenceCode string
 	ClientID           string

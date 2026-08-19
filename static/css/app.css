@@ -758,19 +758,6 @@ html[data-theme="dark"] .stat-card {
   color: var(--text-muted);
 }
 
-.dashboard-columns {
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-
-@media (min-width: 768px) {
-  .dashboard-columns {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 .report-layout {
   display: grid;
   gap: 1.5rem;
@@ -814,6 +801,41 @@ html[data-theme="dark"] .stat-card {
 
 .dashboard-list a:hover {
   text-decoration: underline;
+}
+
+/* Active-project cards: 1 column by default, 2 at md, 3 at lg — same mobile-first breakpoint
+   convention as .stat-grid/.kanban-board, capped independently by the Settings -> Features
+   "Active projects shown" limit (so this never needs to render more than a handful anyway). */
+.dashboard-project-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard-project-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-project-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.dashboard-project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dashboard-project-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0.5rem;
 }
 
 /* --- Entity lists (Clients/Assets/etc.) -------------------------------------------------- */
@@ -874,6 +896,31 @@ html[data-theme="dark"] .stat-card {
   color: var(--text-faint);
   text-align: center;
   padding: 2px;
+}
+
+/* Report detail's "Image gallery" section — one row per image: thumbnail, timestamp, caption
+   input. A plain flex list rather than a masonry grid since the caption input needs full width
+   next to each thumbnail. */
+.gallery-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gallery-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-light);
+}
+
+.gallery-item:first-child {
+  border-top: none;
+}
+
+.gallery-item .row-actions {
+  flex: 1;
 }
 
 .card-header-row {
