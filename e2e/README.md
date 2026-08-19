@@ -1,7 +1,7 @@
 # End-to-end tests
 
 Playwright suite driven against a live server — never against mocks. The app needs libvips
-(govips/cgo), so the server under test always runs in the Debian/libvips Docker image, not
+(govips/cgo), so the server under test always runs in the Ubuntu/libvips Docker image, not
 directly on the host.
 
 ## Run

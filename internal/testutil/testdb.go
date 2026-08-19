@@ -7,18 +7,11 @@ import (
 	"context"
 	"database/sql"
 	"path/filepath"
-	"runtime"
 	"testing"
 
+	"studio/db/migrations"
 	studiodb "studio/internal/db"
 )
-
-// repoRoot resolves the module root from this file's own location, so tests work the same
-// regardless of which package directory `go test` runs from.
-func repoRoot() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "..", "..")
-}
 
 // OpenTestDB opens a fresh, migrated SQLite database backed by a temp file (not ":memory:" —
 // avoids the per-connection-fresh-database surprise an in-memory DSN has once the pool opens
@@ -32,7 +25,7 @@ func OpenTestDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { pool.Close() })
 
-	if err := studiodb.Migrate(context.Background(), pool, filepath.Join(repoRoot(), "db", "migrations")); err != nil {
+	if err := studiodb.Migrate(context.Background(), pool, migrations.Files); err != nil {
 		t.Fatalf("migrate test db: %v", err)
 	}
 	return pool

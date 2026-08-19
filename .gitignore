@@ -2,6 +2,7 @@
 /media-storage/
 /data/
 /bin/
+/dist/
 *_templ.go
 /tmp/
 *.log
@@ -10,3 +11,9 @@
 e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
+
+# Ansible: real inventory/vars/vault, never the .example templates
+ansible/inventory.ini
+ansible/group_vars/all/all.yml
+ansible/group_vars/all/vault.yml
+*.retry

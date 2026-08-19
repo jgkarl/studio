@@ -1,0 +1,22 @@
+---
+# Overridable in group_vars/all.yml - see all.yml.example for the ones you're expected to set.
+studio_github_repo: "jgkarl/studio-go"
+studio_release_asset_name: "studio-server-linux-amd64"
+studio_release_version: "latest"
+
+studio_system_user: studio
+studio_home: /opt/studio
+studio_port: 3000
+
+# Blank disables Caddy install/config entirely - see all.yml.example.
+studio_domain: ""
+
+studio_allow_dev_login: "false"
+studio_app_url: ""
+studio_bootstrap_admin_name: ""
+studio_bootstrap_admin_email: ""
+studio_smtp_host: ""
+studio_smtp_port: "587"
+studio_smtp_user: ""
+studio_smtp_pass: ""
+studio_smtp_from: "studio@localhost"

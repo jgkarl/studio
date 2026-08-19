@@ -1,0 +1,19 @@
+---
+# Lightweight day-to-day update: fetch the latest (or a pinned) release binary and restart only if
+# the version actually changed. Doesn't touch packages/users/Caddy - run deploy.yml instead if
+# those need to change. Runs the studio_app role's release.yml entrypoint directly (not its full
+# tasks/main.yml) so role defaults still load correctly, just without the rest of the
+# provisioning.
+#
+#   ansible-playbook update.yml --ask-vault-pass
+#
+# Pin a specific version instead of always tracking "latest":
+#   ansible-playbook update.yml --ask-vault-pass -e studio_release_version=v1.2.3
+- name: Update Studio to the latest (or pinned) release
+  hosts: studio
+  become: true
+  tasks:
+    - name: Fetch and install the release binary
+      ansible.builtin.include_role:
+        name: studio_app
+        tasks_from: release

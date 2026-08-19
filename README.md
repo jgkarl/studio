@@ -15,11 +15,11 @@ islands, no bundler, no vendored libraries (see `static/js/`).
 - Go 1.25+ (the module's `go.mod` pins this — `go` itself will auto-fetch a matching toolchain if
   your installed version is older, no manual upgrade needed)
 - [templ](https://templ.guide) CLI: `go install github.com/a-h/templ/cmd/templ@latest`
-- `libvips` (image processing — upload thumbnails): `apt install libvips-dev` on Debian/Ubuntu for
-  local dev (needs the `-dev` headers to *build*; the deployed binary only needs the runtime
-  `libvips42` package — see `docs/deploy.md`). **Debian, not Ubuntu, if you can choose** — Ubuntu
-  gates several of libvips's transitive dependencies behind Ubuntu Pro/ESM and the plain-account
-  install fails; Debian has no such restriction.
+- `libvips` (image processing — upload thumbnails, and the IIIF Image API in `internal/iiif`):
+  `apt install libvips-dev` for local dev (needs the `-dev` headers to *build*; the deployed
+  binary only needs the runtime `libvips42` package — see `docs/deploy.md`). Installs cleanly on
+  plain **Ubuntu 24.04** with no extra sources or subscription needed — verified directly against
+  a stock `ubuntu:24.04` image, see `docs/deploy.md`.
 - SQLite itself needs nothing installed — the driver (`modernc.org/sqlite`) is pure Go, compiled
   straight into the binary.
 
@@ -50,10 +50,10 @@ development.
 
 ## Deploying
 
-`docs/deploy.md` — a VPS (Hostinger or any other), no Docker, no separate database server: the
-build already lives at `dist/server`, committed to this repo (rebuilt via `make release`, which
-runs inside a Debian 12 container so it doesn't matter whether your own machine has libvips
-installed). Deploying is `git clone`, `apt install libvips42`, and a systemd unit.
+`docs/deploy.md` — a plain Ubuntu 24.04 VPS, no Docker, no separate database server:
+`.github/workflows/release.yml` publishes a self-contained release binary to GitHub on every
+version tag, and Ansible (`ansible/`) installs `libvips42`, downloads it, and runs it under
+systemd with Caddy in front. See `ansible/README.md` for the actual playbook usage.
 
 ## Tests
 
@@ -81,5 +81,3 @@ purpose — see `docs/tech-stack.md` for the reasoning behind each:
 - **No fictional demo-data seed.** Structural reference data (Classifiers) seeds automatically;
   the original's `db/seed.ts` demo clients/assets/workflows does not have a Go equivalent — every
   entity it would create is reachable through the app's own forms instead.
-- **Debian, not Ubuntu**, is the one supported build/deploy target — see `docs/tech-stack.md`'s
-  govips section for why.

@@ -1,0 +1,24 @@
+# Copy to vault.yml, fill in real values, then encrypt it in place:
+#   cp group_vars/vault.yml.example group_vars/vault.yml
+#   ansible-vault encrypt group_vars/vault.yml
+# Never commit an unencrypted vault.yml (it's gitignored as a backstop, but ansible-vault encrypt
+# is what actually makes it safe to keep in version control afterwards, if you choose to).
+
+vault_studio_auth_secret: "CHANGE_ME"   # openssl rand -hex 32
+vault_studio_allow_dev_login: "false"   # only ever "true" on a throwaway/staging box
+vault_studio_app_url: "https://yourdomain.com"
+
+# Optional: set both to get a first admin account on a brand new database (created once, on the
+# app's first boot against an empty DB - see .env.example at the repo root for the full
+# explanation). Sign in via the dev-login picker, promote a real account under Settings -> Users,
+# then blank these back out and re-run update.yml.
+vault_studio_bootstrap_admin_name: ""
+vault_studio_bootstrap_admin_email: ""
+
+# Leave vault_studio_smtp_host blank to log email bodies to the systemd journal instead of
+# sending them - fine for a first smoke test, not for real use.
+vault_studio_smtp_host: ""
+vault_studio_smtp_port: "587"
+vault_studio_smtp_user: ""
+vault_studio_smtp_pass: ""
+vault_studio_smtp_from: "studio@localhost"

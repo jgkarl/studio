@@ -1,7 +1,8 @@
 # Optional local dev convenience: `docker compose up --build` (or `podman-compose up --build`).
-# Not the primary VPS deployment path — see docs/deploy.md for the git-clone + prebuilt-binary +
-# apt-installed-libvips approach that targets a plain VPS with no container runtime at all. This
-# file is still useful for a quick local try without installing Go/libvips/templ yourself.
+# Not the VPS deployment path — see docs/deploy.md for the Ansible-driven approach (installs
+# libvips42 + the released binary directly on a plain Ubuntu 24.04 VPS, no container runtime
+# there at all). This file is still useful for a quick local try without installing
+# Go/libvips/templ yourself.
 #
 # SQLite is a single file — no separate database service needed at all anymore. Everything the
 # app owns (the .db file + media-storage/) lives under one bind-mounted host directory so it's a

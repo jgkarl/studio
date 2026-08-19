@@ -1,0 +1,24 @@
+# Managed by Ansible (ansible/roles/studio_app/templates/studio.service.j2).
+[Unit]
+Description=Studio (conservation studio management)
+After=network.target
+
+[Service]
+Type=simple
+User={{ studio_system_user }}
+Group={{ studio_system_user }}
+WorkingDirectory={{ studio_home }}
+EnvironmentFile={{ studio_home }}/.env
+ExecStart={{ studio_home }}/server
+Restart=on-failure
+RestartSec=2
+
+# Basic hardening - the binary is fully self-contained (migrations/static assets embedded, see
+# db/migrations/embed.go and static/embed.go), so it only ever needs to write to data/.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ studio_home }}/data
+
+[Install]
+WantedBy=multi-user.target

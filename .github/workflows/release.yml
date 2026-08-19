@@ -1,0 +1,52 @@
+name: Release
+
+# Builds the deploy artifact and publishes it to a GitHub Release whenever a semver tag
+# (v1.2.3) is pushed. This is what ansible/roles/studio_app/tasks/release.yml downloads — see
+# docs/deploy.md. Cutting a release:
+#   git tag v1.2.3 && git push origin v1.2.3
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  build-and-release:
+    # Pinned to the exact OS docs/deploy.md's Ansible playbook targets (Ubuntu 24.04 "noble") -
+    # the binary is dynamically linked against this runner's libvips.so.42, so building on
+    # anything else risks an ABI mismatch on the deploy target.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install libvips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libvips-dev pkg-config
+
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@v0.3.1020
+
+      - name: Generate templates
+        run: templ generate
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      # Migrations and static assets are embedded (db/migrations/embed.go, static/embed.go) - this
+      # one file is the entire deploy artifact, nothing else needs to ship alongside it.
+      - name: Build release binary
+        run: CGO_ENABLED=1 go build -ldflags="-s -w" -o dist/studio-server-linux-amd64 ./cmd/server
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/studio-server-linux-amd64
+          generate_release_notes: true

@@ -1,5 +1,7 @@
 // Command server is the Studio app's single entrypoint: load config, open the SQLite pool, apply
-// pending migrations, mount every module's routes, and serve.
+// pending migrations, mount every module's routes, and serve. Migrations and static assets are
+// embedded (db/migrations/embed.go, static/embed.go) — the compiled binary is fully
+// self-contained, nothing else needs to ship alongside it (see docs/deploy.md).
 package main
 
 import (
@@ -25,6 +27,9 @@ import (
 	"studio/internal/treatments"
 	"studio/internal/web"
 	"studio/internal/workflows"
+
+	"studio/db/migrations"
+	staticassets "studio/static"
 )
 
 func main() {
@@ -41,7 +46,7 @@ func main() {
 	if err := pool.PingContext(ctx); err != nil {
 		log.Fatalf("db ping: %v", err)
 	}
-	if err := db.Migrate(ctx, pool, "db/migrations"); err != nil {
+	if err := db.Migrate(ctx, pool, migrations.Files); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
 	log.Println("database ready, migrations applied")
@@ -74,7 +79,7 @@ func main() {
 	mediaSvc := &media.Service{Pool: pool, Storage: storage}
 
 	mux := http.NewServeMux()
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServerFS(staticassets.Files)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))

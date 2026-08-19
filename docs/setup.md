@@ -12,7 +12,7 @@ docker compose up --build
 # or: podman-compose up --build
 ```
 
-This builds the app image (inside Debian 12, so it doesn't matter whether your own machine has
+This builds the app image (inside Ubuntu 24.04, so it doesn't matter whether your own machine has
 `libvips-dev`) and starts it with a bind-mounted `./data` directory. Open
 <http://localhost:3000>.
 
@@ -25,7 +25,7 @@ from an empty database.
 
 ```bash
 go install github.com/a-h/templ/cmd/templ@v0.3.1020
-sudo apt-get install -y libvips-dev pkg-config   # Debian; see docs/tech-stack.md for why not Ubuntu
+sudo apt-get install -y libvips-dev pkg-config   # works cleanly on plain Ubuntu 24.04+/Debian
 cp .env.example .env
 make run   # templ generate + go run ./cmd/server
 ```
@@ -41,7 +41,7 @@ files.
 | `make run` | `templ generate` + `go run ./cmd/server` |
 | `make dev` | Same, but watches `.templ` files and restarts on change |
 | `make build` | Local `go build` to `bin/server` (needs `libvips-dev` installed) |
-| `make release` | Builds `dist/server` inside Debian 12 via Docker/Podman — what actually gets deployed, see `docs/deploy.md` |
+| `make release` | Builds `dist/server` inside Ubuntu 24.04 via Docker/Podman — same build `.github/workflows/release.yml` runs for a GitHub Release, see `docs/deploy.md` |
 | `make test` | `go test ./...` (needs `libvips-dev` locally — see `docs/tech-stack.md`'s Testing section for which packages don't) |
 | `cd e2e && npm install && npm test` | Playwright end-to-end suite against a running server — see `e2e/README.md` |
 

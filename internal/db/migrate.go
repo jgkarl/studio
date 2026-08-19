@@ -4,20 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"sort"
 	"strings"
 )
 
-// Migrate applies every *.sql file in dir that isn't already recorded in schema_migrations, in
-// filename order (hence the 0001_, 0002_... prefixes) — no external migration framework. Each
-// file is split into individual statements and executed one at a time: unlike the MySQL driver
-// this app used to run on, SQLite has no "run several ;-separated statements in one Exec" mode,
-// so this driver doesn't either. Splitting on a bare ";" is safe here because every migration
-// file is hand-written DDL this app controls — no semicolons inside string literals to worry
-// about.
-func Migrate(ctx context.Context, pool *sql.DB, dir string) error {
+// Migrate applies every *.sql file in migrationsFS that isn't already recorded in
+// schema_migrations, in filename order (hence the 0001_, 0002_... prefixes) — no external
+// migration framework. migrationsFS is db/migrations' embed.FS (see db/migrations/embed.go) in
+// production and in tests (internal/testutil) — the binary/test process never reads
+// db/migrations/ off disk. Each file is split into individual statements and executed one at a
+// time: unlike the MySQL driver this app used to run on, SQLite has no "run several
+// ;-separated statements in one Exec" mode, so this driver doesn't either. Splitting on a bare
+// ";" is safe here because every migration file is hand-written DDL this app controls — no
+// semicolons inside string literals to worry about.
+func Migrate(ctx context.Context, pool *sql.DB, migrationsFS fs.FS) error {
 	if _, err := pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			filename TEXT NOT NULL PRIMARY KEY,
@@ -45,9 +46,9 @@ func Migrate(ctx context.Context, pool *sql.DB, dir string) error {
 	}
 	rows.Close()
 
-	entries, err := os.ReadDir(dir)
+	entries, err := fs.ReadDir(migrationsFS, ".")
 	if err != nil {
-		return fmt.Errorf("reading migrations dir %q: %w", dir, err)
+		return fmt.Errorf("reading migrations: %w", err)
 	}
 	var names []string
 	for _, e := range entries {
@@ -61,7 +62,7 @@ func Migrate(ctx context.Context, pool *sql.DB, dir string) error {
 		if applied[name] {
 			continue
 		}
-		sqlBytes, err := os.ReadFile(filepath.Join(dir, name))
+		sqlBytes, err := fs.ReadFile(migrationsFS, name)
 		if err != nil {
 			return fmt.Errorf("reading migration %q: %w", name, err)
 		}

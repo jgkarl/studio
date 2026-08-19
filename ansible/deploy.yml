@@ -1,0 +1,13 @@
+---
+# First-time (and every-time - fully idempotent) provisioning: packages, system user, data
+# directory, env file, the release binary, the systemd unit, and Caddy. Safe to re-run any time;
+# only changes what's actually out of date.
+#
+#   ansible-playbook deploy.yml --ask-vault-pass
+#
+# See README.md for one-time setup (inventory.ini, group_vars/all.yml, group_vars/vault.yml).
+- name: Provision and deploy Studio
+  hosts: studio
+  become: true
+  roles:
+    - studio_app

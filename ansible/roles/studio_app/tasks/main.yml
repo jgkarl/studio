@@ -1,0 +1,129 @@
+---
+- name: Refuse to deploy with an unset/placeholder auth secret
+  ansible.builtin.assert:
+    that:
+      - studio_auth_secret is defined
+      - studio_auth_secret | length > 0
+      - studio_auth_secret != "CHANGE_ME"
+    fail_msg: >-
+      studio_auth_secret is unset or still the vault.yml.example placeholder - generate a real one
+      with `openssl rand -hex 32` and put it in group_vars/vault.yml before deploying.
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install runtime dependencies
+  ansible.builtin.apt:
+    name:
+      - libvips42
+      - ca-certificates
+    state: present
+
+- name: Create system group
+  ansible.builtin.group:
+    name: "{{ studio_system_user }}"
+    system: true
+    state: present
+
+- name: Create system user
+  ansible.builtin.user:
+    name: "{{ studio_system_user }}"
+    group: "{{ studio_system_user }}"
+    system: true
+    create_home: true
+    home: "{{ studio_home }}"
+    shell: /usr/sbin/nologin
+    state: present
+
+- name: Create data directory
+  ansible.builtin.file:
+    path: "{{ studio_home }}/data"
+    state: directory
+    owner: "{{ studio_system_user }}"
+    group: "{{ studio_system_user }}"
+    mode: "0750"
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: studio.env.j2
+    dest: "{{ studio_home }}/.env"
+    owner: "{{ studio_system_user }}"
+    group: "{{ studio_system_user }}"
+    mode: "0640"
+  notify: restart studio
+
+- name: Fetch and install the release binary
+  ansible.builtin.import_tasks: release.yml
+
+- name: Template systemd unit
+  ansible.builtin.template:
+    src: studio.service.j2
+    dest: /etc/systemd/system/studio.service
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart studio
+
+- name: Ensure the studio service is enabled and started
+  ansible.builtin.systemd:
+    name: studio
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Set up Caddy as the reverse proxy
+  when: studio_domain | length > 0
+  block:
+    - name: Install Caddy apt prerequisites
+      ansible.builtin.apt:
+        name:
+          - debian-keyring
+          - debian-archive-keyring
+          - apt-transport-https
+          - curl
+          - gnupg
+        state: present
+
+    - name: Add the Caddy apt gpg key
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+          | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+      args:
+        executable: /bin/bash
+        creates: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+
+    - name: Add the Caddy apt repository
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+          | tee /etc/apt/sources.list.d/caddy-stable.list
+      args:
+        executable: /bin/bash
+        creates: /etc/apt/sources.list.d/caddy-stable.list
+      register: studio_caddy_repo_added
+
+    - name: Update apt cache after adding the Caddy repo
+      ansible.builtin.apt:
+        update_cache: true
+      when: studio_caddy_repo_added is changed
+
+    - name: Install Caddy
+      ansible.builtin.apt:
+        name: caddy
+        state: present
+
+    - name: Template the Caddyfile
+      ansible.builtin.template:
+        src: Caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+        mode: "0644"
+      notify: reload caddy
+
+    - name: Ensure Caddy is enabled and started
+      ansible.builtin.systemd:
+        name: caddy
+        enabled: true
+        state: started
