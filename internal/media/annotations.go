@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	studiodb "studio/internal/db"
@@ -11,26 +14,31 @@ import (
 	"studio/internal/settings"
 )
 
-// AnnotationRegion is one rectangle drawn on a Media item's "pattern layer" — see
-// db/migrations/0012_media_annotation_regions.sql. Coordinates are percentages (0-100) of the
-// image's own dimensions, not pixels, so a region stays correct regardless of which size the
-// client happens to be viewing the image at.
+// AnnotationRegion is one marked area on a Media item's "pattern layer" — see
+// db/migrations/0012_media_annotation_regions.sql and 0014_media_annotation_shape.sql. Coordinates
+// are percentages (0-100) of the image's own dimensions, not pixels, so a region stays correct
+// regardless of which size the client happens to be viewing the image at. Shape is "rect" (the
+// common case, XPct/YPct/WidthPct/HeightPct is the whole shape) or "freehand" (a brush-drawn area:
+// those same four columns hold its bounding box, and PathData holds the actual outline as a JSON
+// array of {"x","y"} percentage points — see PolygonPoints).
 type AnnotationRegion struct {
 	ID               string
 	MediaID          string
 	AnnotationTypeID string
+	Shape            string
 	XPct             float64
 	YPct             float64
 	WidthPct         float64
 	HeightPct        float64
+	PathData         sql.NullString
 	CreatedAt        time.Time
 }
 
-const annotationRegionColumns = "id, mediaId, annotationTypeId, xPct, yPct, widthPct, heightPct, createdAt"
+const annotationRegionColumns = "id, mediaId, annotationTypeId, shape, xPct, yPct, widthPct, heightPct, pathData, createdAt"
 
 func scanAnnotationRegion(rows *sql.Rows) (AnnotationRegion, error) {
 	var a AnnotationRegion
-	err := rows.Scan(&a.ID, &a.MediaID, &a.AnnotationTypeID, &a.XPct, &a.YPct, &a.WidthPct, &a.HeightPct, &a.CreatedAt)
+	err := rows.Scan(&a.ID, &a.MediaID, &a.AnnotationTypeID, &a.Shape, &a.XPct, &a.YPct, &a.WidthPct, &a.HeightPct, &a.PathData, &a.CreatedAt)
 	return a, err
 }
 
@@ -63,6 +71,64 @@ func CreateRegion(ctx context.Context, q studiodb.Querier, mediaID, annotationTy
 		"INSERT INTO MediaAnnotationRegion (id, mediaId, annotationTypeId, xPct, yPct, widthPct, heightPct) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		id, mediaID, annotationTypeID, x, y, w, h)
 	return id, err
+}
+
+// point is one coordinate of a freehand region's outline — percentages of the image's own
+// dimensions, same convention as AnnotationRegion's XPct/YPct.
+type point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+// CreateFreehandRegion stores a brush-drawn area: pointsJSON is a JSON array of {"x","y"}
+// percentage points as posted by static/js/pattern-layer.js's freehand tool. Every point is
+// clamped into [0,100] (same guarantee CreateRegion makes for rectangles), and the bounding box
+// is computed and stored in the same XPct/YPct/WidthPct/HeightPct columns rectangles use, so a
+// freehand region is still sortable/queryable like one — PathData carries the actual outline for
+// rendering as an SVG <polygon> (see PolygonPoints).
+func CreateFreehandRegion(ctx context.Context, q studiodb.Querier, mediaID, annotationTypeID, pointsJSON string) (string, error) {
+	var raw []point
+	if err := json.Unmarshal([]byte(pointsJSON), &raw); err != nil {
+		return "", fmt.Errorf("invalid points: %w", err)
+	}
+	if len(raw) < 3 {
+		return "", fmt.Errorf("a freehand region needs at least 3 points")
+	}
+
+	minX, minY := 100.0, 100.0
+	maxX, maxY := 0.0, 0.0
+	clamped := make([]point, len(raw))
+	for i, p := range raw {
+		x, y := clampPct(p.X), clampPct(p.Y)
+		clamped[i] = point{X: x, Y: y}
+		minX, maxX = min(minX, x), max(maxX, x)
+		minY, maxY = min(minY, y), max(maxY, y)
+	}
+	pathBytes, err := json.Marshal(clamped)
+	if err != nil {
+		return "", err
+	}
+
+	id := studiodb.NewID()
+	_, err = studiodb.Execute(ctx, q,
+		"INSERT INTO MediaAnnotationRegion (id, mediaId, annotationTypeId, shape, xPct, yPct, widthPct, heightPct, pathData) VALUES (?, ?, ?, 'freehand', ?, ?, ?, ?, ?)",
+		id, mediaID, annotationTypeID, minX, minY, maxX-minX, maxY-minY, string(pathBytes))
+	return id, err
+}
+
+// PolygonPoints turns a freehand region's stored PathData JSON into an SVG
+// <polygon points="x,y x,y ...">-ready string. Empty/invalid data (a corrupt row) renders an empty
+// polygon rather than erroring the whole page.
+func PolygonPoints(pathData string) string {
+	var pts []point
+	if err := json.Unmarshal([]byte(pathData), &pts); err != nil {
+		return ""
+	}
+	parts := make([]string, len(pts))
+	for i, p := range pts {
+		parts[i] = strconv.FormatFloat(p.X, 'f', 3, 64) + "," + strconv.FormatFloat(p.Y, 'f', 3, 64)
+	}
+	return strings.Join(parts, " ")
 }
 
 func clampPct(n float64) float64 {

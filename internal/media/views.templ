@@ -130,19 +130,18 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 		}
 	}
 	if m.Kind == KindImage {
-		@lightboxModal(m.ID)
+		@lightboxModal(m.ID, regions, annotationTypes)
 		<script src="/static/js/lightbox.js" defer></script>
+		<script src="/static/js/pattern-layer.js" defer></script>
 		@iiifViewerModal(m.ID)
 		<script src="/static/js/iiif-viewer.js" defer></script>
-		@patternLayerCard(m, regions, annotationTypes)
-		<script src="/static/js/pattern-layer.js" defer></script>
 	}
 }
 
 // iiifViewerModal is a read-only deep-zoom viewer backed by the real IIIF Image API
 // (internal/iiif) — wheel zooms, drag pans, both recomputing a pct: region server-side crop. Kept
-// separate from the pattern-layer card: combining live pan/zoom with drag-to-draw is a much
-// harder coordinate-transform problem than either alone. No vendored library (studio-go's own
+// separate from the lightbox/pattern-layer editor: combining live pan/zoom with drag-to-draw is a
+// much harder coordinate-transform problem than either alone. No vendored library (studio-go's own
 // README states that as an explicit value) — static/js/iiif-viewer.js is hand-rolled.
 templ iiifViewerModal(mediaID string) {
 	<div id="iiif-viewer-overlay" class="lightbox-overlay" hidden>
@@ -163,58 +162,6 @@ templ iiifViewerModal(mediaID string) {
 	</div>
 }
 
-// patternLayerCard is the "basic pattern layer": the IIIF Image API's quality=gray transform as
-// the base image (that's the "bw image of the original"), an absolutely-positioned SVG overlay of
-// stored rectangle regions (percentage coordinates, so it stays correct at any rendered size), and
-// a legend underneath. Deliberately not the original app's freehand canvas painter — regions are
-// data (rows), never baked into a new raster image.
-templ patternLayerCard(m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
-	@web.Card() {
-		<div class="pattern-layer-header">
-			<h2 class="dashboard-heading">Pattern layer</h2>
-			<div class="pattern-layer-controls">
-				<label class="checkbox-field">
-					<input type="checkbox" id="pattern-layer-show" checked/>
-					Show pattern layer
-				</label>
-				if len(annotationTypes) > 0 {
-					<label class="checkbox-field">
-						<input type="checkbox" id="pattern-layer-add-toggle"/>
-						+ Add region
-					</label>
-				}
-			</div>
-		</div>
-		if len(annotationTypes) == 0 {
-			<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before drawing regions.</p>
-		} else {
-			<div class="pattern-layer-palette" id="pattern-layer-palette" hidden>
-				for i, t := range annotationTypes {
-					<label class="pattern-layer-palette-item">
-						<input type="radio" name="pattern-layer-type" value={ t.ID } checked?={ i == 0 }/>
-						<span class="pattern-layer-swatch" style={ "background-color:" + t.Color }></span>
-						{ t.Label }
-					</label>
-				}
-			</div>
-		}
-		<div class="pattern-layer-stage" id="pattern-layer-wrap" data-media-id={ m.ID }>
-			<img id="pattern-layer-image" class="pattern-layer-image" src={ "/api/iiif/" + m.ID + "/full/max/0/gray.jpg" } alt="Grayscale rendition"/>
-			<svg id="pattern-layer-svg" class="pattern-layer-svg" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-				<defs>
-					for _, t := range UsedTypeOptions(regions, annotationTypes) {
-						@hatchPatternDef(t)
-					}
-				</defs>
-				for _, r := range regions {
-					@regionRect(r, OptionByID(annotationTypes, r.AnnotationTypeID))
-				}
-			</svg>
-		</div>
-		@patternLayerLegend(regions, annotationTypes)
-	}
-}
-
 templ hatchPatternDef(t AnnotationTypeOption) {
 	<pattern
 		id={ "pattern-" + t.ID }
@@ -227,18 +174,31 @@ templ hatchPatternDef(t AnnotationTypeOption) {
 	</pattern>
 }
 
-templ regionRect(r AnnotationRegion, t AnnotationTypeOption) {
+// regionShape renders one stored region as either an SVG <rect> (shape=="rect", the common case)
+// or a <polygon> (shape=="freehand", a brush-drawn outline — see AnnotationRegion.PathData). Both
+// share the same pattern fill, keyed by the region's annotation type.
+templ regionShape(r AnnotationRegion, t AnnotationTypeOption) {
 	if t.ID != "" {
-		<rect
-			x={ formatPct(r.XPct) }
-			y={ formatPct(r.YPct) }
-			width={ formatPct(r.WidthPct) }
-			height={ formatPct(r.HeightPct) }
-			fill={ "url(#pattern-" + t.ID + ")" }
-			stroke={ t.Color }
-			stroke-width="0.3"
-			fill-opacity="0.55"
-		></rect>
+		if r.Shape == "freehand" && r.PathData.Valid {
+			<polygon
+				points={ PolygonPoints(r.PathData.String) }
+				fill={ "url(#pattern-" + t.ID + ")" }
+				stroke={ t.Color }
+				stroke-width="0.3"
+				fill-opacity="0.55"
+			></polygon>
+		} else {
+			<rect
+				x={ formatPct(r.XPct) }
+				y={ formatPct(r.YPct) }
+				width={ formatPct(r.WidthPct) }
+				height={ formatPct(r.HeightPct) }
+				fill={ "url(#pattern-" + t.ID + ")" }
+				stroke={ t.Color }
+				stroke-width="0.3"
+				fill-opacity="0.55"
+			></rect>
+		}
 	}
 }
 
@@ -275,18 +235,34 @@ func formatPct(n float64) string {
 	return strconv.FormatFloat(n, 'f', 3, 64)
 }
 
-// lightboxModal is a simple viewer, not an editor: rotate + brightness/contrast CSS filters and
-// one ephemeral annotation textarea (never persisted — matches the design artifact's own
-// lightboxNote behavior, local component state that resets on close), plus a download link. No
-// canvas, no undo stack, no new Media row on "save" — there's nothing to save.
-templ lightboxModal(mediaID string) {
+// lightboxModal is the image editor: an 80vw x 80vh modal combining the plain viewer (rotate +
+// brightness/contrast CSS filters, an ephemeral note never persisted - matches the design
+// artifact's own lightboxNote behavior, download) with the pattern layer - a percentage-coordinate
+// SVG overlay of stored regions (rect or freehand-brush outlines, see AnnotationRegion), a
+// rectangle/brush draw tool with a type dropdown ("the reason" for a marked area), and a legend
+// that's always rendered underneath, whether or not there's anything marked yet. No raster
+// editing, no undo stack - regions are rows (internal/media/annotations.go), never baked into a
+// new image.
+templ lightboxModal(mediaID string, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
 	<div id="lightbox-overlay" class="lightbox-overlay" hidden>
 		<div class="lightbox-modal">
 			<button type="button" id="lightbox-close" class="lightbox-close" aria-label="Close">
 				<img src="/static/icons/close.svg" width="18" height="18" alt="" class="icon"/>
 			</button>
 			<div class="lightbox-image-wrap">
-				<img id="lightbox-image" class="lightbox-image" src={ "/api/media/" + mediaID } alt=""/>
+				<div class="pattern-layer-stage" id="pattern-layer-wrap" data-media-id={ mediaID }>
+					<img id="lightbox-image" class="lightbox-image" src={ "/api/media/" + mediaID } alt=""/>
+					<svg id="pattern-layer-svg" class="pattern-layer-svg" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+						<defs>
+							for _, t := range UsedTypeOptions(regions, annotationTypes) {
+								@hatchPatternDef(t)
+							}
+						</defs>
+						for _, r := range regions {
+							@regionShape(r, OptionByID(annotationTypes, r.AnnotationTypeID))
+						}
+					</svg>
+				</div>
 			</div>
 			<div class="lightbox-controls">
 				<div class="lightbox-control-row">
@@ -309,8 +285,34 @@ templ lightboxModal(mediaID string) {
 						Download
 					</a>
 				</div>
+				if len(annotationTypes) == 0 {
+					<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
+				} else {
+					<div class="lightbox-control-row pattern-layer-toolbar">
+						<label class="checkbox-field">
+							<input type="checkbox" id="pattern-layer-add-toggle"/>
+							+ Add region
+						</label>
+						<label class="pattern-layer-select-field">
+							Tool
+							<select id="pattern-layer-tool" class="input">
+								<option value="rect">Rectangle</option>
+								<option value="freehand">Freehand brush</option>
+							</select>
+						</label>
+						<label class="pattern-layer-select-field">
+							Type
+							<select id="pattern-layer-type" class="input">
+								for _, t := range annotationTypes {
+									<option value={ t.ID }>{ t.Label }</option>
+								}
+							</select>
+						</label>
+					</div>
+				}
 				<textarea id="lightbox-annotation" class="input" rows="2" placeholder="Add a note (not saved)…"></textarea>
 			</div>
+			@patternLayerLegend(regions, annotationTypes)
 		</div>
 	</div>
 }

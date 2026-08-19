@@ -121,17 +121,25 @@ func (svc *HandlerService) handleCreateAnnotation(w http.ResponseWriter, r *http
 		http.Error(w, "annotationTypeId is required", http.StatusBadRequest)
 		return
 	}
-	x, xErr := strconv.ParseFloat(r.FormValue("xPct"), 64)
-	y, yErr := strconv.ParseFloat(r.FormValue("yPct"), 64)
-	width, wErr := strconv.ParseFloat(r.FormValue("widthPct"), 64)
-	height, hErr := strconv.ParseFloat(r.FormValue("heightPct"), 64)
-	if xErr != nil || yErr != nil || wErr != nil || hErr != nil {
-		http.Error(w, "xPct/yPct/widthPct/heightPct must be numbers", http.StatusBadRequest)
-		return
-	}
-	if _, err := CreateRegion(r.Context(), svc.Pool, id, typeID, x, y, width, height); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
+	if r.FormValue("shape") == "freehand" {
+		if _, err := CreateFreehandRegion(r.Context(), svc.Pool, id, typeID, r.FormValue("points")); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		x, xErr := strconv.ParseFloat(r.FormValue("xPct"), 64)
+		y, yErr := strconv.ParseFloat(r.FormValue("yPct"), 64)
+		width, wErr := strconv.ParseFloat(r.FormValue("widthPct"), 64)
+		height, hErr := strconv.ParseFloat(r.FormValue("heightPct"), 64)
+		if xErr != nil || yErr != nil || wErr != nil || hErr != nil {
+			http.Error(w, "xPct/yPct/widthPct/heightPct must be numbers", http.StatusBadRequest)
+			return
+		}
+		if _, err := CreateRegion(r.Context(), svc.Pool, id, typeID, x, y, width, height); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	// The drag-to-draw UI (static/js/pattern-layer.js) posts via fetch and reloads the page
 	// itself on success — a redirect response body would just be discarded. A plain form post
