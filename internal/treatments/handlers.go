@@ -8,11 +8,11 @@ import (
 
 	"github.com/a-h/templ"
 
-	"studio/internal/auth"
-	"studio/internal/i18n"
-	"studio/internal/media"
-	"studio/internal/settings"
-	"studio/internal/web"
+	"stuudio/internal/auth"
+	"stuudio/internal/i18n"
+	"stuudio/internal/media"
+	"stuudio/internal/settings"
+	"stuudio/internal/web"
 )
 
 type Service struct {

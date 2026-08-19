@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"testing"
 
-	studiodb "studio/internal/db"
-	"studio/internal/testutil"
+	studiodb "stuudio/internal/db"
+	"stuudio/internal/testutil"
 )
 
 func scanCount(rows *sql.Rows) (int, error) {
@@ -43,7 +43,7 @@ func TestBootstrapAdmin(t *testing.T) {
 		t.Fatalf("BootstrapAdmin with empty name/email/password created %d users, want 0", n)
 	}
 
-	if err := BootstrapAdmin(ctx, pool, "Ada Admin", "ada@studio.local", "correct-horse-battery"); err != nil {
+	if err := BootstrapAdmin(ctx, pool, "Ada Admin", "ada@stuudio.local", "correct-horse-battery"); err != nil {
 		t.Fatalf("BootstrapAdmin with name/email but no password: %v", err)
 	}
 	if n := countRows(t, pool, "SELECT COUNT(*) AS n FROM User"); n != 1 {
@@ -52,12 +52,12 @@ func TestBootstrapAdmin(t *testing.T) {
 
 	if n := countRows(t, pool,
 		"SELECT COUNT(*) AS n FROM User WHERE email = ? AND role = 'admin' AND provider = 'email' AND passwordHash IS NOT NULL AND emailVerifiedAt IS NOT NULL",
-		"ada@studio.local"); n != 1 {
+		"ada@stuudio.local"); n != 1 {
 		t.Fatalf("bootstrapped user isn't an active role=admin, provider=email account with a password")
 	}
 
 	// Re-running with the same email must not create a second row.
-	if err := BootstrapAdmin(ctx, pool, "Ada Admin", "ada@studio.local", "correct-horse-battery"); err != nil {
+	if err := BootstrapAdmin(ctx, pool, "Ada Admin", "ada@stuudio.local", "correct-horse-battery"); err != nil {
 		t.Fatalf("BootstrapAdmin (second run): %v", err)
 	}
 	if n := countRows(t, pool, "SELECT COUNT(*) AS n FROM User"); n != 1 {
@@ -69,7 +69,7 @@ func TestBootstrapAdminRequiresPassword(t *testing.T) {
 	ctx := context.Background()
 	pool := testutil.OpenTestDB(t)
 
-	if err := BootstrapAdmin(ctx, pool, "Ada Admin", "ada@studio.local", ""); err != nil {
+	if err := BootstrapAdmin(ctx, pool, "Ada Admin", "ada@stuudio.local", ""); err != nil {
 		t.Fatalf("BootstrapAdmin with no password: %v", err)
 	}
 	if n := countRows(t, pool, "SELECT COUNT(*) AS n FROM User"); n != 0 {

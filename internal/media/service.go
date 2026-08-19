@@ -9,7 +9,7 @@ import (
 
 	"github.com/davidbyttow/govips/v2/vips"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 type Service struct {

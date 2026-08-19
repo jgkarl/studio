@@ -1,8 +1,8 @@
 {
-  "name": "studio-e2e",
+  "name": "stuudio-e2e",
   "version": "1.0.0",
   "private": true,
-  "description": "Playwright end-to-end suite for the Studio app, driven against a running server (Docker or `make run`) via BASE_URL.",
+  "description": "Playwright end-to-end suite for the Stuudio app, driven against a running server (Docker or `make run`) via BASE_URL.",
   "scripts": {
     "test": "playwright test"
   },

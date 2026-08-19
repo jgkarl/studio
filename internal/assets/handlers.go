@@ -8,15 +8,15 @@ import (
 
 	"github.com/a-h/templ"
 
-	"studio/internal/assessments"
-	"studio/internal/auth"
-	"studio/internal/clients"
-	"studio/internal/i18n"
-	"studio/internal/media"
-	"studio/internal/reporter"
-	"studio/internal/settings"
-	"studio/internal/treatments"
-	"studio/internal/web"
+	"stuudio/internal/assessments"
+	"stuudio/internal/auth"
+	"stuudio/internal/clients"
+	"stuudio/internal/i18n"
+	"stuudio/internal/media"
+	"stuudio/internal/reporter"
+	"stuudio/internal/settings"
+	"stuudio/internal/treatments"
+	"stuudio/internal/web"
 )
 
 type Service struct {

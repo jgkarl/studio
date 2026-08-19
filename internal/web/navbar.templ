@@ -3,8 +3,8 @@ package web
 import (
 	"strings"
 
-	"studio/internal/i18n"
-	"studio/internal/theme"
+	"stuudio/internal/i18n"
+	"stuudio/internal/theme"
 )
 
 type navItem struct {
@@ -54,7 +54,7 @@ templ Navbar(c Chrome) {
 		<a href="/" class="navbar-brand">
 			@logoMark()
 			<span class="navbar-brand-text">
-				<span class="navbar-brand-name">Studio</span>
+				<span class="navbar-brand-name">Stuudio</span>
 				<span class="navbar-brand-tagline">conservation management</span>
 			</span>
 		</a>
@@ -194,7 +194,7 @@ templ AppLayout(title string, c Chrome, body templ.Component) {
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<title>{ title } · Studio</title>
+			<title>{ title } · Stuudio</title>
 			<link rel="stylesheet" href="/static/css/app.css"/>
 		</head>
 		<body>

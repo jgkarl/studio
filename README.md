@@ -1,10 +1,9 @@
-# Studio (Go)
+# Stuudio
 
-Go/templ/SQLite rewrite of the [Studio conservation-studio management app](../studio) — a
-ground-up port from the original Next.js/TypeScript/React version, built module by module. See
-that repo's `docs/features.md` for what the app does; see `docs/tech-stack.md` here for how this
-rewrite is actually built, and `docs/setup.md` for a more detailed local-dev walkthrough than the
-quick version below.
+Go/templ/SQLite rewrite of the Studio conservation-studio management app — a ground-up port from
+an original Next.js/TypeScript/React version, built module by module. See `docs/tech-stack.md`
+here for how this rewrite is actually built, and `docs/setup.md` for a more detailed local-dev
+walkthrough than the quick version below.
 
 Same philosophy as the original: no ORM, hand-written SQL and row types, no web framework, plain
 templ templates, JS only where a page genuinely needs client-side interactivity — small vanilla
@@ -40,7 +39,7 @@ docker compose up --build   # or: podman-compose up --build
 
 Either way, migrations in `db/migrations/*.sql` are applied automatically on startup (tracked in
 a `schema_migrations` table — no separate migrate step to remember), the SQLite file is created
-at `DB_PATH` (default `./data/studio.db`) if it doesn't exist yet, and the structural Classifier
+at `DB_PATH` (default `./data/stuudio.db`) if it doesn't exist yet, and the structural Classifier
 reference data every `<select>` in the app reads from is seeded automatically too (idempotent —
 safe on every restart). Set `BOOTSTRAP_ADMIN_NAME`/`BOOTSTRAP_ADMIN_EMAIL` in `.env` to also get a
 first admin account with no manual database work — see `docs/setup.md`.

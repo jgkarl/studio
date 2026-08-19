@@ -10,9 +10,9 @@ import (
 
 	"github.com/a-h/templ"
 
-	"studio/internal/auth"
-	studiodb "studio/internal/db"
-	"studio/internal/web"
+	"stuudio/internal/auth"
+	studiodb "stuudio/internal/db"
+	"stuudio/internal/web"
 )
 
 func chromeFor(r *http.Request, user *auth.User, active string) web.Chrome {

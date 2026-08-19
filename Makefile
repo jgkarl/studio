@@ -16,10 +16,10 @@ build: generate
 # dist/server itself isn't committed (see .gitignore) — CI attaches it to a GitHub Release on
 # every `vX.Y.Z` tag, and that's what Ansible actually deploys.
 release:
-	$(CONTAINER_ENGINE) build --target builder -t studio-go-builder:latest .
-	$(CONTAINER_ENGINE) create --name studio-go-builder-extract studio-go-builder:latest
-	$(CONTAINER_ENGINE) cp studio-go-builder-extract:/out/server ./dist/server
-	$(CONTAINER_ENGINE) rm studio-go-builder-extract
+	$(CONTAINER_ENGINE) build --target builder -t stuudio-builder:latest .
+	$(CONTAINER_ENGINE) create --name stuudio-builder-extract stuudio-builder:latest
+	$(CONTAINER_ENGINE) cp stuudio-builder-extract:/out/server ./dist/server
+	$(CONTAINER_ENGINE) rm stuudio-builder-extract
 	chmod +x dist/server
 
 run: generate

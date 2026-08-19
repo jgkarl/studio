@@ -11,7 +11,7 @@ const (
 	Dark  Theme = "dark"
 )
 
-const cookieName = "studio_theme"
+const cookieName = "stuudio_theme"
 
 func Get(r *http.Request) Theme {
 	c, err := r.Cookie(cookieName)

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 var tokenTTL = map[VerificationTokenType]time.Duration{

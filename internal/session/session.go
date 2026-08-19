@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const cookieName = "studio_session"
+const cookieName = "stuudio_session"
 
 type Manager struct {
 	secret []byte

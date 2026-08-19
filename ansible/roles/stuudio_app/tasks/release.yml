@@ -5,28 +5,28 @@
 
 - name: Resolve "latest" to a concrete tag
   ansible.builtin.uri:
-    url: "https://api.github.com/repos/{{ studio_github_repo }}/releases/latest"
+    url: "https://api.github.com/repos/{{ stuudio_github_repo }}/releases/latest"
     return_content: true
-  register: studio_latest_release
-  when: studio_release_version == "latest"
+  register: stuudio_latest_release
+  when: stuudio_release_version == "latest"
 
 - name: Record which version we're deploying
   ansible.builtin.set_fact:
-    studio_resolved_version: >-
-      {{ studio_latest_release.json.tag_name if studio_release_version == "latest" else studio_release_version }}
+    stuudio_resolved_version: >-
+      {{ stuudio_latest_release.json.tag_name if stuudio_release_version == "latest" else stuudio_release_version }}
 
 - name: Check which version is currently deployed
   ansible.builtin.slurp:
-    src: "{{ studio_home }}/RELEASE_VERSION"
-  register: studio_current_version_raw
+    src: "{{ stuudio_home }}/RELEASE_VERSION"
+  register: stuudio_current_version_raw
   failed_when: false
 
 - name: Download the release binary (only when the version actually changed)
   ansible.builtin.get_url:
-    url: "https://github.com/{{ studio_github_repo }}/releases/download/{{ studio_resolved_version }}/{{ studio_release_asset_name }}"
-    dest: "{{ studio_home }}/server"
-    owner: "{{ studio_system_user }}"
-    group: "{{ studio_system_user }}"
+    url: "https://github.com/{{ stuudio_github_repo }}/releases/download/{{ stuudio_resolved_version }}/{{ stuudio_release_asset_name }}"
+    dest: "{{ stuudio_home }}/server"
+    owner: "{{ stuudio_system_user }}"
+    group: "{{ stuudio_system_user }}"
     mode: "0755"
     # get_url's own default freshness check (comparing HTTP caching headers) is unreliable across
     # different release URLs/CDN responses and can wrongly skip a real version change - our own
@@ -35,16 +35,16 @@
     # "always re-download regardless" - `changed` is still computed correctly from real content.
     force: true
   when: >-
-    studio_current_version_raw.content is not defined
-    or (studio_current_version_raw.content | b64decode | trim) != studio_resolved_version
-  notify: restart studio
-  register: studio_release_download
+    stuudio_current_version_raw.content is not defined
+    or (stuudio_current_version_raw.content | b64decode | trim) != stuudio_resolved_version
+  notify: restart stuudio
+  register: stuudio_release_download
 
 - name: Record the deployed version
   ansible.builtin.copy:
-    content: "{{ studio_resolved_version }}"
-    dest: "{{ studio_home }}/RELEASE_VERSION"
-    owner: "{{ studio_system_user }}"
-    group: "{{ studio_system_user }}"
+    content: "{{ stuudio_resolved_version }}"
+    dest: "{{ stuudio_home }}/RELEASE_VERSION"
+    owner: "{{ stuudio_system_user }}"
+    group: "{{ stuudio_system_user }}"
     mode: "0644"
-  when: studio_release_download is changed
+  when: stuudio_release_download is changed

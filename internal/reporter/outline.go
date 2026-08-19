@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 // emptyDoc is the (now-unused-by-new-reports) empty TipTap document, kept only so Report.Content

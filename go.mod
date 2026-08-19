@@ -1,4 +1,4 @@
-module studio
+module stuudio
 
 go 1.25.0
 

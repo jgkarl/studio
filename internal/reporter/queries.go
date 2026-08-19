@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 const reportColumns = `id, projectId, assetId, title, content, status, authorId,

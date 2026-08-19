@@ -1,7 +1,7 @@
 name: Release
 
 # Builds the deploy artifact and publishes it to a GitHub Release whenever a semver tag
-# (v1.2.3) is pushed. This is what ansible/roles/studio_app/tasks/release.yml downloads — see
+# (v1.2.3) is pushed. This is what ansible/roles/stuudio_app/tasks/release.yml downloads — see
 # docs/deploy.md. Cutting a release:
 #   git tag v1.2.3 && git push origin v1.2.3
 on:
@@ -43,10 +43,10 @@ jobs:
       # Migrations and static assets are embedded (db/migrations/embed.go, static/embed.go) - this
       # one file is the entire deploy artifact, nothing else needs to ship alongside it.
       - name: Build release binary
-        run: CGO_ENABLED=1 go build -ldflags="-s -w" -o dist/studio-server-linux-amd64 ./cmd/server
+        run: CGO_ENABLED=1 go build -ldflags="-s -w" -o dist/stuudio-server-linux-amd64 ./cmd/server
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/studio-server-linux-amd64
+          files: dist/stuudio-server-linux-amd64
           generate_release_notes: true

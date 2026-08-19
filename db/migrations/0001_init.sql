@@ -1,4 +1,4 @@
--- Studio schema, SQLite dialect. Foreign keys are declared inline (table-level CONSTRAINT
+-- Stuudio schema, SQLite dialect. Foreign keys are declared inline (table-level CONSTRAINT
 -- clauses) since SQLite's ALTER TABLE can't add constraints after the fact the way the original
 -- MySQL migration did. SQLite allows a REFERENCES target that doesn't exist yet at CREATE TABLE
 -- time (only checked when FK enforcement actually runs), so the schema's one circular reference

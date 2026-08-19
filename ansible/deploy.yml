@@ -6,8 +6,8 @@
 #   ansible-playbook deploy.yml --ask-vault-pass
 #
 # See README.md for one-time setup (inventory.ini, group_vars/all.yml, group_vars/vault.yml).
-- name: Provision and deploy Studio
-  hosts: studio
+- name: Provision and deploy Stuudio
+  hosts: stuudio
   become: true
   roles:
-    - studio_app
+    - stuudio_app

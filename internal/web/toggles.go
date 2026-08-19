@@ -3,8 +3,8 @@ package web
 import (
 	"net/http"
 
-	"studio/internal/i18n"
-	"studio/internal/theme"
+	"stuudio/internal/i18n"
+	"stuudio/internal/theme"
 )
 
 // MountToggles registers the theme/locale toggle routes shared by every in-app page's Navbar.

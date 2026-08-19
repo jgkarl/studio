@@ -16,7 +16,7 @@ const (
 	LocaleEN Locale = "en"
 )
 
-const cookieName = "studio_locale"
+const cookieName = "stuudio_locale"
 
 func GetLocale(r *http.Request) Locale {
 	c, err := r.Cookie(cookieName)

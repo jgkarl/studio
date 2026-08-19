@@ -73,7 +73,7 @@ func (svc *Service) RenderHTML(ctx context.Context, doc *Doc) string {
   <h1>%s</h1>
   %s
   %s
-  <footer>Exported from Studio on %s</footer>
+  <footer>Exported from Stuudio on %s</footer>
 </body>
 </html>`, html.EscapeString(doc.Title), html.EscapeString(doc.Title), subtitleHTML, sectionsHTML.String(), time.Now().Format("2006-01-02 15:04"))
 }

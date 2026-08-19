@@ -43,7 +43,7 @@ func (m *Mailer) Send(msg Message) error {
 
 	from := m.cfg.From
 	if from == "" {
-		from = "Studio <no-reply@localhost>"
+		from = "Stuudio <no-reply@localhost>"
 	}
 	body := buildMIME(fromAddress(from), msg)
 	addr := m.cfg.Host + ":" + m.cfg.Port
@@ -109,7 +109,7 @@ func sendImplicitTLS(addr, host string, auth smtp.Auth, from, to string, body []
 	return client.Quit()
 }
 
-const mimeBoundary = "studio-mail-boundary"
+const mimeBoundary = "stuudio-mail-boundary"
 
 // buildMIME hand-builds a minimal multipart/alternative (text + html) RFC 822 message —
 // deliberately not pulling in an email-building library for two short transactional templates.

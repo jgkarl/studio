@@ -9,7 +9,7 @@ const path = require("path");
 
 const SCREENSHOT_DIR = path.join(__dirname, "..", "..", "docs", "screenshots");
 // No dev-login picker — sign in through the real /login form (see e2e/README.md).
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "ada@studio.local";
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "ada@stuudio.local";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "correct-horse-battery-staple";
 
 // Standard breakpoints: below the sm tier, at each of sm(640)/md(768)/lg(1024), and a wide

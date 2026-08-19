@@ -9,7 +9,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"studio/internal/mail"
+	"stuudio/internal/mail"
 )
 
 // Mount registers every auth route on mux. Public — no session required to reach any of these

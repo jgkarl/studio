@@ -1,5 +1,5 @@
 -- Re-seeds the annotation_type Classifier — present in the original Next.js app, dropped when
--- studio-go was built to match a stripped-down design artifact, reintroduced here for the
+-- stuudio was built to match a stripped-down design artifact, reintroduced here for the
 -- "pattern layer" feature (see MediaAnnotationRegion, 0012). Each row's data JSON carries the
 -- hatch direction + color the pattern-layer SVG overlay renders it with (internal/media
 -- annotations.go / views.templ) — ported from the original app's HatchDirection type (lib/types.ts):

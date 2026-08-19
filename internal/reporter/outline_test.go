@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	studiodb "studio/internal/db"
-	"studio/internal/testutil"
+	studiodb "stuudio/internal/db"
+	"stuudio/internal/testutil"
 )
 
 func mustExec(t *testing.T, q studiodb.Querier, query string, args ...any) {

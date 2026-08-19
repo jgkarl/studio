@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 const assetColumns = `id, clientId, referenceCode, assetTypeId, title, artist, creationPeriod, dimensions,

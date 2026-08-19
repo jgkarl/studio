@@ -3,7 +3,7 @@ package settings
 import (
 	"context"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 // FeatureLimit is one Dashboard display cap configurable from the Settings "Features" fieldset —

@@ -1,0 +1,4 @@
+# Managed by Ansible (ansible/roles/stuudio_app/templates/Caddyfile.j2).
+{{ stuudio_domain }} {
+    reverse_proxy localhost:{{ stuudio_port }}
+}

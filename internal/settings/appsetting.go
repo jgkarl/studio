@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 // AppSetting is a generic key/value config row — the Dashboard's per-module list caps and the

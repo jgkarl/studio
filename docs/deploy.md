@@ -1,6 +1,6 @@
 # Deploying to a VPS
 
-Studio deploys to a plain **Ubuntu 24.04** VPS via [Ansible](https://www.ansible.com/) — no
+Stuudio deploys to a plain **Ubuntu 24.04** VPS via [Ansible](https://www.ansible.com/) — no
 Docker, no separate database server, no build step on the VPS itself. `.github/workflows/release.yml`
 builds a single, fully self-contained binary (migrations and static assets are embedded — see
 `db/migrations/embed.go` and `static/embed.go`) and publishes it to a GitHub Release on every
@@ -12,7 +12,7 @@ This page covers the reasoning and the parts Ansible doesn't automate (DNS, back
 
 ## Why Ubuntu 24.04, specifically
 
-Studio used to target Debian, on the assumption that Ubuntu gated `libvips-dev`'s transitive
+Stuudio used to target Debian, on the assumption that Ubuntu gated `libvips-dev`'s transitive
 dependencies (`libmagickcore`/`libmagickwand`) behind Ubuntu Pro/ESM. That assumption turned out
 to be wrong for **24.04 "noble"** specifically — verified directly against a stock `ubuntu:24.04`
 container image with no Pro/ESM subscription attached at all:
@@ -38,8 +38,8 @@ dynamically linked against `libvips.so.42`, so the build OS needs to match the d
    templates, fill in your host and secrets, `ansible-vault encrypt group_vars/all/vault.yml`,
    then `ansible-playbook deploy.yml --ask-vault-pass`.
 
-That one playbook run installs `libvips42`, creates the `studio` system user, downloads the
-release binary, templates the systemd unit and env file, and (if `studio_domain` is set) installs
+That one playbook run installs `libvips42`, creates the `stuudio` system user, downloads the
+release binary, templates the systemd unit and env file, and (if `stuudio_domain` is set) installs
 and configures Caddy with automatic Let's Encrypt certificates.
 
 ## Every deploy after that
@@ -49,22 +49,22 @@ cd ansible
 ansible-playbook update.yml --ask-vault-pass
 ```
 
-Fetches whatever `studio_release_version` resolves to (default `"latest"`) and restarts the
+Fetches whatever `stuudio_release_version` resolves to (default `"latest"`) and restarts the
 service only if the version actually changed — see `ansible/README.md` for pinning to an exact
 tag instead of always tracking latest.
 
 ## Backups
 
-Everything the app owns lives under one directory on the VPS: `/opt/studio/data/` (`studio.db` +
+Everything the app owns lives under one directory on the VPS: `/opt/stuudio/data/` (`stuudio.db` +
 the `media-storage/` subdirectory — see `DB_PATH`/`MEDIA_STORAGE_DIR` in the templated `.env`).
 Back that one directory up however you like:
 
 ```bash
-tar czf studio-backup-$(date +%F).tar.gz -C /opt/studio data
+tar czf stuudio-backup-$(date +%F).tar.gz -C /opt/stuudio data
 ```
 
 SQLite is a single file, so a plain file copy while the app is running is safe as long as you
-copy `studio.db` together with its `-wal`/`-shm` sidecar files in the same pass (which `tar` on
+copy `stuudio.db` together with its `-wal`/`-shm` sidecar files in the same pass (which `tar` on
 the whole directory does) — SQLite's WAL mode is designed for exactly this. For a live/hot-backup
 setup with zero pause, look at [Litestream](https://litestream.io/) later; a nightly `tar` cron
 job is more than enough for a prototype's traffic.

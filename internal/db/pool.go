@@ -13,7 +13,7 @@ import (
 )
 
 // dsn builds the modernc.org/sqlite connection string for path — a plain filesystem path (e.g.
-// "./data/studio.db"), with query-string pragmas applied to every connection the pool opens:
+// "./data/stuudio.db"), with query-string pragmas applied to every connection the pool opens:
 //
 //   - foreign_keys(1): SQLite disables FK enforcement by default per-connection; every module's
 //     schema relies on it (ON DELETE CASCADE/SET NULL/RESTRICT).

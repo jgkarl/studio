@@ -6,9 +6,9 @@ import (
 	"database/sql"
 	"time"
 
-	"studio/internal/assessments"
-	"studio/internal/reporter"
-	"studio/internal/treatments"
+	"stuudio/internal/assessments"
+	"stuudio/internal/reporter"
+	"stuudio/internal/treatments"
 )
 
 type Asset struct {

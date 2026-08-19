@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	studiodb "studio/internal/db"
-	"studio/internal/i18n"
-	"studio/internal/settings"
+	studiodb "stuudio/internal/db"
+	"stuudio/internal/i18n"
+	"stuudio/internal/settings"
 )
 
 // AnnotationRegion is one marked area on a Media item's "pattern layer" — see

@@ -1,6 +1,6 @@
 package auth
 
-import "studio/internal/web"
+import "stuudio/internal/web"
 
 templ loginForm(errorCode, noticeCode string) {
 	@web.Card() {
@@ -38,7 +38,7 @@ templ LoginPage(errorCode, noticeCode string) {
 }
 
 templ loginBody(errorCode, noticeCode string) {
-	<h1>Studio</h1>
+	<h1>Stuudio</h1>
 	<p class="tagline">Conservation studio management</p>
 	@loginForm(errorCode, noticeCode)
 }

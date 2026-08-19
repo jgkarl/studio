@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	studiodb "studio/internal/db"
+	studiodb "stuudio/internal/db"
 )
 
 const treatmentColumns = "id, projectId, assetId, method, title, notes, performedByUserId, performedAt, createdAt, updatedAt, deletedAt"

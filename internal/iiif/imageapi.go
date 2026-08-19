@@ -16,7 +16,7 @@ import (
 
 	"github.com/davidbyttow/govips/v2/vips"
 
-	"studio/internal/media"
+	"stuudio/internal/media"
 )
 
 // Error carries an HTTP status alongside the message — handlers.go uses it to pick the right

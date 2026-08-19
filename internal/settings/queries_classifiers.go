@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	studiodb "studio/internal/db"
-	"studio/internal/i18n"
+	studiodb "stuudio/internal/db"
+	"stuudio/internal/i18n"
 )
 
 func scanClassifier(rows *sql.Rows) (Classifier, error) {
