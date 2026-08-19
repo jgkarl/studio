@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"studio/internal/assessments"
 	"studio/internal/assets"
 	"studio/internal/auth"
 	"studio/internal/clients"
@@ -37,10 +38,12 @@ const DemoUserPassword = "StudioDemo123!"
 
 // SeedDemoData creates one example row for every domain model in the schema — a second User (a
 // "conservator", real password/already-verified/already-role-assigned, alongside the
-// .env-bootstrapped admin), two Clients, two Assets with condition history, a Project, a
-// Treatment, a Report, and four Media images (from internal/seed/testdata/cats) wired into the
-// media library via MediaReference, including one annotated MediaAnnotationRegion — so a fresh
-// dev database has something on every screen immediately instead of starting empty.
+// .env-bootstrapped admin), two Clients, two Assets, two Projects (Project is the mandatory
+// parent for Assessments/Treatments/Reports — see db/migrations/0015_project_scoped_records.sql),
+// three Assessments (condition history), a Treatment, a Report, and four Media images (from
+// internal/seed/testdata/cats) wired into the media library via MediaReference, including one
+// annotated MediaAnnotationRegion — so a fresh dev database has something on every screen
+// immediately instead of starting empty.
 //
 // Not called unconditionally: see cmd/server/main.go, which only calls this when
 // cfg.SeedExampleData is true — never true for a production deploy (see
@@ -135,36 +138,54 @@ func SeedDemoData(ctx context.Context, pool *sql.DB, mediaSvc *media.Service) er
 		return fmt.Errorf("seed demo data: creating asset (sketch): %w", err)
 	}
 
-	// Intake state, then a re-assessment after treatment — a small condition history to show on
-	// the asset timeline.
-	intakeStateID, err := assets.RecordState(ctx, pool, assetPainting,
-		"fair", "Surface grime throughout; a few small paint losses in the lower-left corner.", nil, nil)
-	if err != nil {
-		return fmt.Errorf("seed demo data: recording intake state: %w", err)
-	}
-
-	sketchStateID, err := assets.RecordState(ctx, pool, assetSketch,
-		"good", "Minor foxing at the edges; otherwise stable.", nil, nil)
-	if err != nil {
-		return fmt.Errorf("seed demo data: recording sketch state: %w", err)
-	}
-
+	// Every Assessment/Treatment/Report requires a Project (its mandatory parent — see
+	// db/migrations/0015_project_scoped_records.sql), so both assets get one before anything
+	// else can be recorded against them.
 	projectID, err := workflows.Create(ctx, pool, assetPainting, "Winter conservation cycle")
 	if err != nil {
-		return fmt.Errorf("seed demo data: creating project: %w", err)
+		return fmt.Errorf("seed demo data: creating project (painting): %w", err)
 	}
+
+	sketchProjectID, err := workflows.Create(ctx, pool, assetSketch, "Initial condition survey")
+	if err != nil {
+		return fmt.Errorf("seed demo data: creating project (sketch): %w", err)
+	}
+
+	// Intake assessment, then a re-assessment after treatment — a small condition history to
+	// show on the project timeline.
+	intakeAssessmentID, err := assessments.Create(ctx, pool, assessments.Input{
+		ProjectID:   projectID,
+		Condition:   "fair",
+		Description: "Surface grime throughout; a few small paint losses in the lower-left corner.",
+	})
+	if err != nil {
+		return fmt.Errorf("seed demo data: recording intake assessment: %w", err)
+	}
+
+	sketchAssessmentID, err := assessments.Create(ctx, pool, assessments.Input{
+		ProjectID:   sketchProjectID,
+		Condition:   "good",
+		Description: "Minor foxing at the edges; otherwise stable.",
+	})
+	if err != nil {
+		return fmt.Errorf("seed demo data: recording sketch assessment: %w", err)
+	}
+
 	if err := workflows.SetStage(ctx, pool, projectID, "working"); err != nil {
 		return fmt.Errorf("seed demo data: advancing project stage: %w", err)
 	}
 
-	postTreatmentStateID, err := assets.RecordState(ctx, pool, assetPainting,
-		"good", "Surface cleaned; losses stabilized. No active deterioration.", &projectID, nil)
+	postTreatmentAssessmentID, err := assessments.Create(ctx, pool, assessments.Input{
+		ProjectID:   projectID,
+		Condition:   "good",
+		Description: "Surface cleaned; losses stabilized. No active deterioration.",
+	})
 	if err != nil {
-		return fmt.Errorf("seed demo data: recording post-treatment state: %w", err)
+		return fmt.Errorf("seed demo data: recording post-treatment assessment: %w", err)
 	}
 
 	if _, err := treatments.Create(ctx, pool, treatments.Input{
-		AssetID:           assetPainting,
+		ProjectID:         projectID,
 		Method:            "surface_cleaning",
 		Title:             "Initial surface cleaning",
 		Notes:             "Removed surface grime with a dry sponge; tested a small area first. Losses left for a later retouching pass.",
@@ -180,7 +201,7 @@ func SeedDemoData(ctx context.Context, pool *sql.DB, mediaSvc *media.Service) er
 	if err != nil {
 		return fmt.Errorf("seed demo data: uploading before-photo: %w", err)
 	}
-	if err := mediaSvc.AttachMediaReference(ctx, beforePhoto.ID, media.RefAssetState, intakeStateID, "before", 0); err != nil {
+	if err := mediaSvc.AttachMediaReference(ctx, beforePhoto.ID, media.RefAssessment, intakeAssessmentID, "before", 0); err != nil {
 		return fmt.Errorf("seed demo data: attaching before-photo: %w", err)
 	}
 	if _, err := media.CreateRegion(ctx, pool, beforePhoto.ID, "clsfr_annotation_type_loss", 20, 60, 15, 12); err != nil {
@@ -191,7 +212,7 @@ func SeedDemoData(ctx context.Context, pool *sql.DB, mediaSvc *media.Service) er
 	if err != nil {
 		return fmt.Errorf("seed demo data: uploading after-photo: %w", err)
 	}
-	if err := mediaSvc.AttachMediaReference(ctx, afterPhoto.ID, media.RefAssetState, postTreatmentStateID, "after", 0); err != nil {
+	if err := mediaSvc.AttachMediaReference(ctx, afterPhoto.ID, media.RefAssessment, postTreatmentAssessmentID, "after", 0); err != nil {
 		return fmt.Errorf("seed demo data: attaching after-photo: %w", err)
 	}
 
@@ -199,7 +220,7 @@ func SeedDemoData(ctx context.Context, pool *sql.DB, mediaSvc *media.Service) er
 	if err != nil {
 		return fmt.Errorf("seed demo data: uploading reference photo (sketch): %w", err)
 	}
-	if err := mediaSvc.AttachMediaReference(ctx, referencePhoto1.ID, media.RefAssetState, sketchStateID, "documentation", 0); err != nil {
+	if err := mediaSvc.AttachMediaReference(ctx, referencePhoto1.ID, media.RefAssessment, sketchAssessmentID, "documentation", 0); err != nil {
 		return fmt.Errorf("seed demo data: attaching reference photo (sketch): %w", err)
 	}
 
@@ -211,7 +232,7 @@ func SeedDemoData(ctx context.Context, pool *sql.DB, mediaSvc *media.Service) er
 		return fmt.Errorf("seed demo data: attaching reference photo (painting): %w", err)
 	}
 
-	reportID, err := reporter.Create(ctx, pool, assetPainting, &projectID, "Condition Report - Portrait of a Cat", conservatorID, reporter.Sections{
+	reportID, err := reporter.Create(ctx, pool, projectID, "Condition Report - Portrait of a Cat", conservatorID, reporter.Sections{
 		ConditionFindings:  "Surface grime throughout at intake, plus small paint losses lower-left. Stable structurally.",
 		TreatmentPerformed: "Dry surface cleaning across the full painted surface; losses left for a later retouching campaign.",
 	})
