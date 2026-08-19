@@ -11,11 +11,10 @@ import (
 )
 
 type Service struct {
-	Pool          *sql.DB
-	Sessions      *session.Manager
-	Mailer        *mail.Mailer
-	AppURL        string
-	AllowDevLogin bool
+	Pool     *sql.DB
+	Sessions *session.Manager
+	Mailer   *mail.Mailer
+	AppURL   string
 }
 
 // CurrentUser returns the signed-in user for r, or nil if there isn't one.

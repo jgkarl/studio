@@ -78,6 +78,13 @@ follows — see `docs/tech-stack.md`.
 A few spots where this rewrite made a different call than the original TypeScript app, on
 purpose — see `docs/tech-stack.md` for the reasoning behind each:
 
-- **No fictional demo-data seed.** Structural reference data (Classifiers) seeds automatically;
-  the original's `db/seed.ts` demo clients/assets/workflows does not have a Go equivalent — every
-  entity it would create is reachable through the app's own forms instead.
+- **Fictional demo-data seed is dev/docker-only, not a boot-time default.** Structural reference
+  data (Classifiers) still seeds unconditionally on every boot. Fictional demo content (a second
+  "conservator" example login, clients/assets/a project/a treatment/a report, and a few example
+  media library images) mirrors the original's `db/seed.ts` but only runs when
+  `SEED_EXAMPLE_DATA=true` — see `internal/seed/demo.go` and "What first boot actually seeds" in
+  `docs/setup.md`. A production deploy never sets it — only the one `BootstrapAdmin` account from
+  `BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD` boots there.
+- **No dev-login picker.** Every account — the bootstrap admin and any `SEED_EXAMPLE_DATA` demo
+  users included — is a real `provider="email"` row with a real password and `emailVerifiedAt`
+  already set, signing in through the normal `/login` form like any other account.

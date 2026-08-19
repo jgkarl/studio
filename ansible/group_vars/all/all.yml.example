@@ -21,10 +21,11 @@ studio_github_repo: "jgkarl/studio-go"
 # --- Secrets (values live in vault.yml, only referenced by name here) --------------------------
 
 studio_auth_secret: "{{ vault_studio_auth_secret }}"
-studio_allow_dev_login: "{{ vault_studio_allow_dev_login }}"
+studio_seed_example_data: "{{ vault_studio_seed_example_data }}"
 studio_app_url: "{{ vault_studio_app_url }}"
 studio_bootstrap_admin_name: "{{ vault_studio_bootstrap_admin_name }}"
 studio_bootstrap_admin_email: "{{ vault_studio_bootstrap_admin_email }}"
+studio_bootstrap_admin_password: "{{ vault_studio_bootstrap_admin_password }}"
 studio_smtp_host: "{{ vault_studio_smtp_host }}"
 studio_smtp_port: "{{ vault_studio_smtp_port }}"
 studio_smtp_user: "{{ vault_studio_smtp_user }}"

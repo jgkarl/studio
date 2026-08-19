@@ -8,11 +8,11 @@ const path = require("path");
 
 const SCREENSHOT_DIR = path.join(__dirname, "..", "..", "docs", "screenshots");
 const TEST_PHOTO = path.join(__dirname, "..", "fixtures", "test-photo.png");
-// The dev-login picker shows each user's name + role (not email — see internal/auth/views.templ's
-// devLoginList), while Settings shows the email in its inlined Users table — set both via
-// BOOTSTRAP_ADMIN_NAME/BOOTSTRAP_ADMIN_EMAIL when starting the server for this suite.
-const ADMIN_NAME = process.env.E2E_ADMIN_NAME || "Ada Admin";
+// No dev-login picker — sign in through the real /login form, same as any account. Set all three
+// via BOOTSTRAP_ADMIN_NAME/EMAIL/PASSWORD when starting the server for this suite (see
+// e2e/README.md).
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "ada@studio.local";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "correct-horse-battery-staple";
 
 async function shoot(page, name) {
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, name), fullPage: true });
@@ -38,13 +38,14 @@ test.afterAll(async () => {
 });
 
 test.describe("Studio golden path", () => {
-  test("dev login as the bootstrapped admin", async () => {
+  test("log in as the bootstrapped admin", async () => {
     await page.goto("/login");
     await expect(page.locator("h1")).toContainText("Studio");
     await shoot(page, "01-login.png");
 
-    // Dev login picker lists every existing user by name — click the bootstrapped admin's row.
-    await page.click(`form[action="/login/dev"]:has-text("${ADMIN_NAME}") button[type="submit"]`);
+    await page.fill('form[action="/login"] input[name="email"]', ADMIN_EMAIL);
+    await page.fill('form[action="/login"] input[name="password"]', ADMIN_PASSWORD);
+    await page.click('form[action="/login"] button[type="submit"]');
     await expect(page).toHaveURL("/");
     await shoot(page, "02-dashboard.png");
   });

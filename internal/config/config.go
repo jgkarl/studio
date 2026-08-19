@@ -9,11 +9,18 @@ type Config struct {
 	DBPath          string
 	AuthSecret      string
 	AppURL          string
-	AllowDevLogin   bool
 	MediaStorageDir string
 
-	BootstrapAdminName  string
-	BootstrapAdminEmail string
+	BootstrapAdminName     string
+	BootstrapAdminEmail    string
+	BootstrapAdminPassword string
+
+	// SeedExampleData additionally seeds fictional demo content (clients, assets, a project, a
+	// treatment, a report, media library images, and one non-admin example user) — see
+	// internal/seed/demo.go. Never true for a production deploy (see
+	// ansible/roles/studio_app/defaults/main.yml); local .env and docker-compose.yml both default
+	// it to true.
+	SeedExampleData bool
 
 	SMTPHost string
 	SMTPPort string
@@ -28,11 +35,13 @@ func Load() *Config {
 		DBPath:          getenv("DB_PATH", "./data/studio.db"),
 		AuthSecret:      getenv("AUTH_SECRET", "dev-only-insecure-secret-change-me"),
 		AppURL:          os.Getenv("APP_URL"),
-		AllowDevLogin:   os.Getenv("ALLOW_DEV_LOGIN") == "true",
 		MediaStorageDir: getenv("MEDIA_STORAGE_DIR", "./data/media-storage"),
 
-		BootstrapAdminName:  os.Getenv("BOOTSTRAP_ADMIN_NAME"),
-		BootstrapAdminEmail: os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+		BootstrapAdminName:     os.Getenv("BOOTSTRAP_ADMIN_NAME"),
+		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+		BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+
+		SeedExampleData: os.Getenv("SEED_EXAMPLE_DATA") == "true",
 
 		SMTPHost: os.Getenv("SMTP_HOST"),
 		SMTPPort: getenv("SMTP_PORT", "587"),

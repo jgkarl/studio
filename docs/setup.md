@@ -7,19 +7,17 @@ data automatically on first boot — nothing to run by hand before the app is us
 
 ```bash
 cp .env.example .env
-# edit .env — at minimum, set a real AUTH_SECRET (openssl rand -hex 32)
+# edit .env — at minimum, set a real AUTH_SECRET (openssl rand -hex 32) and
+# BOOTSTRAP_ADMIN_NAME/EMAIL/PASSWORD (there's no dev-login picker — this is how you sign in)
 docker compose up --build
 # or: podman-compose up --build
 ```
 
 This builds the app image (inside Ubuntu 24.04, so it doesn't matter whether your own machine has
 `libvips-dev`) and starts it with a bind-mounted `./data` directory. Open
-<http://localhost:3000>.
-
-With `ALLOW_DEV_LOGIN=true` (the `.env.example` default) and `BOOTSTRAP_ADMIN_NAME`/
-`BOOTSTRAP_ADMIN_EMAIL` set, a one-click **Dev login** button appears on `/login` for that admin
-— no password needed locally. Data persists in `./data` across restarts; delete it to start over
-from an empty database.
+<http://localhost:3000> and sign in at `/login` with the email/password you set in
+`BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`. Data persists in `./data` across restarts;
+delete it to start over from an empty database.
 
 ## Option B — Native Go (needs libvips-dev installed)
 
@@ -27,12 +25,12 @@ from an empty database.
 go install github.com/a-h/templ/cmd/templ@v0.3.1020
 sudo apt-get install -y libvips-dev pkg-config   # works cleanly on plain Ubuntu 24.04+/Debian
 cp .env.example .env
+# edit .env — same essentials as Option A
 make run   # templ generate + go run ./cmd/server
 ```
 
-Open <http://localhost:3000>, same dev-login flow as above. `make dev` runs
-`templ generate --watch` alongside the server for live template reload while editing `.templ`
-files.
+Open <http://localhost:3000>, same login as above. `make dev` runs `templ generate --watch`
+alongside the server for live template reload while editing `.templ` files.
 
 ## Everyday commands
 
@@ -56,10 +54,12 @@ See `.env.example` for the full annotated list. The essentials:
   automatically.
 - `MEDIA_STORAGE_DIR` — where uploaded files are written (local disk adapter).
 - `AUTH_SECRET` — signs the session cookie; generate a real one beyond local/throwaway use.
-- `ALLOW_DEV_LOGIN` — `true` shows one-click dev-login buttons for every existing user; set
-  `false` for anything beyond your own machine.
-- `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL` — if both are set, creates that one admin user
-  on first boot against a database with no matching email yet (idempotent — safe to leave set).
+- `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` — if all three are
+  set, creates that one admin user (already active, signs in through the normal `/login` form) on
+  first boot against a database with no matching email yet (idempotent — safe to leave set). This
+  is the only way in on a brand new database — there's no dev-login picker.
+- `SEED_EXAMPLE_DATA` — `true` additionally seeds fictional demo content on first boot (see below)
+  — dev/local convenience only, never set this for a production deploy.
 - `SMTP_*` — leave `SMTP_HOST` blank locally: registration/reset emails print to the server
   console instead of sending, so the whole auth flow is testable without real mail infra.
 
@@ -72,11 +72,23 @@ migrations):
   activity types [historical — the Activity Notebook they fed is retired], project stages,
   priority, treatment methods, client types, contact methods), idempotent (`INSERT OR IGNORE`),
   safe to run on every start.
-- One admin `User`, only if `BOOTSTRAP_ADMIN_NAME`/`BOOTSTRAP_ADMIN_EMAIL` are set and no `User`
-  with that email exists yet.
+- One admin `User`, only if `BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD` are all set and no `User`
+  with that email exists yet — already active (`emailVerifiedAt` set), signs in through the
+  normal `/login` form immediately.
 
-There is deliberately no fictional-demo-data seed (the original TypeScript app's `db/seed.ts` —
-several clients/assets/projects/reports for exercising every screen immediately). That's dev-only
-convenience content, not something either local dev or a production deploy strictly needs — every
-entity it would create is reachable through the app's own CRUD forms, which is how `e2e/tests/
-smoke.spec.js` populates a fresh database for its own run.
+Only when `SEED_EXAMPLE_DATA=true` (the `.env.example`/docker-compose default — never true for a
+production deploy, see `ansible/roles/studio_app/defaults/main.yml`), one more step runs:
+`internal/seed.SeedDemoData` (idempotent — skipped entirely once its conservator user exists):
+
+- A second `User`, "Conservator Example" (`role=conservator`) — same shape as the bootstrap
+  admin: real password (`internal/seed.DemoUserPassword`), already active, signs in through
+  `/login` immediately — alongside the one admin `BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD`
+  creates, so there's a non-admin account to sign in as too.
+- Two `Client`s, two `Asset`s (with condition-state history), a `Project`, a `Treatment`, a
+  `Report`, and four `Media` images — from `internal/seed/testdata/cats` — wired into the media
+  library (including one annotated region), so every screen has something to look at immediately.
+
+A production boot (`SEED_EXAMPLE_DATA` unset/`false`) never runs this — only the Classifiers and
+the one `BootstrapAdmin` account above. `e2e/tests/smoke.spec.js` still populates its own fresh
+database through the app's CRUD forms rather than relying on this seed, so it exercises those
+forms too.

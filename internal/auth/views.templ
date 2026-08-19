@@ -33,35 +33,14 @@ templ loginForm(errorCode, noticeCode string) {
 	}
 }
 
-templ devLoginList(users []User) {
-	<div class="dev-login">
-		<p class="dev-login-heading">Dev login</p>
-		if len(users) == 0 {
-			<p class="page-subtitle">No users yet — seed some with the seed command.</p>
-		}
-		for _, u := range users {
-			<form method="post" action="/login/dev">
-				<input type="hidden" name="userId" value={ u.ID }/>
-				<button type="submit" class="btn btn-secondary">
-					<span>{ u.Name }</span>
-					<span class="page-subtitle">{ string(u.Role) }</span>
-				</button>
-			</form>
-		}
-	</div>
+templ LoginPage(errorCode, noticeCode string) {
+	@web.AuthLayout("Sign in", loginBody(errorCode, noticeCode))
 }
 
-templ LoginPage(errorCode, noticeCode string, devLoginEnabled bool, devUsers []User) {
-	@web.AuthLayout("Sign in", loginBody(errorCode, noticeCode, devLoginEnabled, devUsers))
-}
-
-templ loginBody(errorCode, noticeCode string, devLoginEnabled bool, devUsers []User) {
+templ loginBody(errorCode, noticeCode string) {
 	<h1>Studio</h1>
 	<p class="tagline">Conservation studio management</p>
 	@loginForm(errorCode, noticeCode)
-	if devLoginEnabled {
-		@devLoginList(devUsers)
-	}
 }
 
 templ RegisterPage() {

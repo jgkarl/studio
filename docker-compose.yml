@@ -17,7 +17,14 @@ services:
       - "${PORT:-3000}:3000"
     environment:
       AUTH_SECRET: "${AUTH_SECRET:-dev-only-insecure-secret-change-me}"
-      ALLOW_DEV_LOGIN: "${ALLOW_DEV_LOGIN:-true}"
+      # No dev-login picker — these three are the only way in. Compose only forwards vars listed
+      # here (unlike DB_PATH/MEDIA_STORAGE_DIR/PORT, which the Dockerfile already sets to match
+      # the /data volume mount), so BOOTSTRAP_ADMIN_* has to be explicit or the container boots
+      # with no usable login at all.
+      BOOTSTRAP_ADMIN_NAME: "${BOOTSTRAP_ADMIN_NAME:-}"
+      BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
+      BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
+      SEED_EXAMPLE_DATA: "${SEED_EXAMPLE_DATA:-true}"
     volumes:
       - ./data:/data
     restart: unless-stopped

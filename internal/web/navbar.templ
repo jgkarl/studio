@@ -149,10 +149,7 @@ templ Navbar(c Chrome) {
 }
 
 templ logoMark() {
-	<svg width="30" height="30" viewBox="0 0 24 24" style="flex-shrink:0;">
-		<path d="M3 9.3C3 4.7 7 2 12 2s9 2.7 9 7.3c0 6.4 -6.8 11.2 -8.6 12.4a0.9 0.9 0 0 1 -0.8 0C9.8 20.5 3 15.7 3 9.3Z" fill="var(--gray-900)"></path>
-		<path d="M12 20.4V5.2M12 5.2L6.3 17.6M12 5.2l5.7 12.4M12 8.2L4.4 14.6M12 8.2l7.6 6.4M12 11.4L3.4 16.9M12 11.4l8.6 5.5" stroke="#EEA42E" stroke-width="0.85" fill="none" stroke-linecap="round"></path>
-	</svg>
+	<img src={ iconSrc("logo") } width="30" height="30" alt="" class="icon" style="flex-shrink:0;"/>
 }
 
 templ themeGlyph(c Chrome) {

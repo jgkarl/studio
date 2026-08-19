@@ -303,30 +303,6 @@ html[data-theme="dark"] .card {
   text-decoration: underline;
 }
 
-.dev-login {
-  margin-top: 1.5rem;
-  border-top: 1px solid var(--border);
-  padding-top: 1.25rem;
-}
-
-.dev-login .dev-login-heading {
-  margin: 0 0 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-faint);
-}
-
-.dev-login form + form {
-  margin-top: 0.5rem;
-}
-
-.dev-login .btn {
-  width: 100%;
-  justify-content: space-between;
-}
-
 .btn-block {
   width: 100%;
   justify-content: center;

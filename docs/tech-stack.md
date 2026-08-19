@@ -91,8 +91,11 @@ needs it.
 - Session cookies: HMAC-SHA256 signed, `internal/session`. Passwords: `golang.org/x/crypto/scrypt`.
   Verification/reset tokens: single-use, stored hashed. No OAuth, no third-party auth service —
   same "few dependencies, all auditable" posture as the rest of the stack.
-- `ALLOW_DEV_LOGIN=true` adds a one-click picker (any existing user, no password) for local/staging
-  use only — never set it on a real deployment.
+- No dev-login picker — every account, including the first admin
+  (`BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD`, see `internal/seed/admin.go`) and any seeded example
+  users (`SEED_EXAMPLE_DATA=true`, see `internal/seed/demo.go`), is a real `provider="email"` row
+  with a real scrypt-hashed password and `emailVerifiedAt` already set, signing in through the
+  normal `/login` form like any other account.
 
 ## JS: no bundler, plain vanilla islands only
 

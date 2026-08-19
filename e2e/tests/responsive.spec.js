@@ -8,7 +8,9 @@ const { test, expect } = require("@playwright/test");
 const path = require("path");
 
 const SCREENSHOT_DIR = path.join(__dirname, "..", "..", "docs", "screenshots");
-const ADMIN_NAME = process.env.E2E_ADMIN_NAME || "Ada Admin";
+// No dev-login picker — sign in through the real /login form (see e2e/README.md).
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "ada@studio.local";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "correct-horse-battery-staple";
 
 // Standard breakpoints: below the sm tier, at each of sm(640)/md(768)/lg(1024), and a wide
 // desktop well past lg to confirm nothing keeps growing new columns unexpectedly.
@@ -33,7 +35,9 @@ test.beforeAll(async ({ browser }) => {
   page = await context.newPage();
 
   await page.goto("/login");
-  await page.click(`form[action="/login/dev"]:has-text("${ADMIN_NAME}") button[type="submit"]`);
+  await page.fill('form[action="/login"] input[name="email"]', ADMIN_EMAIL);
+  await page.fill('form[action="/login"] input[name="password"]', ADMIN_PASSWORD);
+  await page.click('form[action="/login"] button[type="submit"]');
   await expect(page).toHaveURL("/");
 
   await page.goto("/clients/new");

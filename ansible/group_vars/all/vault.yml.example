@@ -5,15 +5,16 @@
 # is what actually makes it safe to keep in version control afterwards, if you choose to).
 
 vault_studio_auth_secret: "CHANGE_ME"   # openssl rand -hex 32
-vault_studio_allow_dev_login: "false"   # only ever "true" on a throwaway/staging box
+vault_studio_seed_example_data: "false"   # fictional demo content - only ever "true" on a throwaway/staging box
 vault_studio_app_url: "https://yourdomain.com"
 
-# Optional: set both to get a first admin account on a brand new database (created once, on the
-# app's first boot against an empty DB - see .env.example at the repo root for the full
-# explanation). Sign in via the dev-login picker, promote a real account under Settings -> Users,
-# then blank these back out and re-run update.yml.
+# Set all three to get a first admin account on a brand new database (created once, on the app's
+# first boot against an empty DB - see .env.example at the repo root for the full explanation).
+# There's no dev-login picker - this is the only way in, so a real password is required. Safe to
+# leave set permanently (idempotent - a no-op once the account exists).
 vault_studio_bootstrap_admin_name: ""
 vault_studio_bootstrap_admin_email: ""
+vault_studio_bootstrap_admin_password: "CHANGE_ME"
 
 # Leave vault_studio_smtp_host blank to log email bodies to the systemd journal instead of
 # sending them - fine for a first smoke test, not for real use.

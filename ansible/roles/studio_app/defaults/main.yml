@@ -11,10 +11,11 @@ studio_port: 3000
 # Blank disables Caddy install/config entirely - see all.yml.example.
 studio_domain: ""
 
-studio_allow_dev_login: "false"
+studio_seed_example_data: "false"
 studio_app_url: ""
 studio_bootstrap_admin_name: ""
 studio_bootstrap_admin_email: ""
+studio_bootstrap_admin_password: ""
 studio_smtp_host: ""
 studio_smtp_port: "587"
 studio_smtp_user: ""

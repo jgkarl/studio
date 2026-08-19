@@ -17,7 +17,6 @@ import (
 func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /login", svc.handleLoginPage)
 	mux.HandleFunc("POST /login", svc.handleLogin)
-	mux.HandleFunc("POST /login/dev", svc.handleDevLogin)
 	mux.HandleFunc("POST /logout", svc.handleLogout)
 
 	mux.HandleFunc("GET /register", svc.handleRegisterPage)
@@ -49,11 +48,7 @@ func (s *Service) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	var devUsers []User
-	if s.AllowDevLogin {
-		devUsers, _ = ListUsers(r.Context(), s.Pool)
-	}
-	writeHTML(w, r, LoginPage(r.URL.Query().Get("error"), r.URL.Query().Get("notice"), s.AllowDevLogin, devUsers))
+	writeHTML(w, r, LoginPage(r.URL.Query().Get("error"), r.URL.Query().Get("notice")))
 }
 
 func loginFailure(w http.ResponseWriter, r *http.Request, reason string) {
@@ -88,29 +83,6 @@ func (s *Service) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.Sessions.Create(w, user.ID)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
-func (s *Service) handleDevLogin(w http.ResponseWriter, r *http.Request) {
-	if !s.AllowDevLogin {
-		http.Error(w, "Dev login is disabled (ALLOW_DEV_LOGIN is not true).", http.StatusForbidden)
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	userID := r.FormValue("userId")
-	user, err := GetUserByID(r.Context(), s.Pool, userID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if user == nil {
-		http.Error(w, "Unknown user.", http.StatusBadRequest)
-		return
-	}
 	s.Sessions.Create(w, user.ID)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

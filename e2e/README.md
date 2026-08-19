@@ -11,13 +11,13 @@ directly on the host.
 make release   # or: docker build -t studio-go .
 docker run -d --name studio-e2e -p 4070:3000 \
   -e AUTH_SECRET=some-random-string \
-  -e ALLOW_DEV_LOGIN=true \
   -e BOOTSTRAP_ADMIN_NAME="Ada Admin" \
   -e BOOTSTRAP_ADMIN_EMAIL="ada@studio.local" \
+  -e BOOTSTRAP_ADMIN_PASSWORD="correct-horse-battery-staple" \
   -v "$(mktemp -d):/data" \
   studio-go
 
-# 2. Run the suite against it:
+# 2. Run the suite against it (E2E_ADMIN_* must match what you passed above if you changed them):
 cd e2e
 npm install
 BASE_URL=http://localhost:4070 npm test

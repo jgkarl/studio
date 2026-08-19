@@ -51,7 +51,7 @@ func main() {
 	}
 	log.Println("database ready, migrations applied")
 
-	if err := seed.BootstrapAdmin(ctx, pool, cfg.BootstrapAdminName, cfg.BootstrapAdminEmail); err != nil {
+	if err := seed.BootstrapAdmin(ctx, pool, cfg.BootstrapAdminName, cfg.BootstrapAdminEmail, cfg.BootstrapAdminPassword); err != nil {
 		log.Fatalf("bootstrapping admin: %v", err)
 	}
 
@@ -61,6 +61,17 @@ func main() {
 	storage, err := media.NewLocalDiskAdapter(cfg.MediaStorageDir)
 	if err != nil {
 		log.Fatalf("media storage: %v", err)
+	}
+	mediaSvc := &media.Service{Pool: pool, Storage: storage}
+
+	// Example data across every domain model (clients, assets, a project, a treatment, a report,
+	// media library images) plus a second "conservator" example login — dev/docker convenience
+	// only, never a production deploy (see ansible/roles/studio_app/defaults/main.yml) — a
+	// production boot only ever gets the one BootstrapAdmin account above.
+	if cfg.SeedExampleData {
+		if err := seed.SeedDemoData(ctx, pool, mediaSvc); err != nil {
+			log.Fatalf("seeding demo data: %v", err)
+		}
 	}
 
 	authSvc := &auth.Service{
@@ -73,10 +84,8 @@ func main() {
 			Pass: cfg.SMTPPass,
 			From: cfg.SMTPFrom,
 		}),
-		AppURL:        cfg.AppURL,
-		AllowDevLogin: cfg.AllowDevLogin,
+		AppURL: cfg.AppURL,
 	}
-	mediaSvc := &media.Service{Pool: pool, Storage: storage}
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServerFS(staticassets.Files)))
