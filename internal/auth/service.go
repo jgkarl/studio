@@ -44,17 +44,8 @@ func (s *Service) Origin(r *http.Request) string {
 	return proto + "://" + r.Host
 }
 
-type ctxKey int
-
-const userCtxKey ctxKey = 0
-
-func UserFromContext(ctx context.Context) *User {
-	u, _ := ctx.Value(userCtxKey).(*User)
-	return u
-}
-
 // RequireUser redirects to /login when no session is present; otherwise calls next with the
-// user attached to the request context (retrieve via UserFromContext).
+// signed-in user.
 func (s *Service) RequireUser(next func(w http.ResponseWriter, r *http.Request, user *User)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, err := s.CurrentUser(r.Context(), r)
@@ -66,8 +57,7 @@ func (s *Service) RequireUser(next func(w http.ResponseWriter, r *http.Request, 
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		ctx := context.WithValue(r.Context(), userCtxKey, user)
-		next(w, r.WithContext(ctx), user)
+		next(w, r, user)
 	}
 }
 

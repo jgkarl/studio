@@ -51,11 +51,6 @@ func MarkEmailVerified(ctx context.Context, q studiodb.Querier, userID string) e
 	return err
 }
 
-func SetUserRole(ctx context.Context, q studiodb.Querier, userID string, role Role) error {
-	_, err := studiodb.Execute(ctx, q, "UPDATE User SET role = ? WHERE id = ?", role, userID)
-	return err
-}
-
 func scanVerificationToken(rows *sql.Rows) (VerificationToken, error) {
 	var t VerificationToken
 	err := rows.Scan(&t.ID, &t.UserID, &t.TokenHash, &t.Type, &t.ExpiresAt, &t.UsedAt, &t.CreatedAt)

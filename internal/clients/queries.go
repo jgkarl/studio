@@ -92,26 +92,6 @@ func Update(ctx context.Context, q studiodb.Querier, id string, in Input) error 
 	return err
 }
 
-// FindOrCreateByEmail looks up a Client by email, creating a minimal one (email only, type
-// "individual") if none exists — the entry point for any intake path where a prospect isn't
-// already a Client record. Email isn't unique in the schema (institutions may share a contact
-// inbox), so this matches the first existing record rather than relying on a DB constraint.
-func FindOrCreateByEmail(ctx context.Context, q studiodb.Querier, email, name string) (*Client, error) {
-	existing, err := studiodb.QueryOne(ctx, q, "SELECT "+clientColumns+" FROM Client WHERE email = ? LIMIT 1", scanClient, email)
-	if err != nil || existing != nil {
-		return existing, err
-	}
-	displayName := name
-	if displayName == "" {
-		displayName = email
-	}
-	id := studiodb.NewID()
-	if _, err := studiodb.Execute(ctx, q, "INSERT INTO Client (id, email, name, type, updatedAt) VALUES (?, ?, ?, ?, ?)",
-		id, email, displayName, "individual", time.Now()); err != nil {
-		return nil, err
-	}
-	return GetByID(ctx, q, id)
-}
 
 // --- Detail-page read-only summaries (Assets) -----------------------------------------------
 

@@ -252,7 +252,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 				}
 			}
 			@web.Modal("modal-project", "Add: Projects") {
-				<form method="post" action="/projects" class="form-grid">
+				<form method="post" action="/projects" enctype="multipart/form-data" class="form-grid">
 					<input type="hidden" name="assetId" value={ asset.ID }/>
 					@web.Field("Title", "e.g. \"Cleaning and varnish removal\"") {
 						<input class="input" name="title" required/>

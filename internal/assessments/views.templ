@@ -21,33 +21,31 @@ templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Loc
 			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
 			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
 		</div>
-		@web.Card() {
-			if len(rows) == 0 {
-				<p class="empty-state">No assessments recorded yet.</p>
-			}
-			<ul class="entity-list" data-el-list>
-				for _, row := range rows {
-					<li
-						data-el-row
-						data-el-search={ assessmentSearchHaystack(row) }
-						data-el-condition={ row.Condition }
-						data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
-						data-el-group-client={ row.ClientName }
-					>
-						<a href={ templ.URL("/assessments/" + row.ID) } class="entity-list-row">
-							<div>
-								<span class="entity-list-name">{ assetLabel(row.AssetTitle, row.AssetReferenceCode) }</span>
-								<div class="page-subtitle">{ row.Description } · owner: { row.ClientName }</div>
-							</div>
-							<div class="row-actions">
-								<span class="badge">{ row.Condition }</span>
-								<span class="page-subtitle">{ row.RecordedAt.Format("2006-01-02") }</span>
-							</div>
-						</a>
-					</li>
-				}
-			</ul>
+		if len(rows) == 0 {
+			<p class="empty-state">No assessments recorded yet.</p>
 		}
+		<ul class="entity-list" data-el-list>
+			for _, row := range rows {
+				<li
+					data-el-row
+					data-el-search={ assessmentSearchHaystack(row) }
+					data-el-condition={ row.Condition }
+					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
+					data-el-group-client={ row.ClientName }
+				>
+					<a href={ templ.URL("/assessments/" + row.ID) } class="entity-list-row">
+						<div>
+							<span class="entity-list-name">{ assetLabel(row.AssetTitle, row.AssetReferenceCode) }</span>
+							<div class="page-subtitle">{ row.Description } · owner: { row.ClientName }</div>
+						</div>
+						<div class="row-actions">
+							<span class="badge">{ row.Condition }</span>
+							<span class="page-subtitle">{ row.RecordedAt.Format("2006-01-02") }</span>
+						</div>
+					</a>
+				</li>
+			}
+		</ul>
 	</div>
 	<script src="/static/js/entity-list-filter.js" defer></script>
 }

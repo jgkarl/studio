@@ -80,13 +80,18 @@ needs it.
   `libvips` — the one part of this app that isn't pure Go. Used for upload-time thumbnail
   generation (`internal/media/service.go`) and a from-scratch IIIF Image API v3 implementation
   (`internal/iiif` — region/size/rotation/quality/format transforms + `info.json`), which backs
-  the Media view's "pattern layer" (grayscale base image, `quality=gray`) and a hand-rolled
-  deep-zoom viewer (`static/js/iiif-viewer.js` — no vendored OpenSeadragon, see the JS section
-  below).
+  the Media view's "pattern layer" (grayscale base image, `quality=gray`) and the deep-zoom viewer
+  (OpenSeadragon, vendored — see the JS section below — tiling against the same `info.json`).
+- `internal/media/rasterize.go`'s `RenderAnnotatedImage` flattens a media item's drawn regions and
+  their legend into the image itself: it builds a standalone SVG (the image as a `data:` URI plus
+  the same region/legend markup the editor renders) and rasterizes it to PNG via
+  `libvips`'s librsvg-backed SVG loader — no separate SVG library. Backs the "Download annotated"
+  button and report HTML/PDF exports.
 - This is why local `go build` needs `libvips-dev` installed to compile against
   (`apt install libvips-dev` — works cleanly on plain Ubuntu 24.04, see `docs/deploy.md`), and
   why the Docker/release builds run inside a container: reproducible regardless of what's
-  installed on your own machine.
+  installed on your own machine. `libvips42`'s Ubuntu package links `librsvg` directly, so no
+  separate package is needed for the SVG rasterization path.
 
 ## Auth: hand-rolled, no external provider
 
@@ -101,16 +106,20 @@ needs it.
 
 ## JS: no bundler, plain vanilla islands only
 
-There is no `npm run build` step for the frontend — no webpack/esbuild/vite, and no vendored or
-CDN-loaded third-party JS at all. `static/js/iiif-viewer.js` (deep-zoom pan/zoom) and
-`static/js/pattern-layer.js` (region annotations) are hand-rolled against `internal/iiif`'s own
-Image API rather than vendoring OpenSeadragon, same reasoning `internal/reporter`'s structured
-sections replaced a CDN-loaded TipTap. Every script is plain vanilla JS loaded via
-`<script type="module">`, reused across every kanban board on a shared
-`data-url-template`/`data-status-field` convention (`static/js/kanban.js` — native HTML5 Drag and
-Drop, chosen over `dnd-kit`, which has no vanilla build) plus small single-page islands
-(`static/js/lightbox.js` for the Media view, `static/js/album.js` for the media grid's
-filter/search).
+There is no `npm run build` step for the frontend — no webpack/esbuild/vite, and (with one
+deliberate exception) no vendored or CDN-loaded third-party JS. That exception is
+[OpenSeadragon](https://openseadragon.github.io/) (`static/openseadragon/`, vendored — real tiled
+deep zoom is enough of a lift that hand-rolling it wasn't worth it, unlike the rest of the app):
+`static/js/osd-viewer.js` initializes it against `internal/iiif`'s own Image API `info.json`
+route and layers the stored annotation regions/legend on top via OpenSeadragon's overlay API.
+Everything else stays hand-rolled vanilla JS, including `static/js/pattern-layer.js` (region
+annotations — the rect/freehand drawing tool and its save-on-drop calls) and
+`internal/reporter`'s structured sections, which replaced a CDN-loaded TipTap. Every other script
+is plain vanilla JS loaded via `<script type="module">`, reused across every kanban board on a
+shared `data-url-template`/`data-status-field` convention (`static/js/kanban.js` — native HTML5
+Drag and Drop, chosen over `dnd-kit`, which has no vanilla build) plus small single-page islands
+(`static/js/lightbox.js` for the Media view's rotate/brightness/contrast/description-save
+controls, `static/js/album.js` for the media grid's filter/search).
 
 ## Build & deploy
 

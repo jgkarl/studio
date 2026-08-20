@@ -107,55 +107,11 @@ func CreateClassifier(ctx context.Context, q studiodb.Querier, in ClassifierInpu
 	return id, err
 }
 
-func UpdateClassifier(ctx context.Context, q studiodb.Querier, id string, in ClassifierInput) error {
-	_, err := studiodb.Execute(ctx, q,
-		"UPDATE Classifier SET title = ?, titleEt = ?, description = ?, descriptionEt = ?, sequence = ?, isActive = ?, data = ?, updatedAt = ? WHERE id = ?",
-		in.Title, nullIfEmpty(in.TitleEt), nullIfEmpty(in.Description), nullIfEmpty(in.DescriptionEt), in.Sequence,
-		in.IsActive, nullIfEmpty(in.Data), time.Now(), id,
-	)
-	return err
-}
-
 func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
 	}
 	return s
-}
-
-func findNeighborClassifier(ctx context.Context, q studiodb.Querier, row *Classifier, direction string) (*Classifier, error) {
-	if direction == "up" {
-		return studiodb.QueryOne(ctx, q,
-			"SELECT "+classifierColumns+" FROM Classifier WHERE type = ? AND id != ? AND sequence <= ? ORDER BY sequence DESC, id DESC LIMIT 1",
-			scanClassifier, row.Type, row.ID, row.Sequence)
-	}
-	return studiodb.QueryOne(ctx, q,
-		"SELECT "+classifierColumns+" FROM Classifier WHERE type = ? AND id != ? AND sequence >= ? ORDER BY sequence ASC, id ASC LIMIT 1",
-		scanClassifier, row.Type, row.ID, row.Sequence)
-}
-
-// ReorderClassifier swaps sequence with the adjacent row (same type) — the gridview's up/down
-// arrows. No-op at an edge.
-func ReorderClassifier(ctx context.Context, pool *sql.DB, id, direction string) error {
-	row, err := GetClassifierByID(ctx, pool, id)
-	if err != nil {
-		return err
-	}
-	if row == nil {
-		return fmt.Errorf("classifier %s not found", id)
-	}
-	neighbor, err := findNeighborClassifier(ctx, pool, row, direction)
-	if err != nil || neighbor == nil {
-		return err
-	}
-	_, err = studiodb.WithTransaction(ctx, pool, func(tx *sql.Tx) (struct{}, error) {
-		if _, err := studiodb.Execute(ctx, tx, "UPDATE Classifier SET sequence = ? WHERE id = ?", neighbor.Sequence, row.ID); err != nil {
-			return struct{}{}, err
-		}
-		_, err := studiodb.Execute(ctx, tx, "UPDATE Classifier SET sequence = ? WHERE id = ?", row.Sequence, neighbor.ID)
-		return struct{}{}, err
-	})
-	return err
 }
 
 // classifierUsageChecks: types backed by a real foreign key elsewhere in the schema — deleting a

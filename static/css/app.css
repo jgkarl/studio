@@ -28,8 +28,6 @@
   --border-light: var(--gray-100);
   --accent: var(--green-500);
   --accent-text: #ffffff;
-  --danger: #F44336;
-  --danger-text: #ffffff;
   --green-bg: #E9F7EE;
   --green-text: #205D36;
   --amber-bg: #FDF6EA;
@@ -166,14 +164,38 @@ html[data-theme="dark"] .card {
   color: var(--text);
 }
 
-.btn-danger {
-  background: var(--danger);
-  color: var(--danger-text);
-}
-
 .btn-ghost {
   background: transparent;
   color: var(--text-muted);
+}
+
+.btn:hover {
+  filter: brightness(0.96);
+}
+
+.btn-secondary:hover {
+  background: var(--bg);
+  border-color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  background: var(--neutral-bg);
+  color: var(--text);
+}
+
+.btn:active {
+  filter: brightness(0.9);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 1px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .badge {
@@ -188,10 +210,8 @@ html[data-theme="dark"] .card {
   color: var(--neutral-text);
 }
 
-.badge-neutral { background: var(--neutral-bg); color: var(--neutral-text); }
 .badge-green { background: var(--green-bg); color: var(--green-text); }
 .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
-.badge-red   { background: var(--red-bg);   color: var(--red-text); }
 .badge-blue  { background: var(--blue-bg);  color: var(--blue-text); }
 
 .field {
@@ -364,16 +384,6 @@ html[data-theme="dark"] select.input, html[data-theme="dark"] select {
   display: inline;
 }
 
-.move-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.move-buttons .btn {
-  padding: 0.125rem 0.375rem;
-}
-
 .inline-edit-form {
   display: flex;
   flex-wrap: wrap;
@@ -381,28 +391,11 @@ html[data-theme="dark"] select.input, html[data-theme="dark"] select {
   gap: 0.75rem;
 }
 
-.inline-edit-grid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 640px) {
-  .inline-edit-grid {
-    grid-template-columns: repeat(3, 1fr);
-    align-items: end;
-  }
-}
-
 .checkbox-field {
   display: flex;
   align-items: center;
   gap: 0.375rem;
   font-size: 0.875rem;
-}
-
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* --- Navbar --------------------------------------------------------------------------------
@@ -586,6 +579,11 @@ html[data-theme="dark"] .nav-toggle-btn {
   color: var(--text);
 }
 
+.navbar-pill-btn:hover,
+.navbar-icon-btn:hover {
+  background: var(--neutral-bg);
+}
+
 html[data-theme="dark"] .navbar-pill-btn,
 html[data-theme="dark"] .navbar-icon-btn {
   border-color: rgba(255, 255, 255, 0.25);
@@ -662,9 +660,14 @@ html[data-theme="dark"] .navbar-icon-btn {
 .nav-drawer-close {
   background: transparent;
   border: none;
+  border-radius: 4px;
   cursor: pointer;
   padding: 6px;
   display: inline-flex;
+}
+
+.nav-drawer-close:hover {
+  background: var(--neutral-bg);
 }
 
 .nav-drawer-links {
@@ -1142,38 +1145,6 @@ html[data-theme="dark"] .stat-card {
   color: var(--text-muted);
 }
 
-.subsection {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
-}
-
-.subsection-heading {
-  margin: 0 0 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-faint);
-}
-
-.tag-pill-neutral {
-  background: var(--border);
-  color: var(--text);
-}
-
-.condition-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.condition-item {
-  border-left: 2px solid var(--border);
-  padding-left: 0.75rem;
-  margin-bottom: 1rem;
-}
-
 /* --- Album ------------------------------------------------------------------------------- */
 
 .album-controls {
@@ -1336,6 +1307,10 @@ html[data-theme="dark"] .stat-card {
   border-radius: 999px;
   background: var(--bg);
   cursor: pointer;
+}
+
+.lightbox-close:hover {
+  background: var(--neutral-bg);
 }
 
 .lightbox-image-wrap {
@@ -1546,15 +1521,7 @@ html[data-theme="dark"] .stat-card {
   display: inline;
 }
 
-/* --- Commerce: line items grid + kanban ----------------------------------------------------- */
-
-.line-items-grid {
-  display: grid;
-  grid-template-columns: 2fr repeat(3, 1fr);
-  gap: 0.5rem;
-  align-items: center;
-  margin-top: 0.5rem;
-}
+/* --- Commerce: kanban ------------------------------------------------------------------------ */
 
 /* Full-bleed 5-column board (Orders) - breaks out of .container's 1200px max-width to use the
    full viewport instead of horizontal-scrolling fixed-width columns. */
@@ -1660,102 +1627,6 @@ html[data-theme="dark"] .kanban-card {
   text-decoration: underline;
 }
 
-/* --- Reporter (TipTap) ------------------------------------------------------------------------ */
-
-.report-editor-root {
-  margin-bottom: 1.5rem;
-}
-
-.report-editor-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 0.5rem 0.5rem 0 0;
-  background: var(--bg);
-  padding: 0.5rem;
-}
-
-.report-editor-btn {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8125rem;
-}
-
-.report-editor-btn.is-active {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-
-.report-editor-save {
-  margin-left: auto;
-}
-
-.report-editor-content {
-  border: 1px solid var(--border);
-  border-radius: 0 0 0.5rem 0.5rem;
-  background: var(--surface);
-  padding: 1rem 1.25rem;
-  min-height: 12rem;
-}
-
-.report-editor-root[data-readonly] .report-editor-content {
-  border-radius: 0.5rem;
-}
-
-.report-editor-content .ProseMirror {
-  outline: none;
-}
-
-.report-editor-content .ProseMirror > * + * {
-  margin-top: 0.75em;
-}
-
-.report-editor-content .ProseMirror h1 { font-size: 1.5rem; font-weight: 600; }
-.report-editor-content .ProseMirror h2 { font-size: 1.25rem; font-weight: 600; }
-.report-editor-content .ProseMirror h3 { font-size: 1.0625rem; font-weight: 600; }
-
-.report-editor-content .ProseMirror ul,
-.report-editor-content .ProseMirror ol {
-  padding-left: 1.5rem;
-}
-
-.report-editor-content .ProseMirror blockquote {
-  border-left: 3px solid var(--border);
-  padding-left: 0.75rem;
-  color: var(--text-muted);
-}
-
-.report-editor-content .ProseMirror pre {
-  background: var(--bg);
-  border-radius: 0.375rem;
-  padding: 0.5rem 0.75rem;
-  overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8125rem;
-}
-
-.report-editor-content .ProseMirror code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.875em;
-}
-
-.report-editor-content .ProseMirror img {
-  max-width: 100%;
-  border-radius: 0.375rem;
-}
-
-.report-editor-content .ProseMirror a {
-  color: var(--blue-text);
-  text-decoration: underline;
-}
-
-.report-editor-content .ProseMirror hr {
-  border: none;
-  border-top: 1px solid var(--border);
-}
-
 /* --- Modal (generic "+Add" dialog) ------------------------------------------------------------ */
 /* Mirrors .lightbox-overlay/.lightbox-modal/.lightbox-close's tokens/spacing — same overlay
    pattern, narrower panel (these hold forms, not an image). static/js/modal.js drives open/close. */
@@ -1804,6 +1675,10 @@ html[data-theme="dark"] .kanban-card {
   border-radius: 999px;
   background: var(--bg);
   cursor: pointer;
+}
+
+.modal-close:hover {
+  background: var(--neutral-bg);
 }
 
 /* --- Entity-list row actions (View/Edit/Unlink icon buttons) --------------------------------- */
