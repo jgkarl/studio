@@ -1,4 +1,4 @@
-.PHONY: generate build release run test dev docker-up docker-down
+.PHONY: generate build release run test dev docker-up docker-down install-hooks
 
 CONTAINER_ENGINE ?= docker
 
@@ -16,10 +16,10 @@ build: generate
 # dist/server itself isn't committed (see .gitignore) — CI attaches it to a GitHub Release on
 # every `vX.Y.Z` tag, and that's what Ansible actually deploys.
 release:
-	$(CONTAINER_ENGINE) build --target builder -t stuudio-builder:latest .
-	$(CONTAINER_ENGINE) create --name stuudio-builder-extract stuudio-builder:latest
-	$(CONTAINER_ENGINE) cp stuudio-builder-extract:/out/server ./dist/server
-	$(CONTAINER_ENGINE) rm stuudio-builder-extract
+	$(CONTAINER_ENGINE) build --target builder -t studio-builder:latest .
+	$(CONTAINER_ENGINE) create --name studio-builder-extract studio-builder:latest
+	$(CONTAINER_ENGINE) cp studio-builder-extract:/out/server ./dist/server
+	$(CONTAINER_ENGINE) rm studio-builder-extract
 	chmod +x dist/server
 
 run: generate
@@ -38,3 +38,9 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+# One-time, per-clone opt-in — git doesn't use .githooks/ on its own. Points this clone's hooks at
+# the tracked .githooks/ dir (see .githooks/pre-commit) instead of the untracked .git/hooks/.
+install-hooks:
+	git config core.hooksPath .githooks
+	chmod +x .githooks/*

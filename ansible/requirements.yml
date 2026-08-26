@@ -1,0 +1,9 @@
+---
+# Install with: ansible-galaxy collection install -r requirements.yml
+collections:
+  # community.general.ufw — used by roles/harden and roles/studio_app.
+  - name: community.general
+    version: ">=8.0.0"
+  # ansible.posix.authorized_key — used by roles/harden to install the ansible user's SSH key.
+  - name: ansible.posix
+    version: ">=1.5.0"

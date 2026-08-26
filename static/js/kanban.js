@@ -1,6 +1,6 @@
-// Generic kanban board — native HTML5 Drag and Drop API, no dependency. dnd-kit (the original
-// app's drag library) is React-only with no framework-agnostic build, so this is a small vanilla
-// island instead rather than vendoring React+ReactDOM just for one board. Reused by every kanban
+// Generic kanban board — native HTML5 Drag and Drop API, no dependency. Common drag-and-drop
+// libraries (e.g. dnd-kit) are framework-bound with no vanilla build, so this is a small vanilla
+// island instead of vendoring a framework just for one board. Reused by every kanban
 // in the app (currently just Projects); the board element carries the per-board config via data
 // attributes so this script itself never hardcodes an entity or route:
 //   data-url-template="/projects/{id}/stage"  — {id} is replaced with the dragged card's item id

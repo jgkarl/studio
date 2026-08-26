@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	studiodb "stuudio/internal/db"
-	"stuudio/internal/i18n"
-	"stuudio/internal/settings"
+	studiodb "studio/internal/db"
+	"studio/internal/i18n"
+	"studio/internal/settings"
 )
 
 // AnnotationRegion is one marked area on a Media item's "pattern layer" — see
@@ -244,9 +244,9 @@ func CountRegionsForProject(ctx context.Context, q studiodb.Querier, projectID s
 	return *n, nil
 }
 
-// hatchAngle maps a HATCH_DIRECTIONS code (ported from the original app's lib/types.ts) to the
-// rotation applied to a single base horizontal-line SVG <pattern> — one pattern shape, four
-// directions, rather than four different line geometries.
+// hatchAngle maps a hatch-direction code to the rotation applied to a single base
+// horizontal-line SVG <pattern> — one pattern shape, four directions, rather than four different
+// line geometries.
 func HatchAngle(hatch string) int {
 	switch hatch {
 	case "hatch-vertical":

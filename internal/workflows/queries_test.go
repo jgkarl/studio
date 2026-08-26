@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"testing"
 
-	"stuudio/internal/assets"
-	"stuudio/internal/clients"
-	"stuudio/internal/settings"
-	"stuudio/internal/testutil"
-	"stuudio/internal/workflows"
+	"studio/internal/assets"
+	"studio/internal/clients"
+	"studio/internal/settings"
+	"studio/internal/testutil"
+	"studio/internal/workflows"
 )
 
 func createFixtureAsset(t *testing.T, ctx context.Context, pool *sql.DB) string {

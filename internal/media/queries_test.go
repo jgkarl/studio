@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"stuudio/internal/auth"
-	"stuudio/internal/i18n"
-	"stuudio/internal/testutil"
+	"studio/internal/auth"
+	"studio/internal/i18n"
+	"studio/internal/testutil"
 )
 
 func createFixtureUser(t *testing.T, ctx context.Context, svc *Service) string {

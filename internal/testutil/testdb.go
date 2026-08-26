@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"stuudio/db/migrations"
-	studiodb "stuudio/internal/db"
+	"studio/db/migrations"
+	studiodb "studio/internal/db"
 )
 
 // OpenTestDB opens a fresh, migrated SQLite database backed by a temp file (not ":memory:" —

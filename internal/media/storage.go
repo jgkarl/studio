@@ -7,9 +7,9 @@ import (
 	"strings"
 )
 
-// StorageAdapter — see docs/plan/02-architecture.md §2.3 in the original app for the "swap the
-// implementation, not the calling code" rationale. LocalDiskAdapter is the only implementation
-// here too; an S3-compatible adapter later means implementing this interface, nothing else.
+// StorageAdapter exists so a future S3-compatible backend just means implementing this
+// interface — swap the implementation, not the calling code. LocalDiskAdapter is the only
+// implementation here so far.
 type StorageAdapter interface {
 	Put(key string, data []byte) error
 	Get(key string) ([]byte, error)

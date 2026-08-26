@@ -62,7 +62,7 @@ type Media struct {
 	CreatedAt       time.Time
 }
 
-// ReferencingType — the polymorphic MediaReference.referencingType values (matches lib/types.ts).
+// ReferencingType — the polymorphic MediaReference.referencingType values.
 type ReferencingType string
 
 const (

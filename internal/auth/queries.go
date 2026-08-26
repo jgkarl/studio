@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	studiodb "stuudio/internal/db"
+	studiodb "studio/internal/db"
 )
 
 func scanUser(rows *sql.Rows) (User, error) {

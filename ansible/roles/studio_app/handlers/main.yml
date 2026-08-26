@@ -4,11 +4,11 @@
     daemon_reload: true
   listen: reload systemd
 
-- name: Restart stuudio
+- name: Restart studio
   ansible.builtin.systemd:
-    name: stuudio
+    name: studio
     state: restarted
-  listen: restart stuudio
+  listen: restart studio
 
 - name: Reload caddy
   ansible.builtin.systemd:

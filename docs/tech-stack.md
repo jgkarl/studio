@@ -54,8 +54,8 @@ needs it.
   multi-statement-per-`Exec` mode, so the runner splits each file on `;` and executes statements
   one at a time — safe here because every migration is hand-written DDL this app controls.
 - **Row types are hand-written**, one Go struct per table (`sql.NullString`/`sql.NullTime` for
-  nullable columns), field-for-field matching the migrations — kept in sync by hand, the same
-  tradeoff as the original TypeScript app's approach, just in Go.
+  nullable columns), field-for-field matching the migrations — kept in sync by hand, a deliberate
+  tradeoff against a schema-driven codegen step.
 - Connection pragmas (`internal/db/pool.go`): `foreign_keys(1)` (off by default in SQLite —
   every module's `ON DELETE CASCADE`/`SET NULL`/`RESTRICT` relies on this being on),
   `journal_mode(WAL)` (concurrent readers alongside one writer), `busy_timeout(5000)`, and

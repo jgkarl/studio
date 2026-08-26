@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"stuudio/internal/auth"
-	studiodb "stuudio/internal/db"
+	"studio/internal/auth"
+	studiodb "studio/internal/db"
 )
 
 func scanUserID(rows *sql.Rows) (string, error) {

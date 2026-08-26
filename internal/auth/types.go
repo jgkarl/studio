@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// Role — same string-union-as-VARCHAR approach as the Node app's lib/types.ts: validated at the
-// application layer, not a native DB enum.
+// Role — stored as VARCHAR, validated at the application layer, not a native DB enum.
 type Role string
 
 const (

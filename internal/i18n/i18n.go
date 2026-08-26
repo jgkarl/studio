@@ -1,5 +1,5 @@
 // Package i18n is a small hand-rolled dictionary + cookie-toggle locale switch — no i18n
-// framework, mirrors the original app's lib/i18n.ts. Estonian (et) is the default; only an
+// framework. Estonian (et) is the default; only an
 // explicit toggle switches to English (en). The dictionary only covers what the modules built so
 // far actually render (nav + dashboard); auth/settings still use hardcoded English strings from
 // their own modules — folding those in is a follow-up, not a blocker for this module.
@@ -16,7 +16,7 @@ const (
 	LocaleEN Locale = "en"
 )
 
-const cookieName = "stuudio_locale"
+const cookieName = "studio_locale"
 
 func GetLocale(r *http.Request) Locale {
 	c, err := r.Cookie(cookieName)

@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strconv"
 
-	studiodb "stuudio/internal/db"
-	"stuudio/internal/media"
-	"stuudio/internal/settings"
+	studiodb "studio/internal/db"
+	"studio/internal/media"
+	"studio/internal/settings"
 )
 
 // clientInfoRow/assetInfoRow/projectInfoRow are local, denormalized reads of exactly the fields

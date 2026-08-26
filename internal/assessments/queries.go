@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	studiodb "stuudio/internal/db"
+	studiodb "studio/internal/db"
 )
 
 const assessmentColumns = `id, projectId, assetId, "condition", description, recordedAt, updatedAt, deletedAt`

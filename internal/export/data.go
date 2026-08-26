@@ -5,14 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 
-	"stuudio/internal/assessments"
-	"stuudio/internal/assets"
-	"stuudio/internal/clients"
-	"stuudio/internal/i18n"
-	"stuudio/internal/media"
-	"stuudio/internal/reporter"
-	"stuudio/internal/settings"
-	"stuudio/internal/workflows"
+	"studio/internal/assessments"
+	"studio/internal/assets"
+	"studio/internal/clients"
+	"studio/internal/i18n"
+	"studio/internal/media"
+	"studio/internal/reporter"
+	"studio/internal/settings"
+	"studio/internal/workflows"
 )
 
 // exportLocale is fixed: exported HTML/PDF documents are plain, non-localized output regardless

@@ -8,13 +8,13 @@ import (
 	"database/sql"
 	"net/http"
 
-	"stuudio/internal/assessments"
-	"stuudio/internal/auth"
-	studiodb "stuudio/internal/db"
-	"stuudio/internal/reporter"
-	"stuudio/internal/settings"
-	"stuudio/internal/treatments"
-	"stuudio/internal/web"
+	"studio/internal/assessments"
+	"studio/internal/auth"
+	studiodb "studio/internal/db"
+	"studio/internal/reporter"
+	"studio/internal/settings"
+	"studio/internal/treatments"
+	"studio/internal/web"
 )
 
 type Service struct {

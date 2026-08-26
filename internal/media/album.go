@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	studiodb "stuudio/internal/db"
+	studiodb "studio/internal/db"
 )
 
 // AlbumItem is one Media row annotated with which Asset/Project/Client it belongs to — every

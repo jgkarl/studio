@@ -1,15 +1,15 @@
-# Managed by Ansible (ansible/roles/stuudio_app/templates/stuudio.service.j2).
+# Managed by Ansible (ansible/roles/studio_app/templates/studio.service.j2).
 [Unit]
-Description=Stuudio (conservation studio management)
+Description=Studio (conservation studio management)
 After=network.target
 
 [Service]
 Type=simple
-User={{ stuudio_system_user }}
-Group={{ stuudio_system_user }}
-WorkingDirectory={{ stuudio_home }}
-EnvironmentFile={{ stuudio_home }}/.env
-ExecStart={{ stuudio_home }}/server
+User={{ studio_system_user }}
+Group={{ studio_system_user }}
+WorkingDirectory={{ studio_home }}
+EnvironmentFile={{ studio_home }}/.env
+ExecStart={{ studio_home }}/server
 Restart=on-failure
 RestartSec=2
 
@@ -18,7 +18,7 @@ RestartSec=2
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths={{ stuudio_home }}/data
+ReadWritePaths={{ studio_home }}/data
 
 [Install]
 WantedBy=multi-user.target

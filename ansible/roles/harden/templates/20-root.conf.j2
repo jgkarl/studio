@@ -1,0 +1,14 @@
+# Managed by Ansible (roles/harden/templates/20-root.conf.j2).
+#
+# PermitRootLogin no already fully blocks root over SSH by itself — the Pubkey/Password lines
+# below are deliberate belt-and-suspenders so root's auth methods are closed even if
+# PermitRootLogin is ever loosened later without someone noticing the rest.
+Match User root
+    PermitRootLogin no
+    PubkeyAuthentication no
+    PasswordAuthentication no
+    MaxSessions 5
+    MaxAuthTries 5
+
+# Closes the Match block above — see 10-ansible-user.conf.j2 for why this matters.
+Match all

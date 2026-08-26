@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	studiodb "stuudio/internal/db"
+	studiodb "studio/internal/db"
 )
 
 const clientColumns = `id, type, name, email, phone, address, city, postalCode, country, notes,

@@ -10,9 +10,9 @@ import (
 
 	"github.com/a-h/templ"
 
-	"stuudio/internal/auth"
-	studiodb "stuudio/internal/db"
-	"stuudio/internal/web"
+	"studio/internal/auth"
+	studiodb "studio/internal/db"
+	"studio/internal/web"
 )
 
 func chromeFor(r *http.Request, user *auth.User, active string) web.Chrome {
@@ -26,7 +26,7 @@ type Service struct {
 
 // Mount registers every settings route on mux. Classifiers require a signed-in user
 // (RequireUser, not RequireAdmin — the nav only shows a Settings link to admins, but
-// conservators can still reach these routes directly, same as the original app); the Users tab
+// conservators can still reach these routes directly); the Users tab
 // (both viewing and its role-change mutation) is RequireAdmin-gated since it can grant admin
 // access to any account.
 func Mount(mux *http.ServeMux, svc *Service) {

@@ -18,7 +18,7 @@ type Config struct {
 	// SeedExampleData additionally seeds fictional demo content (clients, assets, a project, a
 	// treatment, a report, media library images, and one non-admin example user) — see
 	// internal/seed/demo.go. Never true for a production deploy (see
-	// ansible/roles/stuudio_app/defaults/main.yml); local .env and docker-compose.yml both default
+	// ansible/roles/studio_app/defaults/main.yml); local .env and docker-compose.yml both default
 	// it to true.
 	SeedExampleData bool
 
@@ -32,7 +32,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:            getenv("PORT", "3000"),
-		DBPath:          getenv("DB_PATH", "./data/stuudio.db"),
+		DBPath:          getenv("DB_PATH", "./data/studio.db"),
 		AuthSecret:      getenv("AUTH_SECRET", "dev-only-insecure-secret-change-me"),
 		AppURL:          os.Getenv("APP_URL"),
 		MediaStorageDir: getenv("MEDIA_STORAGE_DIR", "./data/media-storage"),
@@ -47,7 +47,7 @@ func Load() *Config {
 		SMTPPort: getenv("SMTP_PORT", "587"),
 		SMTPUser: os.Getenv("SMTP_USER"),
 		SMTPPass: os.Getenv("SMTP_PASS"),
-		SMTPFrom: getenv("SMTP_FROM", "stuudio@localhost"),
+		SMTPFrom: getenv("SMTP_FROM", "studio@localhost"),
 	}
 }
 

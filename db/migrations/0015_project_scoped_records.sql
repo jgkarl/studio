@@ -3,7 +3,7 @@
 -- first Project, and everything else is recorded under a Project from then on (still filterable
 -- by Asset via the join to Project.assetId — see each module's ListByAsset).
 --
--- This app has no real deployment yet — data/stuudio.db is local throwaway dev data (confirmed
+-- This app has no real deployment yet — data/studio.db is local throwaway dev data (confirmed
 -- with the app owner) — so these are plain rebuilds with no row-preserving INSERT/SELECT dance:
 -- Treatment/Report/AssetState are dropped and recreated with their final shape. Asset is the one
 -- exception that IS rebuilt with its data carried forward, because unlike the other three it

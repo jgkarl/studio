@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"stuudio/internal/media"
-	"stuudio/internal/testutil"
+	"studio/internal/media"
+	"studio/internal/testutil"
 )
 
 func newTestMediaService(t *testing.T) *media.Service {

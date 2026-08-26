@@ -3,8 +3,8 @@ package web
 import (
 	"net/http"
 
-	"stuudio/internal/i18n"
-	"stuudio/internal/theme"
+	"studio/internal/i18n"
+	"studio/internal/theme"
 )
 
 // Chrome is everything the persistent app shell (Navbar + page wrapper) needs to render, for

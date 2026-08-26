@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"stuudio/internal/mail"
-	"stuudio/internal/session"
+	"studio/internal/mail"
+	"studio/internal/session"
 )
 
 type Service struct {

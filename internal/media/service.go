@@ -9,7 +9,7 @@ import (
 
 	"github.com/davidbyttow/govips/v2/vips"
 
-	studiodb "stuudio/internal/db"
+	studiodb "studio/internal/db"
 )
 
 type Service struct {
@@ -19,7 +19,7 @@ type Service struct {
 
 // storeImageVariants stores a "web" thumbnail conversion (max 1600x1600, EXIF auto-rotated,
 // JPEG q80) alongside the original — non-fatal on failure (an undecodable/corrupt image still
-// keeps its original servable as-is), same as the original app's sharp-based try/catch.
+// keeps its original servable as-is).
 func (s *Service) storeImageVariants(mediaID string, buf []byte) (width, height int) {
 	img, err := vips.NewImageFromBuffer(buf)
 	if err != nil {

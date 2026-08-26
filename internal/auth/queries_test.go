@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"stuudio/internal/testutil"
+	"studio/internal/testutil"
 )
 
 func TestCreateUserAndGetByIDAndEmail(t *testing.T) {

@@ -1,0 +1,17 @@
+---
+# Generic Ubuntu 24.04 host hardening — no app-specific assumptions. Overridable in
+# group_vars/all.yml, same as studio_app's vars.
+
+# Dedicated automation account: pubkey-only, passwordless sudo, MaxSessions 5. Required.
+harden_ansible_user: ansible
+harden_ansible_pubkey: ""   # e.g. contents of ~/.ssh/kiagoeu_vps_ansible.pub — set in group_vars/all.yml
+
+# Anyone else allowed to log in (in addition to harden_ansible_user, which is always appended).
+# The existing human admin(s) on the box — root is never included here, it's handled separately
+# and fully disabled below regardless of this list.
+harden_extra_allowed_users: []
+
+# Firewall: SSH is always allowed (added before `ufw enable` so a run never locks itself out).
+# App-specific ports (e.g. 80/443 for Caddy) are opened by the app's own role, not here, so this
+# role stays reusable for non-web hosts too.
+harden_ssh_port: 22

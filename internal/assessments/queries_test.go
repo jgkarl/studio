@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"testing"
 
-	"stuudio/internal/assessments"
-	"stuudio/internal/assets"
-	"stuudio/internal/clients"
-	"stuudio/internal/settings"
-	"stuudio/internal/testutil"
-	"stuudio/internal/workflows"
+	"studio/internal/assessments"
+	"studio/internal/assets"
+	"studio/internal/clients"
+	"studio/internal/settings"
+	"studio/internal/testutil"
+	"studio/internal/workflows"
 )
 
 func createFixtureProject(t *testing.T, ctx context.Context, pool *sql.DB) (projectID, assetID string) {

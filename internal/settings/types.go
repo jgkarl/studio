@@ -6,8 +6,8 @@ import (
 	"database/sql"
 	"time"
 
-	"stuudio/internal/i18n"
-	"stuudio/internal/web"
+	"studio/internal/i18n"
+	"studio/internal/web"
 )
 
 type ClassifierType string

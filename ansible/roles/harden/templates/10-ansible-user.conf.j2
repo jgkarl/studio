@@ -1,0 +1,9 @@
+# Managed by Ansible (roles/harden/templates/10-ansible-user.conf.j2).
+Match User {{ harden_ansible_user }}
+    PasswordAuthentication no
+    PubkeyAuthentication yes
+    MaxSessions 5
+
+# Closes the Match block above — without this, its scope would otherwise leak into whatever
+# sshd_config.d file is included next (Match scope spans across Included files).
+Match all

@@ -8,14 +8,14 @@ directly on the host.
 
 ```sh
 # 1. Build and start the app with a throwaway database and a bootstrap admin:
-make release   # or: docker build -t stuudio ...
-docker run -d --name stuudio-e2e -p 4070:3000 \
+make release   # or: docker build -t studio ...
+docker run -d --name studio-e2e -p 4070:3000 \
   -e AUTH_SECRET=some-random-string \
   -e BOOTSTRAP_ADMIN_NAME="Ada Admin" \
-  -e BOOTSTRAP_ADMIN_EMAIL="ada@stuudio.local" \
+  -e BOOTSTRAP_ADMIN_EMAIL="ada@studio.local" \
   -e BOOTSTRAP_ADMIN_PASSWORD="correct-horse-battery-staple" \
   -v "$(mktemp -d):/data" \
-  stuudio
+  studio
 
 # 2. Run the suite against it (E2E_ADMIN_* must match what you passed above if you changed them):
 cd e2e
@@ -23,7 +23,7 @@ npm install
 BASE_URL=http://localhost:4070 npm test
 
 # 3. Tear down:
-docker rm -f stuudio-e2e
+docker rm -f studio-e2e
 ```
 
 Uses the system-installed Chromium (`/snap/bin/chromium` by default — override with

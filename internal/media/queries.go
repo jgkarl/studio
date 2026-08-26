@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	studiodb "stuudio/internal/db"
+	studiodb "studio/internal/db"
 )
 
 const mediaColumns = `id, storageKey, kind, mimeType, sizeBytes, width, height, durationSeconds,

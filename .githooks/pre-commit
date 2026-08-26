@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Tracked pre-commit hook — not auto-installed by git itself, see `make install-hooks` /
+# README.md "Git hooks". Two independent checks, each only runs if relevant files are staged:
+#
+# 1. Any staged ansible/group_vars/**/vault.yml must be ansible-vault encrypted. vault.yml is
+#    gitignored, so this only ever fires if someone force-adds one (`git add -f`) — a safety net,
+#    not the primary defense.
+# 2. Any staged Go/templ/SQL file triggers a full templ generate + go build + go vet + go test
+#    gate before the commit is allowed through.
+set -uo pipefail
+
+fail=0
+
+# --- 1. Ansible vault files must be encrypted ---------------------------------------------------
+
+vault_files=$(git diff --cached --name-only --diff-filter=ACM -- '*vault.yml' || true)
+if [ -n "$vault_files" ]; then
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    if ! git show ":$f" 2>/dev/null | head -n1 | grep -q '^\$ANSIBLE_VAULT;'; then
+      echo "pre-commit: $f is staged but not encrypted with ansible-vault." >&2
+      echo "  Run: ansible-vault encrypt $f" >&2
+      fail=1
+    fi
+  done <<<"$vault_files"
+fi
+
+# --- 2. Go build/vet/test whenever Go-relevant files are staged ---------------------------------
+
+go_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.go' '*.templ' '*.sql' 'go.mod' 'go.sum' || true)
+if [ -n "$go_files" ]; then
+  if ! command -v templ >/dev/null 2>&1; then
+    echo "pre-commit: templ CLI not found on PATH (needed to regenerate .templ -> _templ.go)." >&2
+    echo "  go install github.com/a-h/templ/cmd/templ@v0.3.1020" >&2
+    fail=1
+  else
+    echo "pre-commit: templ generate"
+    if ! templ generate >/dev/null; then fail=1; fi
+
+    echo "pre-commit: go build ./..."
+    if ! go build ./...; then fail=1; fi
+
+    echo "pre-commit: go vet ./..."
+    if ! go vet ./...; then fail=1; fi
+
+    echo "pre-commit: go test ./..."
+    if ! go test ./...; then fail=1; fi
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "pre-commit: failed, commit aborted (bypass deliberately with git commit --no-verify)." >&2
+  exit 1
+fi
+
+exit 0

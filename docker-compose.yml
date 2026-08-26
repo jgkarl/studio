@@ -12,7 +12,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: localhost/stuudio:latest
+    image: localhost/studio:latest
     ports:
       - "${PORT:-3000}:3000"
     environment:

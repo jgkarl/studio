@@ -1,0 +1,4 @@
+# Managed by Ansible (roles/harden/templates/00-allowusers.conf.j2). Global context (no Match
+# block) — must load before any Match block below, since Match scope in sshd_config spans across
+# included files until the next Match line. Numbered 00- so it's included first.
+AllowUsers {{ ([harden_ansible_user] + harden_extra_allowed_users) | unique | join(' ') }}

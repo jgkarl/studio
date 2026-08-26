@@ -5,9 +5,10 @@
 #
 #   ansible-playbook deploy.yml --ask-vault-pass
 #
-# See README.md for one-time setup (inventory.ini, group_vars/all.yml, group_vars/vault.yml).
-- name: Provision and deploy Stuudio
-  hosts: stuudio
+# Run harden.yml first on a fresh host - see README.md for one-time setup (inventory.ini,
+# group_vars/all.yml, group_vars/vault.yml).
+- name: Provision and deploy Studio
+  hosts: studio
   become: true
   roles:
-    - stuudio_app
+    - studio_app

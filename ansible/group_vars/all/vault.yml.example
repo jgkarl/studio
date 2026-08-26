@@ -4,22 +4,22 @@
 # Never commit an unencrypted vault.yml (it's gitignored as a backstop, but ansible-vault encrypt
 # is what actually makes it safe to keep in version control afterwards, if you choose to).
 
-vault_stuudio_auth_secret: "CHANGE_ME"   # openssl rand -hex 32
-vault_stuudio_seed_example_data: "false"   # fictional demo content - only ever "true" on a throwaway/staging box
-vault_stuudio_app_url: "https://yourdomain.com"
+vault_studio_auth_secret: "CHANGE_ME"   # openssl rand -hex 32
+vault_studio_seed_example_data: "false"   # fictional demo content - only ever "true" on a throwaway/staging box
+vault_studio_app_url: "https://yourdomain.com"
 
 # Set all three to get a first admin account on a brand new database (created once, on the app's
 # first boot against an empty DB - see .env.example at the repo root for the full explanation).
 # There's no dev-login picker - this is the only way in, so a real password is required. Safe to
 # leave set permanently (idempotent - a no-op once the account exists).
-vault_stuudio_bootstrap_admin_name: ""
-vault_stuudio_bootstrap_admin_email: ""
-vault_stuudio_bootstrap_admin_password: "CHANGE_ME"
+vault_studio_bootstrap_admin_name: ""
+vault_studio_bootstrap_admin_email: ""
+vault_studio_bootstrap_admin_password: "CHANGE_ME"
 
-# Leave vault_stuudio_smtp_host blank to log email bodies to the systemd journal instead of
+# Leave vault_studio_smtp_host blank to log email bodies to the systemd journal instead of
 # sending them - fine for a first smoke test, not for real use.
-vault_stuudio_smtp_host: ""
-vault_stuudio_smtp_port: "587"
-vault_stuudio_smtp_user: ""
-vault_stuudio_smtp_pass: ""
-vault_stuudio_smtp_from: "stuudio@localhost"
+vault_studio_smtp_host: ""
+vault_studio_smtp_port: "587"
+vault_studio_smtp_user: ""
+vault_studio_smtp_pass: ""
+vault_studio_smtp_from: "studio@localhost"

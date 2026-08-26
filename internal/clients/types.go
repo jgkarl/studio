@@ -1,6 +1,5 @@
 // Package clients is the Client module: profile CRUD. The Assets section on the detail page
-// queries that table directly (same as the original app's page.tsx, which never imported an
-// assets domain module either).
+// queries that table directly rather than importing an assets domain module.
 package clients
 
 import (

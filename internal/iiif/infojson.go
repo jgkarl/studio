@@ -1,8 +1,7 @@
 package iiif
 
 // BuildInfoJSON is the IIIF Image API 3.0 `info.json` descriptor —
-// see https://iiif.io/api/image/3/#5-image-information. Same shape as the original app's
-// lib/iiif/imageApi.ts buildInfoJson.
+// see https://iiif.io/api/image/3/#5-image-information.
 func BuildInfoJSON(mediaID string, width, height int, origin string) map[string]any {
 	return map[string]any{
 		"@context":  "http://iiif.io/api/image/3/context.json",

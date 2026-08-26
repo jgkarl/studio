@@ -2,11 +2,11 @@
 - name: Refuse to deploy with an unset/placeholder auth secret
   ansible.builtin.assert:
     that:
-      - stuudio_auth_secret is defined
-      - stuudio_auth_secret | length > 0
-      - stuudio_auth_secret != "CHANGE_ME"
+      - studio_auth_secret is defined
+      - studio_auth_secret | length > 0
+      - studio_auth_secret != "CHANGE_ME"
     fail_msg: >-
-      stuudio_auth_secret is unset or still the vault.yml.example placeholder - generate a real one
+      studio_auth_secret is unset or still the vault.yml.example placeholder - generate a real one
       with `openssl rand -hex 32` and put it in group_vars/vault.yml before deploying.
 
 - name: Update apt cache
@@ -23,59 +23,66 @@
 
 - name: Create system group
   ansible.builtin.group:
-    name: "{{ stuudio_system_user }}"
+    name: "{{ studio_system_user }}"
     system: true
     state: present
 
 - name: Create system user
   ansible.builtin.user:
-    name: "{{ stuudio_system_user }}"
-    group: "{{ stuudio_system_user }}"
+    name: "{{ studio_system_user }}"
+    group: "{{ studio_system_user }}"
     system: true
     create_home: true
-    home: "{{ stuudio_home }}"
+    home: "{{ studio_home }}"
     shell: /usr/sbin/nologin
     state: present
 
 - name: Create data directory
   ansible.builtin.file:
-    path: "{{ stuudio_home }}/data"
+    path: "{{ studio_home }}/data"
     state: directory
-    owner: "{{ stuudio_system_user }}"
-    group: "{{ stuudio_system_user }}"
+    owner: "{{ studio_system_user }}"
+    group: "{{ studio_system_user }}"
     mode: "0750"
 
 - name: Template environment file
   ansible.builtin.template:
-    src: stuudio.env.j2
-    dest: "{{ stuudio_home }}/.env"
-    owner: "{{ stuudio_system_user }}"
-    group: "{{ stuudio_system_user }}"
+    src: studio.env.j2
+    dest: "{{ studio_home }}/.env"
+    owner: "{{ studio_system_user }}"
+    group: "{{ studio_system_user }}"
     mode: "0640"
-  notify: restart stuudio
+  notify: restart studio
 
 - name: Fetch and install the release binary
   ansible.builtin.import_tasks: release.yml
 
 - name: Template systemd unit
   ansible.builtin.template:
-    src: stuudio.service.j2
-    dest: /etc/systemd/system/stuudio.service
+    src: studio.service.j2
+    dest: /etc/systemd/system/studio.service
     mode: "0644"
   notify:
     - reload systemd
-    - restart stuudio
+    - restart studio
 
-- name: Ensure the stuudio service is enabled and started
+- name: Ensure the studio service is enabled and started
   ansible.builtin.systemd:
-    name: stuudio
+    name: studio
     enabled: true
     state: started
     daemon_reload: true
 
 - name: Set up Caddy as the reverse proxy
-  when: stuudio_domain | length > 0
+  when: studio_domain | length > 0
   block:
+    - name: Open 80/443 for Caddy (harden role already opened 22)
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: ["80", "443"]
+
     - name: Install Caddy apt prerequisites
       ansible.builtin.apt:
         name:
@@ -103,12 +110,12 @@
       args:
         executable: /bin/bash
         creates: /etc/apt/sources.list.d/caddy-stable.list
-      register: stuudio_caddy_repo_added
+      register: studio_caddy_repo_added
 
     - name: Update apt cache after adding the Caddy repo
       ansible.builtin.apt:
         update_cache: true
-      when: stuudio_caddy_repo_added is changed
+      when: studio_caddy_repo_added is changed
 
     - name: Install Caddy
       ansible.builtin.apt:

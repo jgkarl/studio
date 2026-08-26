@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"stuudio/internal/assets"
-	"stuudio/internal/clients"
-	"stuudio/internal/settings"
-	"stuudio/internal/testutil"
+	"studio/internal/assets"
+	"studio/internal/clients"
+	"studio/internal/settings"
+	"studio/internal/testutil"
 )
 
 func TestCreateAndGetClassifierByID(t *testing.T) {

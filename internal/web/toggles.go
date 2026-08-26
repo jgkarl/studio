@@ -3,13 +3,13 @@ package web
 import (
 	"net/http"
 
-	"stuudio/internal/i18n"
-	"stuudio/internal/theme"
+	"studio/internal/i18n"
+	"studio/internal/theme"
 )
 
 // MountToggles registers the theme/locale toggle routes shared by every in-app page's Navbar.
-// Ungated (no session required) - same as the original app's toggleTheme/toggleLocale actions,
-// which read/set a plain cookie and don't touch anything user-specific.
+// Ungated (no session required) - these just read/set a plain cookie and don't touch anything
+// user-specific.
 func MountToggles(mux *http.ServeMux) {
 	mux.HandleFunc("POST /theme/toggle", func(w http.ResponseWriter, r *http.Request) {
 		next := theme.Light

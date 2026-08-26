@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"testing"
 
-	"stuudio/internal/assets"
-	"stuudio/internal/auth"
-	"stuudio/internal/clients"
-	"stuudio/internal/reporter"
-	"stuudio/internal/settings"
-	"stuudio/internal/testutil"
-	"stuudio/internal/workflows"
+	"studio/internal/assets"
+	"studio/internal/auth"
+	"studio/internal/clients"
+	"studio/internal/reporter"
+	"studio/internal/settings"
+	"studio/internal/testutil"
+	"studio/internal/workflows"
 )
 
 func createFixtureProjectAndAuthor(t *testing.T, ctx context.Context, pool *sql.DB) (projectID, authorID string) {

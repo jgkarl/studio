@@ -43,14 +43,14 @@ alongside the server for live template reload while editing `.templ` files.
 | `make test` | `go test ./...` (needs `libvips-dev` locally — see `docs/tech-stack.md`'s Testing section for which packages don't) |
 | `cd e2e && npm install && npm test` | Playwright end-to-end suite against a running server — see `e2e/README.md` |
 
-No Prisma-Studio-style DB browser — SQLite is one file (`data/stuudio.db` by default); use the
+No Prisma-Studio-style DB browser — SQLite is one file (`data/studio.db` by default); use the
 `sqlite3` CLI or any regular SQLite GUI pointed at it directly.
 
 ## Environment variables
 
 See `.env.example` for the full annotated list. The essentials:
 
-- `DB_PATH` — SQLite file path (default `./data/stuudio.db`); the parent directory is created
+- `DB_PATH` — SQLite file path (default `./data/studio.db`); the parent directory is created
   automatically.
 - `MEDIA_STORAGE_DIR` — where uploaded files are written (local disk adapter).
 - `AUTH_SECRET` — signs the session cookie; generate a real one beyond local/throwaway use.
@@ -77,7 +77,7 @@ migrations):
   normal `/login` form immediately.
 
 Only when `SEED_EXAMPLE_DATA=true` (the `.env.example`/docker-compose default — never true for a
-production deploy, see `ansible/roles/stuudio_app/defaults/main.yml`), one more step runs:
+production deploy, see `ansible/roles/studio_app/defaults/main.yml`), one more step runs:
 `internal/seed.SeedDemoData` (idempotent — skipped entirely once its conservator user exists):
 
 - A second `User`, "Conservator Example" (`role=conservator`) — same shape as the bootstrap

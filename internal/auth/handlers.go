@@ -9,7 +9,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"stuudio/internal/mail"
+	"studio/internal/mail"
 )
 
 // Mount registers every auth route on mux. Public — no session required to reach any of these
@@ -304,7 +304,6 @@ func (s *Service) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Note: this doesn't invalidate any other active session for the account — the
-	// signed-cookie session has no server-side session table to revoke from. A known
-	// limitation carried over from the original app.
+	// signed-cookie session has no server-side session table to revoke from.
 	http.Redirect(w, r, "/login?notice="+url.QueryEscape("passwordUpdated"), http.StatusSeeOther)
 }

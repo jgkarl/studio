@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"time"
 
-	"stuudio/internal/assessments"
-	"stuudio/internal/assets"
-	"stuudio/internal/auth"
-	"stuudio/internal/clients"
-	studiodb "stuudio/internal/db"
-	"stuudio/internal/media"
-	"stuudio/internal/reporter"
-	"stuudio/internal/treatments"
-	"stuudio/internal/workflows"
+	"studio/internal/assessments"
+	"studio/internal/assets"
+	"studio/internal/auth"
+	"studio/internal/clients"
+	studiodb "studio/internal/db"
+	"studio/internal/media"
+	"studio/internal/reporter"
+	"studio/internal/treatments"
+	"studio/internal/workflows"
 )
 
 //go:embed testdata/cats/*.jpg
@@ -29,12 +29,12 @@ var catFiles = []string{"cat-1.jpg", "cat-2.jpg", "cat-3.jpg", "cat-4.jpg"}
 // demoConservatorEmail is fixed on purpose: SeedDemoData checks for this row first and no-ops if
 // it's already there, so re-running it on every `make run`/docker compose boot (see
 // cmd/server/main.go) doesn't pile up duplicate demo rows.
-const demoConservatorEmail = "conservator@stuudio.local"
+const demoConservatorEmail = "conservator@studio.local"
 
 // DemoUserPassword is the fixed, documented sign-in password for every example user SeedDemoData
 // creates (currently just the conservator) — there's no dev-login picker any more, so this is
 // how a developer actually gets into the seeded account. See docs/setup.md.
-const DemoUserPassword = "StuudioDemo123!"
+const DemoUserPassword = "StudioDemo123!"
 
 // SeedDemoData creates one example row for every domain model in the schema — a second User (a
 // "conservator", real password/already-verified/already-role-assigned, alongside the
@@ -47,7 +47,7 @@ const DemoUserPassword = "StuudioDemo123!"
 //
 // Not called unconditionally: see cmd/server/main.go, which only calls this when
 // cfg.SeedExampleData is true — never true for a production deploy (see
-// ansible/roles/stuudio_app/defaults/main.yml). A production boot only ever gets the one
+// ansible/roles/studio_app/defaults/main.yml). A production boot only ever gets the one
 // BootstrapAdmin account from BOOTSTRAP_ADMIN_NAME/EMAIL/PASSWORD.
 //
 // Idempotent: bails out immediately if demoConservatorEmail's User already exists, so it's safe

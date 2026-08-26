@@ -9,8 +9,8 @@ import (
 
 	"github.com/davidbyttow/govips/v2/vips"
 
-	"stuudio/internal/i18n"
-	"stuudio/internal/settings"
+	"studio/internal/i18n"
+	"studio/internal/settings"
 )
 
 const legendRowHeight = 26

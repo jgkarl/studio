@@ -2,9 +2,7 @@
 // (https://iiif.io/api/image/3/) — region, size, rotation, quality, and format transforms applied
 // live via govips against the stored original file (internal/media). Level 2-*equivalent* feature
 // set (documented as such in BuildInfoJSON) — this is a from-scratch implementation of the spec's
-// transform semantics, not run through the official IIIF validator. Ported from the original
-// Next.js app's lib/iiif/imageApi.ts (sharp-based) — same region/size/rotation math and edge-case
-// clamping, govips instead of sharp.
+// transform semantics, not run through the official IIIF validator.
 package iiif
 
 import (
@@ -16,7 +14,7 @@ import (
 
 	"github.com/davidbyttow/govips/v2/vips"
 
-	"stuudio/internal/media"
+	"studio/internal/media"
 )
 
 // Error carries an HTTP status alongside the message — handlers.go uses it to pick the right

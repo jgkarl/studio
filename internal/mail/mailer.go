@@ -1,7 +1,7 @@
 // Package mail sends transactional email — real SMTP (net/smtp, stdlib only) when SMTP_HOST is
 // configured, or a console transport that just logs the message when it isn't. Same pattern as
 // Rails' letter_opener / Django's console email backend: fully testable without real mail
-// infrastructure. Mirrors the original app's lib/mail/mailer.ts.
+// infrastructure.
 package mail
 
 import (
@@ -43,7 +43,7 @@ func (m *Mailer) Send(msg Message) error {
 
 	from := m.cfg.From
 	if from == "" {
-		from = "Stuudio <no-reply@localhost>"
+		from = "Studio <no-reply@localhost>"
 	}
 	body := buildMIME(fromAddress(from), msg)
 	addr := m.cfg.Host + ":" + m.cfg.Port
@@ -109,7 +109,7 @@ func sendImplicitTLS(addr, host string, auth smtp.Auth, from, to string, body []
 	return client.Quit()
 }
 
-const mimeBoundary = "stuudio-mail-boundary"
+const mimeBoundary = "studio-mail-boundary"
 
 // buildMIME hand-builds a minimal multipart/alternative (text + html) RFC 822 message —
 // deliberately not pulling in an email-building library for two short transactional templates.

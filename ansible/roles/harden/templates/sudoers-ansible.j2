@@ -1,0 +1,4 @@
+# Managed by Ansible (roles/harden/templates/sudoers-ansible.j2). Dedicated automation account —
+# passwordless sudo is the point (non-interactive playbook runs), access itself is gated by
+# pubkey-only SSH (see 10-ansible-user.conf) rather than a sudo password.
+{{ harden_ansible_user }} ALL=(ALL) NOPASSWD:ALL

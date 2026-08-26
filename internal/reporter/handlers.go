@@ -7,11 +7,11 @@ import (
 
 	"github.com/a-h/templ"
 
-	"stuudio/internal/assessments"
-	"stuudio/internal/auth"
-	"stuudio/internal/media"
-	"stuudio/internal/treatments"
-	"stuudio/internal/web"
+	"studio/internal/assessments"
+	"studio/internal/auth"
+	"studio/internal/media"
+	"studio/internal/treatments"
+	"studio/internal/web"
 )
 
 type Service struct {

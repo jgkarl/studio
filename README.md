@@ -1,12 +1,11 @@
-# Stuudio
+# Studio
 
-Go/templ/SQLite rewrite of the Studio conservation-studio management app — a ground-up port from
-an original Next.js/TypeScript/React version, built module by module. See `docs/tech-stack.md`
-here for how this rewrite is actually built, and `docs/setup.md` for a more detailed local-dev
-walkthrough than the quick version below.
+Studio is a conservation-studio management app: Go, templ, and SQLite, built module by module. See
+`docs/tech-stack.md` here for how it's actually built, and `docs/setup.md` for a more detailed
+local-dev walkthrough than the quick version below.
 
-Same philosophy as the original: no ORM, hand-written SQL and row types, no web framework, plain
-templ templates, JS only where a page genuinely needs client-side interactivity — small vanilla
+Deliberately minimal: no ORM, hand-written SQL and row types, no web framework, plain templ
+templates, JS only where a page genuinely needs client-side interactivity — small vanilla
 islands, no bundler, almost no vendored libraries (see `static/js/`). The one deliberate exception
 is [OpenSeadragon](https://openseadragon.github.io/) (`static/openseadragon/`), vendored for the
 deep-zoom media viewer's real tile scheduling against the IIIF Image API — see
@@ -42,7 +41,7 @@ docker compose up --build   # or: podman-compose up --build
 
 Either way, migrations in `db/migrations/*.sql` are applied automatically on startup (tracked in
 a `schema_migrations` table — no separate migrate step to remember), the SQLite file is created
-at `DB_PATH` (default `./data/stuudio.db`) if it doesn't exist yet, and the structural Classifier
+at `DB_PATH` (default `./data/studio.db`) if it doesn't exist yet, and the structural Classifier
 reference data every `<select>` in the app reads from is seeded automatically too (idempotent —
 safe on every restart). Set `BOOTSTRAP_ADMIN_NAME`/`BOOTSTRAP_ADMIN_EMAIL` in `.env` to also get a
 first admin account with no manual database work — see `docs/setup.md`.
@@ -64,6 +63,18 @@ make test                                       # go test ./...
 cd e2e && npm install && npm test               # end-to-end (needs a server running — see e2e/README.md)
 ```
 
+## Git hooks
+
+```bash
+make install-hooks   # one-time, per clone
+```
+
+Points this clone at the tracked `.githooks/pre-commit` (git doesn't use it on its own). It gates
+any commit touching Go/templ/SQL files on `templ generate` + `go build` + `go vet` + `go test`
+passing, and refuses to let an unencrypted `ansible/group_vars/all/vault.yml` be committed (that
+file is gitignored, so this only matters if it's ever force-added). Bypass deliberately with
+`git commit --no-verify` if you really need to.
+
 ## Layout
 
 See the module list in git history / commit messages for build order. Each top-level package
@@ -81,18 +92,16 @@ the old `AssetState`/"condition status" concept), Treatments, Reports, and media
 under a Project from there on, while staying filterable by Asset everywhere (every one of those
 denormalizes its own `assetId` alongside the required `projectId`).
 
-## Known, disclosed differences from the original app
+## Two deliberate behaviors worth knowing
 
-A few spots where this rewrite made a different call than the original TypeScript app, on
-purpose — see `docs/tech-stack.md` for the reasoning behind each:
+See `docs/tech-stack.md` for the reasoning behind each:
 
 - **Fictional demo-data seed is dev/docker-only, not a boot-time default.** Structural reference
   data (Classifiers) still seeds unconditionally on every boot. Fictional demo content (a second
   "conservator" example login, clients/assets/a project/a treatment/a report, and a few example
-  media library images) mirrors the original's `db/seed.ts` but only runs when
-  `SEED_EXAMPLE_DATA=true` — see `internal/seed/demo.go` and "What first boot actually seeds" in
-  `docs/setup.md`. A production deploy never sets it — only the one `BootstrapAdmin` account from
-  `BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD` boots there.
+  media library images) only runs when `SEED_EXAMPLE_DATA=true` — see `internal/seed/demo.go` and
+  "What first boot actually seeds" in `docs/setup.md`. A production deploy never sets it — only
+  the one `BootstrapAdmin` account from `BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD` boots there.
 - **No dev-login picker.** Every account — the bootstrap admin and any `SEED_EXAMPLE_DATA` demo
   users included — is a real `provider="email"` row with a real password and `emailVerifiedAt`
   already set, signing in through the normal `/login` form like any other account.

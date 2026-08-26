@@ -1,0 +1,15 @@
+---
+# Ubuntu 24.04 host hardening — run this once against a fresh host, before deploy.yml. Creates the
+# dedicated "ansible" automation user, disables root over SSH, restricts logins to just the
+# allowed accounts, and enables a baseline ufw firewall. Fully idempotent, safe to re-run any
+# time (e.g. after adding a name to harden_extra_allowed_users).
+#
+#   ansible-playbook harden.yml --ask-vault-pass
+#
+# Generic — no studio-specific assumptions — so the same role/playbook works for any future host
+# under /opt/app/*. See README.md for one-time setup.
+- name: Harden Ubuntu 24.04 host (SSH, sudo, firewall)
+  hosts: studio
+  become: true
+  roles:
+    - harden

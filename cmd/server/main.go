@@ -1,4 +1,4 @@
-// Command server is the Stuudio app's single entrypoint: load config, open the SQLite pool, apply
+// Command server is the Studio app's single entrypoint: load config, open the SQLite pool, apply
 // pending migrations, mount every module's routes, and serve. Migrations and static assets are
 // embedded (db/migrations/embed.go, static/embed.go) — the compiled binary is fully
 // self-contained, nothing else needs to ship alongside it (see docs/deploy.md).
@@ -10,27 +10,27 @@ import (
 	"net/http"
 	"time"
 
-	"stuudio/internal/assessments"
-	"stuudio/internal/assets"
-	"stuudio/internal/auth"
-	"stuudio/internal/clients"
-	"stuudio/internal/config"
-	"stuudio/internal/dashboard"
-	"stuudio/internal/db"
-	"stuudio/internal/export"
-	"stuudio/internal/iiif"
-	"stuudio/internal/mail"
-	"stuudio/internal/media"
-	"stuudio/internal/reporter"
-	"stuudio/internal/seed"
-	"stuudio/internal/session"
-	"stuudio/internal/settings"
-	"stuudio/internal/treatments"
-	"stuudio/internal/web"
-	"stuudio/internal/workflows"
+	"studio/internal/assessments"
+	"studio/internal/assets"
+	"studio/internal/auth"
+	"studio/internal/clients"
+	"studio/internal/config"
+	"studio/internal/dashboard"
+	"studio/internal/db"
+	"studio/internal/export"
+	"studio/internal/iiif"
+	"studio/internal/mail"
+	"studio/internal/media"
+	"studio/internal/reporter"
+	"studio/internal/seed"
+	"studio/internal/session"
+	"studio/internal/settings"
+	"studio/internal/treatments"
+	"studio/internal/web"
+	"studio/internal/workflows"
 
-	"stuudio/db/migrations"
-	staticassets "stuudio/static"
+	"studio/db/migrations"
+	staticassets "studio/static"
 )
 
 func main() {
@@ -67,7 +67,7 @@ func main() {
 
 	// Example data across every domain model (clients, assets, a project, a treatment, a report,
 	// media library images) plus a second "conservator" example login — dev/docker convenience
-	// only, never a production deploy (see ansible/roles/stuudio_app/defaults/main.yml) — a
+	// only, never a production deploy (see ansible/roles/studio_app/defaults/main.yml) — a
 	// production boot only ever gets the one BootstrapAdmin account above.
 	if cfg.SeedExampleData {
 		if err := seed.SeedDemoData(ctx, pool, mediaSvc); err != nil {

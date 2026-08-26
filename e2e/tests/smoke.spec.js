@@ -13,7 +13,7 @@ const TEST_PHOTO = path.join(__dirname, "..", "fixtures", "test-photo.png");
 // No dev-login picker — sign in through the real /login form, same as any account. Set all three
 // via BOOTSTRAP_ADMIN_NAME/EMAIL/PASSWORD when starting the server for this suite (see
 // e2e/README.md).
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "ada@stuudio.local";
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "ada@studio.local";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "correct-horse-battery-staple";
 
 async function shoot(page, name) {
@@ -39,10 +39,10 @@ test.afterAll(async () => {
   await page.close();
 });
 
-test.describe("Stuudio golden path", () => {
+test.describe("Studio golden path", () => {
   test("log in as the bootstrapped admin", async () => {
     await page.goto("/login");
-    await expect(page.locator("h1")).toContainText("Stuudio");
+    await expect(page.locator("h1")).toContainText("Studio");
     await shoot(page, "01-login.png");
 
     await page.fill('form[action="/login"] input[name="email"]', ADMIN_EMAIL);

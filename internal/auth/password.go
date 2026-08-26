@@ -11,11 +11,8 @@ import (
 )
 
 // scrypt (stdlib-adjacent — golang.org/x/crypto, no cgo, no native binary) rather than
-// bcrypt/argon2, matching the original app's reasoning for using Node's built-in scrypt: no
-// extra native dependency, and scrypt being CPU/memory-heavy is the point (brute-force
-// resistance), not a bug to work around. Params are Go's own choice, not required to bit-match
-// the original Node app's scryptSync output — this is a separate app/database, not a shared
-// user table.
+// bcrypt/argon2 — no extra native dependency, and scrypt being CPU/memory-heavy is the point
+// (brute-force resistance), not a bug to work around.
 const (
 	scryptN      = 1 << 15 // 32768
 	scryptR      = 8

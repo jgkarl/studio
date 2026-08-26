@@ -1,6 +1,5 @@
 // Album filter/search/group — vanilla JS over cards already rendered server-side (no extra
-// round-trip for what's purely a client-side view change), same behavior as the original app's
-// React AlbumGallery client component.
+// round-trip for what's purely a client-side view change).
 document.addEventListener("DOMContentLoaded", () => {
   const grid = document.getElementById("album-grid");
   if (!grid) return;

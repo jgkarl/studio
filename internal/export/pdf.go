@@ -17,8 +17,8 @@ const (
 )
 
 // RenderPDF renders a Doc as a single-page-flow A4 PDF using only the core Helvetica font (no
-// embedded TTF) — a deliberate v1 choice mirroring the original's plain react-pdf/Helvetica
-// output. UTF-8 text is translated to cp1252 on a best-effort basis via
+// embedded TTF) — a deliberate v1 choice, plain and fast over pixel-perfect. UTF-8 text is
+// translated to cp1252 on a best-effort basis via
 // UnicodeTranslatorFromDescriptor; characters outside that code page are dropped rather than
 // corrupting the document.
 func (svc *Service) RenderPDF(ctx context.Context, doc *Doc) ([]byte, error) {
@@ -98,7 +98,7 @@ func (svc *Service) RenderPDF(ctx context.Context, doc *Doc) ([]byte, error) {
 	pdf.SetFont("Helvetica", "I", 8)
 	pdf.SetTextColor(168, 162, 158)
 	pdf.SetY(-15)
-	pdf.CellFormat(0, 8, tr("Exported from Stuudio on "+time.Now().Format("2006-01-02 15:04")), "", 0, "L", false, 0, "")
+	pdf.CellFormat(0, 8, tr("Exported from Studio on "+time.Now().Format("2006-01-02 15:04")), "", 0, "L", false, 0, "")
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {

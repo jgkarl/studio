@@ -3,7 +3,7 @@ package settings
 import (
 	"context"
 
-	studiodb "stuudio/internal/db"
+	studiodb "studio/internal/db"
 )
 
 // ReportableField is one Client/Asset/Project description field that can be toggled on/off for

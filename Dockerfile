@@ -38,7 +38,7 @@ WORKDIR /app
 COPY --from=builder /out/server ./server
 
 ENV PORT=3000
-ENV DB_PATH=/data/stuudio.db
+ENV DB_PATH=/data/studio.db
 ENV MEDIA_STORAGE_DIR=/data/media-storage
 EXPOSE 3000
 CMD ["./server"]

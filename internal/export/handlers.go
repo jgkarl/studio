@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"stuudio/internal/auth"
+	"studio/internal/auth"
 )
 
 func Mount(mux *http.ServeMux, svc *Service, authSvc *auth.Service) {

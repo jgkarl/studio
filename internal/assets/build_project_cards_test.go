@@ -3,9 +3,9 @@ package assets
 import (
 	"testing"
 
-	"stuudio/internal/assessments"
-	"stuudio/internal/reporter"
-	"stuudio/internal/treatments"
+	"studio/internal/assessments"
+	"studio/internal/reporter"
+	"studio/internal/treatments"
 )
 
 func TestBuildProjectCardsBucketsByProject(t *testing.T) {

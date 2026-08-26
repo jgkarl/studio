@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"stuudio/internal/testutil"
+	"studio/internal/testutil"
 )
 
 func TestCreateAndGetByID(t *testing.T) {

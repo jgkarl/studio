@@ -1,0 +1,118 @@
+---
+# Generic Ubuntu 24.04 host hardening: dedicated "ansible" automation user (pubkey-only,
+# passwordless sudo), root SSH fully disabled, AllowUsers locked to just the accounts that should
+# be able to log in, and a baseline ufw firewall (SSH only — app-specific ports are opened by the
+# app's own role). Idempotent, safe to re-run any time.
+#
+#   ansible-playbook harden.yml --ask-vault-pass
+
+- name: Refuse to run against anything but Ubuntu 24.04+
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == "Ubuntu"
+      - ansible_facts.distribution_version is version('24.04', '>=')
+    fail_msg: >-
+      This role only supports Ubuntu 24.04+ (found {{ ansible_facts.distribution }}
+      {{ ansible_facts.distribution_version }}) — libvips42 and the rest of studio_app's
+      assumptions are pinned to it, see docs/deploy.md.
+
+- name: Refuse to run with an unset ansible-user public key
+  ansible.builtin.assert:
+    that:
+      - harden_ansible_pubkey is defined
+      - harden_ansible_pubkey | trim | length > 0
+    fail_msg: >-
+      harden_ansible_pubkey is unset — put the contents of the ansible automation user's
+      public key (e.g. ~/.ssh/kiagoeu_vps_ansible.pub) in group_vars/all.yml before running this
+      playbook, or you'll lock yourself out once PasswordAuthentication is disabled for it.
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Create the ansible automation group
+  ansible.builtin.group:
+    name: "{{ harden_ansible_user }}"
+    state: present
+
+- name: Create the ansible automation user
+  ansible.builtin.user:
+    name: "{{ harden_ansible_user }}"
+    group: "{{ harden_ansible_user }}"
+    groups: sudo
+    append: true
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: Authorize the ansible user's public key
+  ansible.posix.authorized_key:
+    user: "{{ harden_ansible_user }}"
+    key: "{{ harden_ansible_pubkey }}"
+    state: present
+
+- name: Grant the ansible user passwordless sudo
+  ansible.builtin.template:
+    src: sudoers-ansible.j2
+    dest: /etc/sudoers.d/{{ harden_ansible_user }}
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Ensure sshd includes /etc/ssh/sshd_config.d/*.conf
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    insertbefore: BOF
+    state: present
+  # Ubuntu 24.04 ships this on the first line by default — this just guards against a stripped-down
+  # image where it's missing, since everything below depends on it actually being included.
+  register: harden_sshd_include
+  notify: restart sshd
+
+- name: Template sshd drop-in files
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/ssh/sshd_config.d/{{ item }}
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - 00-allowusers.conf
+    - 10-ansible-user.conf
+    - 20-root.conf
+  register: harden_sshd_dropins
+  notify: restart sshd
+
+# Runs before the handler above (handlers only fire after all of this role's tasks complete) — if
+# the templated config doesn't actually parse, the play fails here and the restart handler never
+# fires, so a bad config never reaches the running sshd.
+- name: Validate sshd config before ever restarting it
+  ansible.builtin.command: sshd -t
+  changed_when: false
+  when: harden_sshd_include is changed or harden_sshd_dropins is changed
+
+- name: Set default ufw policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny }
+    - { direction: outgoing, policy: allow }
+
+- name: Allow SSH through ufw (before enabling, so this run can't lock itself out)
+  community.general.ufw:
+    rule: allow
+    port: "{{ harden_ssh_port | string }}"
+    proto: tcp
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled
