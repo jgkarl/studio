@@ -27,7 +27,7 @@ studio_port: 3000
 studio_release_version: "latest"
 
 # owner/repo on GitHub that release.yml publishes to.
-studio_github_repo: "jgkarl/studio-go"
+studio_github_repo: "jgkarl/studio"
 
 # --- Secrets (values live in vault.yml, only referenced by name here) --------------------------
 

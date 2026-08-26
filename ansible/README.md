@@ -123,6 +123,18 @@ Fetches whatever `studio_release_version` resolves to (default `"latest"`, track
 recent GitHub Release) and restarts the service only if the version actually changed. Doesn't
 touch packages, the system user, ufw, or Caddy - just the binary.
 
+Whenever a version change is actually about to happen (both here and in `deploy.yml`, since both
+run the same `roles/studio_app/tasks/release.yml`), the database is backed up first - a
+`studio.db`/`-wal`/`-shm` snapshot (`tar`, tolerant of the sidecars not existing) written to
+`{{ studio_home }}/backups/studio-db-<timestamp>.tar.gz` before the new binary is installed or the
+service restarts. Skipped on a no-op run (nothing to install) and before the very first deploy (no
+database yet). Not automatically pruned:
+
+```bash
+# on the VPS, delete backups older than 30 days
+find /opt/app/studio/backups -name '*.tar.gz' -mtime +30 -delete
+```
+
 Pin an exact version instead of always tracking latest:
 
 ```bash
@@ -135,8 +147,9 @@ ansible-playbook update.yml --ask-vault-pass -e studio_release_version=v1.2.3
 
 - **DNS** - point `studio_domain`'s `A`/`AAAA` record at your VPS yourself before the Caddy step
   runs, or Let's Encrypt's HTTP challenge will fail.
-- **Backups** - see `../docs/deploy.md`'s Backups section; `/opt/app/studio/data/` is the whole
-  app's state (SQLite DB + uploaded media).
+- **Full backups** - `deploy.yml`/`update.yml` only ever auto-back-up the database itself (see
+  above), never `media-storage/`. For the whole app's state, see `../docs/deploy.md`'s Backups
+  section.
 - **The very first login** - `harden.yml` needs an account that already has sudo on the box
   (typically whatever the VPS provider set up, or an existing account like `karl`) before it can
   create the `ansible` user; there's no way to automate that first bootstrap.

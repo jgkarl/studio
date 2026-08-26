@@ -59,6 +59,11 @@ tag instead of always tracking latest.
 
 ## Backups
 
+`deploy.yml`/`update.yml` already snapshot the database itself automatically before installing an
+actually-different release — see "Update to a newer release" in `../ansible/README.md`. That
+covers `studio.db` but not `media-storage/`; for the whole app's state, or a backup outside of a
+deploy, do it yourself.
+
 Everything the app owns lives under one directory on the VPS: `/opt/app/studio/data/`
 (`studio.db` + the `media-storage/` subdirectory — see `DB_PATH`/`MEDIA_STORAGE_DIR` in the
 templated `.env`). Back that one directory up however you like:
@@ -72,6 +77,11 @@ copy `studio.db` together with its `-wal`/`-shm` sidecar files in the same pass 
 the whole directory does) — SQLite's WAL mode is designed for exactly this. For a live/hot-backup
 setup with zero pause, look at [Litestream](https://litestream.io/) later; a nightly `tar` cron
 job is more than enough for a prototype's traffic.
+
+## Managing the database
+
+See **[`manage.md`](manage.md)** — ad-hoc `sqlite3` access on the VPS: confirming a user's role/
+verification status, promoting a user to admin, checking what a deploy actually seeded.
 
 ## Local dev / trying it without a VPS
 

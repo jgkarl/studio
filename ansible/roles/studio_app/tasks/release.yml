@@ -1,7 +1,9 @@
 ---
 # Fetches the release binary (see .github/workflows/release.yml) and restarts the service if the
 # deployed version actually changed. Standalone and idempotent by design - both deploy.yml (via
-# the full role) and update.yml (which imports just this file) run it directly.
+# the full role) and update.yml (which imports just this file) run it directly. Backs up the
+# database first whenever a version change is actually about to happen (see the "Back up the
+# database" block below) - no point backing up on a no-op run where nothing installs.
 
 - name: Resolve "latest" to a concrete tag
   ansible.builtin.uri:
@@ -21,6 +23,53 @@
   register: studio_current_version_raw
   failed_when: false
 
+- name: Record whether this run is actually installing a new version
+  ansible.builtin.set_fact:
+    studio_version_changed: >-
+      {{ studio_current_version_raw.content is not defined
+         or (studio_current_version_raw.content | b64decode | trim) != studio_resolved_version }}
+
+- name: Check whether a database exists yet to back up
+  ansible.builtin.stat:
+    path: "{{ studio_home }}/data/studio.db"
+  register: studio_db_stat
+  when: studio_version_changed | bool
+
+- name: Back up the database before installing a new version
+  when: (studio_version_changed | bool) and studio_db_stat.stat.exists
+  block:
+    - name: Record the backup timestamp
+      ansible.builtin.set_fact:
+        studio_backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+
+    - name: Ensure the backup directory exists
+      ansible.builtin.file:
+        path: "{{ studio_home }}/backups"
+        state: directory
+        owner: "{{ studio_system_user }}"
+        group: "{{ studio_system_user }}"
+        mode: "0750"
+
+    # --ignore-failed-read tolerates studio.db-wal/-shm not existing (e.g. right after a WAL
+    # checkpoint) without failing the backup - the .db file itself is what actually matters, and
+    # we already confirmed it exists above.
+    - name: Snapshot the database (with its WAL/SHM sidecars, if present) before updating
+      ansible.builtin.shell: |
+        set -euo pipefail
+        tar czf {{ studio_home }}/backups/studio-db-{{ studio_backup_timestamp }}.tar.gz \
+          --ignore-failed-read -C {{ studio_home }}/data studio.db studio.db-wal studio.db-shm
+      args:
+        executable: /bin/bash
+
+    - name: Fix backup archive ownership
+      ansible.builtin.file:
+        path: "{{ studio_home }}/backups/studio-db-{{ studio_backup_timestamp }}.tar.gz"
+        owner: "{{ studio_system_user }}"
+        group: "{{ studio_system_user }}"
+        mode: "0640"
+
+# Not automatically pruned - see ansible/README.md for a manual cleanup one-liner.
+
 - name: Download the release binary (only when the version actually changed)
   ansible.builtin.get_url:
     url: "https://github.com/{{ studio_github_repo }}/releases/download/{{ studio_resolved_version }}/{{ studio_release_asset_name }}"
@@ -30,13 +79,12 @@
     mode: "0755"
     # get_url's own default freshness check (comparing HTTP caching headers) is unreliable across
     # different release URLs/CDN responses and can wrongly skip a real version change - our own
-    # RELEASE_VERSION marker (the `when` below) is the actual source of truth for whether to fetch
-    # at all; force here just means "don't second-guess that with your own heuristic," not
-    # "always re-download regardless" - `changed` is still computed correctly from real content.
+    # RELEASE_VERSION marker (studio_version_changed, above) is the actual source of truth for
+    # whether to fetch at all; force here just means "don't second-guess that with your own
+    # heuristic," not "always re-download regardless" - `changed` is still computed correctly
+    # from real content.
     force: true
-  when: >-
-    studio_current_version_raw.content is not defined
-    or (studio_current_version_raw.content | b64decode | trim) != studio_resolved_version
+  when: studio_version_changed | bool
   notify: restart studio
   register: studio_release_download
 

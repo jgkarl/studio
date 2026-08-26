@@ -164,8 +164,11 @@ including the pre-Ansible VPS bootstrap steps):
 
 `update.yml` is the lightweight day-to-day path: fetches whatever `studio_release_version`
 resolves to (default `"latest"`) and restarts only if the version actually changed — doesn't touch
-packages, users, or Caddy. `Dockerfile`/`docker-compose.yml` exist only for local "try it without
-installing anything" use, not the deploy path.
+packages, users, or Caddy. Both `deploy.yml` and `update.yml` run the same
+`roles/studio_app/tasks/release.yml`, which snapshots `studio.db` (+ `-wal`/`-shm`) to
+`{{ studio_home }}/backups/` before installing an actually-different version — skipped on a no-op
+run or before the first deploy. `Dockerfile`/`docker-compose.yml` exist only for local "try it
+without installing anything" use, not the deploy path.
 
 ## Integrations
 
@@ -185,5 +188,6 @@ installing anything" use, not the deploy path.
 - `docs/setup.md` — full local-dev walkthrough (Docker and native), env var reference, exactly
   what first boot seeds.
 - `docs/deploy.md` — deployment reasoning (why Ubuntu 24.04 specifically), backups.
+- `docs/manage.md` — ad-hoc `sqlite3` access on the VPS (user status/role fixes, sanity checks).
 - `ansible/README.md` — the actual playbook usage, one-time setup, VPS bootstrap steps.
 - `e2e/README.md` — Playwright suite usage.
