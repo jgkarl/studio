@@ -110,16 +110,16 @@ There is no `npm run build` step for the frontend — no webpack/esbuild/vite, a
 deliberate exception) no vendored or CDN-loaded third-party JS. That exception is
 [OpenSeadragon](https://openseadragon.github.io/) (`static/openseadragon/`, vendored — real tiled
 deep zoom is enough of a lift that hand-rolling it wasn't worth it, unlike the rest of the app):
-`static/js/osd-viewer.js` initializes it against `internal/iiif`'s own Image API `info.json`
-route and layers the stored annotation regions/legend on top via OpenSeadragon's overlay API.
-Everything else stays hand-rolled vanilla JS, including `static/js/pattern-layer.js` (region
-annotations — the rect/freehand drawing tool and its save-on-drop calls) and
+`static/js/lightbox.js` initializes it against `internal/iiif`'s own Image API `info.json` route
+as the Media view's one image viewer/editor — rotate/brightness/contrast/download, the
+rect/freehand pattern-layer drawing tool and its save-on-drop calls, and the description-save
+note, all layered on that same deep-zoom surface via OpenSeadragon's overlay/coordinate-conversion
+API rather than a plain flat `<img>`. Everything else stays hand-rolled vanilla JS, including
 `internal/reporter`'s structured sections, which replaced a CDN-loaded TipTap. Every other script
 is plain vanilla JS loaded via `<script type="module">`, reused across every kanban board on a
 shared `data-url-template`/`data-status-field` convention (`static/js/kanban.js` — native HTML5
 Drag and Drop, chosen over `dnd-kit`, which has no vanilla build) plus small single-page islands
-(`static/js/lightbox.js` for the Media view's rotate/brightness/contrast/description-save
-controls, `static/js/album.js` for the media grid's filter/search).
+(`static/js/album.js` for the media grid's filter/search).
 
 ## Build & deploy
 

@@ -8,8 +8,8 @@ Deliberately minimal: no ORM, hand-written SQL and row types, no web framework, 
 templates, JS only where a page genuinely needs client-side interactivity — small vanilla
 islands, no bundler, almost no vendored libraries (see `static/js/`). The one deliberate exception
 is [OpenSeadragon](https://openseadragon.github.io/) (`static/openseadragon/`), vendored for the
-deep-zoom media viewer's real tile scheduling against the IIIF Image API — see
-`static/js/osd-viewer.js`'s header comment.
+media viewer/editor's real tile scheduling against the IIIF Image API — see
+`static/js/lightbox.js`'s header comment.
 
 ## Requirements
 

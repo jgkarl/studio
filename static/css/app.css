@@ -1361,6 +1361,7 @@ html[data-theme="dark"] .stat-card {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  z-index: 10;
   padding: 0.4rem;
   border: 0;
   border-radius: 999px;
@@ -1379,16 +1380,6 @@ html[data-theme="dark"] .stat-card {
   overflow: hidden;
   flex: 1;
   min-height: 0;
-}
-
-.lightbox-image {
-  display: block;
-  max-width: 100%;
-  max-height: 50vh;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  transition: transform 0.15s ease;
 }
 
 .lightbox-controls {
@@ -1452,25 +1443,38 @@ html[data-theme="dark"] .stat-card {
   object-fit: cover;
 }
 
-/* --- IIIF deep-zoom viewer -------------------------------------------------------------------
-   Read-only tiled deep-zoom viewer (static/js/osd-viewer.js, OpenSeadragon) against the IIIF
-   Image API, with the same stored annotation regions (internal/media/annotations.go) + legend the
-   editor shows, overlaid via OpenSeadragon's own overlay positioning (viewer.addOverlay) so the
-   SVG tracks pan/zoom automatically instead of needing hand-rolled viewport-transform math. */
+/* --- Pattern layer / deep-zoom viewer ----------------------------------------------------------
+   The media view's one image viewer/editor (static/js/lightbox.js): OpenSeadragon deep zoom
+   against the IIIF Image API is the viewing surface (.osd-viewer), with the stored annotation
+   regions (internal/media/annotations.go — rectangles or freehand-brush outlines) rendered into a
+   0-100 viewBox SVG that OpenSeadragon manages as one of its own overlays (viewer.addOverlay) so
+   it tracks pan/zoom/rotation automatically instead of needing hand-rolled viewport-transform
+   math — new regions are drawn directly on this same surface. A legend is always rendered
+   underneath, whether or not anything's marked yet. */
 
-.iiif-viewer-modal {
-  max-width: min(90vw, 60rem);
+/* Rotate is applied to this wrapper, one level above .pattern-layer-stage - never to the stage
+   itself, since OpenSeadragon measures that element's own box for its canvas/tile layout, and a
+   transform on the element being measured skews its bounding-rect-based size math. Keeping the
+   transform one level up leaves OpenSeadragon measuring an always-unrotated box, and just visually
+   spins the whole already-correctly-sized result. */
+.pattern-layer-rotate-wrap {
+  width: 100%;
+  transition: transform 0.2s ease;
 }
 
-.iiif-viewer-stage {
-  overflow: hidden;
+.pattern-layer-stage {
+  position: relative;
+  width: 100%;
+  height: 55vh;
+  min-height: 20rem;
   border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--bg);
 }
 
 .osd-viewer {
   width: 100%;
-  height: 70vh;
-  background: var(--bg);
+  height: 100%;
 }
 
 .osd-annotation-overlay {
@@ -1478,29 +1482,6 @@ html[data-theme="dark"] .stat-card {
   height: 100%;
   display: block;
   pointer-events: none;
-}
-
-/* --- Pattern layer ---------------------------------------------------------------------------
-   Lives inside the lightbox modal (image editor): an absolutely-positioned percentage-coordinate
-   SVG overlay of stored regions (internal/media/annotations.go — rectangles or freehand-brush
-   outlines), drawn/toggled by static/js/pattern-layer.js, with a legend always rendered
-   underneath. .pattern-layer-stage shrink-wraps to the <img>'s own rendered box (not the
-   flex-centered .lightbox-image-wrap around it, which may be larger/letterboxed) so the SVG's
-   0-100 viewBox lines up with the image pixel-for-pixel regardless of aspect ratio. */
-
-.pattern-layer-stage {
-  position: relative;
-  display: inline-block;
-  max-width: 100%;
-  max-height: 100%;
-  line-height: 0;
-}
-
-.pattern-layer-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
 }
 
 .pattern-layer-stage.is-add-mode {

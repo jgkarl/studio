@@ -92,7 +92,7 @@ constructs each module's `Service`, calls every module's `Mount(mux, svc)` in se
 **IIIF/media pipeline**: `internal/media` handles upload + a "web" thumbnail variant (non-fatal on
 failure); `internal/iiif` is a from-scratch IIIF Image API v3 implementation (region/size/rotation/
 quality/format transforms via govips, not run through the official validator) backing both the
-deep-zoom viewer (`static/js/osd-viewer.js` + vendored OpenSeadragon) and the pattern-layer
+deep-zoom viewer/editor (`static/js/lightbox.js` + vendored OpenSeadragon) and the pattern-layer
 grayscale base image. `internal/media/rasterize.go` flattens a media item's drawn annotation
 regions + legend into a downloadable PNG via libvips' SVG rasterizer.
 

@@ -156,7 +156,7 @@ func (svc *HandlerService) handleCreateAnnotation(w http.ResponseWriter, r *http
 			return
 		}
 	}
-	// The drag-to-draw UI (static/js/pattern-layer.js) posts via fetch and reloads the page
+	// The drag-to-draw UI (static/js/lightbox.js) posts via fetch and reloads the page
 	// itself on success — a redirect response body would just be discarded. A plain form post
 	// (no JS) still gets sent back to the media view, same convention as handleSetStage.
 	if r.Header.Get("X-Requested-With") == "fetch" {
