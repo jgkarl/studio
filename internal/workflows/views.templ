@@ -110,7 +110,7 @@ templ newBody(options []AssetOption, conditions []settings.Classifier, preselect
 				<input class="input" name="title" required/>
 			}
 			<div class="form-section">
-				<p class="form-section-title">Initial assessment <span class="page-subtitle">(optional)</span></p>
+				<p class="form-section-title">Initial assessment</p>
 				@web.Field("Condition", "") {
 					@web.ClassifierAutocomplete("assessmentCondition", "condition_state", "code", "", "Select…", settings.ClassifierAutocompleteOptions(conditions, locale))
 				}
@@ -161,165 +161,161 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 			· owner: <a href={ templ.URL("/clients/" + client.ID) }>{ client.Name }</a>
 		}
 	</p>
-	<div class="report-layout">
-		<div class="report-layout-main">
-			@web.Card() {
-				<dl class="detail-dl">
-					@detailField("Stage", stageTitle(stages, project.Stage, locale))
-					@detailField("Priority", project.Priority)
-					@detailField("Assigned to", assignedToName)
-				</dl>
-				if project.Stage != "completed" {
-					<form method="post" action={ templ.URL("/projects/" + project.ID + "/stage") } class="inline-edit-form">
-						@web.Field("Move to stage", "") {
-							<select class="input" name="stage">
-								for _, stage := range stages {
-									if stage.Code != "completed" {
-										<option value={ stage.Code } selected?={ stage.Code == project.Stage }>{ settings.ClassifierLabel(stage, locale) }</option>
-									}
-								}
-							</select>
+	@web.Card() {
+		<dl class="detail-dl">
+			@detailField("Stage", stageTitle(stages, project.Stage, locale))
+			@detailField("Priority", project.Priority)
+			@detailField("Assigned to", assignedToName)
+		</dl>
+		if project.Stage != "completed" {
+			<form method="post" action={ templ.URL("/projects/" + project.ID + "/stage") } class="inline-edit-form">
+				@web.Field("Move to stage", "") {
+					<select class="input" name="stage">
+						for _, stage := range stages {
+							if stage.Code != "completed" {
+								<option value={ stage.Code } selected?={ stage.Code == project.Stage }>{ settings.ClassifierLabel(stage, locale) }</option>
+							}
 						}
-						<button type="submit" class="btn btn-secondary">
-							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
-							Update stage
-						</button>
-					</form>
-					<form method="post" action={ templ.URL("/projects/" + project.ID + "/finish") } class="form-section" data-confirm="Finish this project? If it has no report yet, one will be drafted automatically for you to review.">
-						<button type="submit" class="btn btn-primary">
-							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
-							Finish project
-						</button>
-					</form>
-				} else {
-					@web.OpenBadge(true)
+					</select>
 				}
-			}
-			@web.Card() {
-				<div class="card-header-row">
-					<h2 class="dashboard-heading">Assessments</h2>
-					@web.ModalTrigger("modal-assessment", "Add")
-				</div>
-				if len(projectAssessments) == 0 {
-					<p class="empty-state">No assessments recorded yet.</p>
-				}
-				<ul class="entity-list">
-					for _, a := range projectAssessments {
-						<li class="entity-list-row">
-							<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
-							<div class="row-actions">
-								<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
-								<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
-									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
-								</a>
-							</div>
-						</li>
-					}
-				</ul>
-				@web.Modal("modal-assessment", "Add: Assessment") {
-					@assessments.AddModalBody(project.ID, nil, conditions, locale)
-				}
-			}
-			@web.Card() {
-				<div class="card-header-row">
-					<h2 class="dashboard-heading">Treatments</h2>
-					@web.ModalTrigger("modal-treatment", "Add")
-				</div>
-				if len(projectTreatments) == 0 {
-					<p class="empty-state">No treatments logged yet.</p>
-				}
-				<ul class="entity-list">
-					for _, t := range projectTreatments {
-						<li class="entity-list-row">
-							<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
-							<div class="row-actions">
-								<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
-								<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
-								<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
-									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
-								</a>
-							</div>
-						</li>
-					}
-				</ul>
-				@web.Modal("modal-treatment", "Add: Treatments") {
-					@treatments.AddModalBody(project.ID, nil, treatmentMethods, locale)
-				}
-			}
-			@web.Card() {
-				<div class="card-header-row">
-					<h2 class="dashboard-heading">Reports</h2>
-					@web.ModalTrigger("modal-report", "Add")
-				</div>
-				if len(projectReports) == 0 {
-					<p class="empty-state">No reports yet for this project.</p>
-				}
-				<ul class="entity-list">
-					for _, rep := range projectReports {
-						<li class="entity-list-row">
-							<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
-							<div class="row-actions">
-								if rep.Status == "final" {
-									<span class="badge badge-green">Final</span>
-								} else {
-									<span class="badge badge-amber">Draft</span>
-								}
-								<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
-									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
-								</a>
-							</div>
-						</li>
-					}
-				</ul>
-				@web.Modal("modal-report", "Add: Reports") {
-					@reporter.AddModalBody(project.ID, nil)
-				}
-			}
-			@web.Card() {
-				<div class="card-header-row">
-					<h2 class="dashboard-heading">Media</h2>
-					@web.ModalTrigger("modal-media", "Add")
-				</div>
-				<p class="page-subtitle">{ strconv.Itoa(damageMappingCount) } damage mapping(s) marked across this project's media.</p>
-				if len(projectMedia) == 0 {
-					<p class="empty-state">No media yet.</p>
-				}
-				<ul class="entity-list">
-					for _, ref := range projectMedia {
-						<li class="entity-list-row">
-							<a href={ mediaViewHref(ref) } class="entity-list-name">
-								<img class="entity-thumb" src={ "/api/media/" + ref.MediaID } alt="" style="width:2.5rem;height:2.5rem;display:inline-block;vertical-align:middle;margin-right:0.5rem;border-radius:4px;"/>
-								if ref.Role.Valid {
-									{ ref.Role.String }
-								} else {
-									{ string(ref.Media.Kind) }
-								}
-							</a>
-							<div class="row-actions">
-								<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
-									<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
-								</a>
-								<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
-									<button type="submit" class="row-action-icon" title="Unlink">
-										<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
-									</button>
-								</form>
-							</div>
-						</li>
-					}
-				</ul>
-				@web.Modal("modal-media", "Add: Media") {
-					<form method="post" action={ templ.URL("/projects/" + project.ID + "/media") } enctype="multipart/form-data" class="form-grid">
-						@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
-						<button type="submit" class="btn btn-primary">
-							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
-							Upload
-						</button>
-					</form>
-				}
-			}
+				<button type="submit" class="btn btn-secondary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+					Update stage
+				</button>
+			</form>
+			<form method="post" action={ templ.URL("/projects/" + project.ID + "/finish") } class="form-section" data-confirm="Finish this project? If it has no report yet, one will be drafted automatically for you to review.">
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Finish project
+				</button>
+			</form>
+		} else {
+			@web.OpenBadge(true)
+		}
+	}
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Assessments</h2>
+			@web.ModalTrigger("modal-assessment", "Add")
 		</div>
-	</div>
+		if len(projectAssessments) == 0 {
+			<p class="empty-state">No assessments recorded yet.</p>
+		}
+		<ul class="entity-list">
+			for _, a := range projectAssessments {
+				<li class="entity-list-row">
+					<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
+					<div class="row-actions">
+						<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
+						<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
+							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+						</a>
+					</div>
+				</li>
+			}
+		</ul>
+		@web.Modal("modal-assessment", "Add: Assessment") {
+			@assessments.AddModalBody(project.ID, nil, conditions, locale)
+		}
+	}
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Treatments</h2>
+			@web.ModalTrigger("modal-treatment", "Add")
+		</div>
+		if len(projectTreatments) == 0 {
+			<p class="empty-state">No treatments logged yet.</p>
+		}
+		<ul class="entity-list">
+			for _, t := range projectTreatments {
+				<li class="entity-list-row">
+					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
+					<div class="row-actions">
+						<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
+						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+						<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
+							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+						</a>
+					</div>
+				</li>
+			}
+		</ul>
+		@web.Modal("modal-treatment", "Add: Treatments") {
+			@treatments.AddModalBody(project.ID, nil, treatmentMethods, locale)
+		}
+	}
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Reports</h2>
+			@web.ModalTrigger("modal-report", "Add")
+		</div>
+		if len(projectReports) == 0 {
+			<p class="empty-state">No reports yet for this project.</p>
+		}
+		<ul class="entity-list">
+			for _, rep := range projectReports {
+				<li class="entity-list-row">
+					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
+					<div class="row-actions">
+						if rep.Status == "final" {
+							<span class="badge badge-green">Final</span>
+						} else {
+							<span class="badge badge-amber">Draft</span>
+						}
+						<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
+							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+						</a>
+					</div>
+				</li>
+			}
+		</ul>
+		@web.Modal("modal-report", "Add: Reports") {
+			@reporter.AddModalBody(project.ID, nil)
+		}
+	}
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Media</h2>
+			@web.ModalTrigger("modal-media", "Add")
+		</div>
+		<p class="page-subtitle">{ strconv.Itoa(damageMappingCount) } damage mapping(s) marked across this project's media.</p>
+		if len(projectMedia) == 0 {
+			<p class="empty-state">No media yet.</p>
+		}
+		<ul class="entity-list">
+			for _, ref := range projectMedia {
+				<li class="entity-list-row">
+					<a href={ mediaViewHref(ref) } class="entity-list-name">
+						<img class="entity-thumb" src={ "/api/media/" + ref.MediaID } alt="" style="width:2.5rem;height:2.5rem;display:inline-block;vertical-align:middle;margin-right:0.5rem;border-radius:4px;"/>
+						if ref.Role.Valid {
+							{ ref.Role.String }
+						} else {
+							{ string(ref.Media.Kind) }
+						}
+					</a>
+					<div class="row-actions">
+						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
+							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+						</a>
+						<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
+							<button type="submit" class="row-action-icon" title="Unlink">
+								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+							</button>
+						</form>
+					</div>
+				</li>
+			}
+		</ul>
+		@web.Modal("modal-media", "Add: Media") {
+			<form method="post" action={ templ.URL("/projects/" + project.ID + "/media") } enctype="multipart/form-data" class="form-grid">
+				@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
+				<button type="submit" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Upload
+				</button>
+			</form>
+		}
+	}
 	<script src="/static/js/modal.js" defer></script>
 	<script src="/static/js/confirm.js" defer></script>
 }
@@ -413,4 +409,3 @@ templ editBody(project Project) {
 		</form>
 	}
 }
-

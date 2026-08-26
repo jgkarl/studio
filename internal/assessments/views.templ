@@ -39,7 +39,7 @@ templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Loc
 							<div class="page-subtitle">{ row.Description } · owner: { row.ClientName }</div>
 						</div>
 						<div class="row-actions">
-							<span class="badge">{ row.Condition }</span>
+							<span class="badge tag-chip" data-el-tag-filter="condition" data-el-tag-value={ row.Condition } role="button" tabindex="0">{ row.Condition }</span>
 							<span class="page-subtitle">{ row.RecordedAt.Format("2006-01-02") }</span>
 						</div>
 					</a>

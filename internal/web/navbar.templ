@@ -69,6 +69,14 @@ templ Navbar(c Chrome) {
 			}
 		</nav>
 		<div class="navbar-controls">
+			<form method="post" action="/locale/toggle">
+				<button type="submit" class="navbar-pill-btn" title={ localeToggleTitle(c) }>{ localeCode(c) }</button>
+			</form>
+			<form method="post" action="/theme/toggle">
+				<button type="submit" class="navbar-icon-btn" title={ themeToggleTitle(c) } aria-label={ themeToggleTitle(c) }>
+					@themeGlyph(c)
+				</button>
+			</form>
 			<button type="button" class="account-menu-trigger" data-account-menu-open aria-haspopup="true" aria-label="Account menu">
 				<span class="avatar-chip avatar-chip-sm avatar-chip-user">{ initials(c.UserName) }</span>
 				<span class="navbar-user-text">
@@ -78,15 +86,6 @@ templ Navbar(c Chrome) {
 				</span>
 			</button>
 			<div id="account-menu" class="account-menu-panel" hidden>
-				<form method="post" action="/locale/toggle">
-					<button type="submit" class="account-menu-item">{ localeToggleTitle(c) }</button>
-				</form>
-				<form method="post" action="/theme/toggle">
-					<button type="submit" class="account-menu-item">
-						@themeGlyph(c)
-						{ themeToggleTitle(c) }
-					</button>
-				</form>
 				if c.ShowSettings {
 					<a href="/settings" class="account-menu-item account-menu-link">{ c.Dict.Nav.Settings }</a>
 				}
@@ -125,28 +124,30 @@ templ Navbar(c Chrome) {
 				</a>
 			}
 		</nav>
-		<div class="nav-drawer-controls">
-			<form method="post" action="/locale/toggle" style="flex:1;">
-				<button type="submit" class="navbar-pill-btn" style="width:100%;">{ localeCode(c) }</button>
-			</form>
-			<form method="post" action="/theme/toggle" style="flex:1;">
-				<button type="submit" class="navbar-icon-btn" style="width:100%;">
-					@themeGlyph(c)
-				</button>
-			</form>
-		</div>
 		<div class="nav-drawer-footer">
-			<span class="avatar-chip avatar-chip-sm avatar-chip-user">{ initials(c.UserName) }</span>
-			<span style="font-size:13px;line-height:1.3;">
-				{ c.UserName }
-				<br/>
-				<span class="navbar-user-role">{ c.UserRole }</span>
-			</span>
-			<form method="post" action="/logout">
-				<button type="submit" class="btn btn-ghost" title={ c.Dict.Common.SignOut } aria-label={ c.Dict.Common.SignOut }>
-					<img src={ iconSrc("logout") } width="18" height="18" alt="" class="icon"/>
-				</button>
-			</form>
+			<div class="nav-drawer-footer-user">
+				<span class="avatar-chip avatar-chip-sm avatar-chip-user">{ initials(c.UserName) }</span>
+				<span style="font-size:13px;line-height:1.3;">
+					{ c.UserName }
+					<br/>
+					<span class="navbar-user-role">{ c.UserRole }</span>
+				</span>
+				<form method="post" action="/logout">
+					<button type="submit" class="btn btn-ghost" title={ c.Dict.Common.SignOut } aria-label={ c.Dict.Common.SignOut }>
+						<img src={ iconSrc("logout") } width="18" height="18" alt="" class="icon"/>
+					</button>
+				</form>
+			</div>
+			<div class="nav-drawer-controls">
+				<form method="post" action="/locale/toggle" style="flex:1;">
+					<button type="submit" class="navbar-pill-btn" style="width:100%;">{ localeCode(c) }</button>
+				</form>
+				<form method="post" action="/theme/toggle" style="flex:1;">
+					<button type="submit" class="navbar-icon-btn" style="width:100%;">
+						@themeGlyph(c)
+					</button>
+				</form>
+			</div>
 		</div>
 	</aside>
 }

@@ -77,7 +77,8 @@ cp group_vars/all/all.yml.example group_vars/all/all.yml
 # studio_release_version if you want to pin
 
 cp group_vars/all/vault.yml.example group_vars/all/vault.yml
-# edit group_vars/all/vault.yml: a real AUTH_SECRET (openssl rand -hex 32), APP_URL, SMTP if wanted
+# edit group_vars/all/vault.yml: a real AUTH_SECRET (openssl rand -hex 32), APP_URL, SMTP if wanted,
+# and vault_ansible_become_password if the account inventory.ini connects as needs a sudo password
 ansible-vault encrypt group_vars/all/vault.yml
 ```
 
@@ -85,6 +86,17 @@ ansible-vault encrypt group_vars/all/vault.yml
 the `.example` templates are tracked. Encrypting `vault.yml` means it's safe to keep around (or
 even commit) afterwards; you'll need the vault password (`--ask-vault-pass`, or a
 `--vault-password-file`) for every playbook run.
+
+**Sudo ("become") password**: both playbooks run every task via `become: true`. If the account
+`inventory.ini` connects as already has passwordless sudo (true of the dedicated `ansible` user
+`harden.yml` creates, which `deploy.yml`/`update.yml` connect as) there's nothing else to do. If it
+doesn't - often the case for `harden.yml`'s own first run, e.g. a VPS provider's default account, or
+your own login - set `vault_ansible_become_password` in `vault.yml` (mapped to the
+`ansible_become_password` magic variable in `all.yml`) instead of passing `--ask-become-pass` by
+hand on every run. Leave it blank to fall back to passwordless-sudo behavior unchanged.
+
+Already have a `vault.yml` from before this variable existed? Add the one line with
+`ansible-vault edit group_vars/all/vault.yml` - everything else in this doc works either way.
 
 ## 1. Harden the host (once, before the first deploy)
 

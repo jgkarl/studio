@@ -31,6 +31,12 @@ studio_github_repo: "jgkarl/studio"
 
 # --- Secrets (values live in vault.yml, only referenced by name here) --------------------------
 
+# The magic variable name Ansible itself looks for when it needs a sudo password - defined here
+# (not directly in vault.yml) purely so every other var above stays the "plain name -> {{
+# vault_plain_name }}" pattern. Blank/unset is fine (and the default) when the connecting account
+# already has passwordless sudo.
+ansible_become_password: "{{ vault_ansible_become_password | default('') }}"
+
 studio_auth_secret: "{{ vault_studio_auth_secret }}"
 studio_seed_example_data: "{{ vault_studio_seed_example_data }}"
 studio_app_url: "{{ vault_studio_app_url }}"

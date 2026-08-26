@@ -20,6 +20,16 @@ async function shoot(page, name) {
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, name), fullPage: true });
 }
 
+// Fills a ClassifierAutocomplete field (internal/web/ui.templ) by its `name` - these replaced
+// plain <select>s app-wide (see "UI refactor: full-width lists, classifier autocomplete, link/
+// select polish"), so there's no <select> to target any more. Typing a title already in the
+// <datalist> and blurring (static/js/classifier-autocomplete.js) resolves it into the hidden
+// field the form actually submits.
+async function fillClassifierAutocomplete(page, name, title) {
+  await page.fill(`input[list="${name}-options"]`, title);
+  await page.locator(`input[list="${name}-options"]`).press("Tab");
+}
+
 test.describe.configure({ mode: "serial" });
 
 let clientId, assetId, projectId, treatmentId, reportId;
@@ -33,6 +43,10 @@ let page;
 test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext();
   page = await context.newPage();
+  // Several forms in this golden path (e.g. "Finish project") carry data-confirm
+  // (static/js/confirm.js), which calls the native confirm() before submitting - Playwright
+  // auto-dismisses unhandled dialogs, which would silently no-op every one of those submits.
+  page.on("dialog", (dialog) => dialog.accept());
 });
 
 test.afterAll(async () => {
@@ -63,7 +77,7 @@ test.describe("Studio golden path", () => {
 
   test("create a client", async () => {
     await page.goto("/clients/new");
-    await page.selectOption('select[name="type"]', "individual");
+    await fillClassifierAutocomplete(page, "type", "Individual");
     await page.fill('input[name="name"]', "Jane Collector");
     await page.fill('input[name="email"]', "jane@example.com");
     await page.fill('input[name="country"]', "DE");
@@ -79,7 +93,7 @@ test.describe("Studio golden path", () => {
   test("create an asset, which leads straight into starting its first project", async () => {
     await page.goto("/assets/new");
     await page.selectOption('select[name="clientId"]', clientId);
-    await page.selectOption('select[name="assetTypeId"]', { label: "Painting" });
+    await fillClassifierAutocomplete(page, "assetTypeId", "Painting");
     await page.fill('input[name="referenceCode"]', "A-0001");
     await page.fill('input[name="title"]', "Sunset over the Bay");
     await page.fill('input[name="artist"]', "J. Doe");
@@ -95,7 +109,7 @@ test.describe("Studio golden path", () => {
     await page.fill('input[name="title"]', "Conservation of Sunset over the Bay");
     // The New Project form's optional "Initial assessment" sub-block records the intake
     // condition as this project's first Assessment, right after the project itself is created.
-    await page.selectOption('select[name="assessmentCondition"]', { index: 1 });
+    await fillClassifierAutocomplete(page, "assessmentCondition", "Excellent");
     await page.fill('textarea[name="assessmentDescription"]', "Minor surface grime, otherwise stable.");
     await page.setInputFiles('input[name="photos"]', TEST_PHOTO);
     await shoot(page, "07-project-new-with-assessment.png");
@@ -109,7 +123,7 @@ test.describe("Studio golden path", () => {
 
   test("log a treatment on the project", async () => {
     await page.goto(`/treatments/new?projectId=${projectId}`);
-    await page.selectOption('select[name="method"]', { label: "Surface cleaning" });
+    await fillClassifierAutocomplete(page, "method", "Surface cleaning");
     await page.fill('input[name="title"]', "Surface cleaning of top layer");
     await page.fill('textarea[name="notes"]', "Removed surface grime with a dry sponge.");
     await shoot(page, "09-treatment-new.png");
@@ -191,7 +205,7 @@ test.describe("Studio golden path", () => {
     // A Report already exists (created above), so finishing just marks the project completed and
     // returns to its own detail page rather than drafting/redirecting to a new report.
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
-    await expect(page.getByText("Completed")).toBeVisible();
+    await expect(page.locator("dd.detail-dd").getByText("Completed")).toBeVisible();
     await shoot(page, "16b-project-finished.png");
   });
 

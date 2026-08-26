@@ -53,38 +53,51 @@ templ dualStatCard(primary, secondary int, label, href string) {
 
 templ projectCardView(card projectCard, c web.Chrome) {
 	<div class="card dashboard-project-card">
-		<a href={ templ.URL("/projects/" + card.Project.ID) } class="entity-list-name">{ card.Project.Title }</a>
-		<div class="page-subtitle">
-			if card.Project.AssetTitle != "" {
-				{ card.Project.AssetTitle }
-			} else {
-				{ card.Project.AssetReferenceCode }
-			}
+		<div class="dashboard-project-card-header">
+			<a href={ templ.URL("/projects/" + card.Project.ID) } class="dashboard-project-card-title">
+				{ card.Project.Title }
+				<span class="dashboard-project-card-asset">({ projectAssetLabel(card) })</span>
+			</a>
 		</div>
-		@projectCardSection(c.Dict.Dashboard.AssessmentsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Assessments))
-		<ul class="dashboard-list">
-			for _, a := range card.Assessments {
-				<li><a href={ templ.URL("/assessments/" + a.ID) }>{ a.Condition } — { a.RecordedAt.Format("2006-01-02") }</a></li>
-			}
-		</ul>
-		@projectCardSection(c.Dict.Dashboard.TreatmentsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Treatments))
-		<ul class="dashboard-list">
-			for _, t := range card.Treatments {
-				<li><a href={ templ.URL("/treatments/" + t.ID) }>{ t.Title }</a></li>
-			}
-		</ul>
-		@projectCardSection(c.Dict.Dashboard.ReportsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Reports))
-		<ul class="dashboard-list">
-			for _, rep := range card.Reports {
-				<li><a href={ templ.URL("/reports/" + rep.ID) }>{ rep.Title }</a></li>
-			}
-		</ul>
+		<div class="dashboard-project-card-body">
+			<div>
+				@projectCardSection(c.Dict.Dashboard.AssessmentsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Assessments))
+				<ul class="dashboard-list">
+					for _, a := range card.Assessments {
+						<li><a href={ templ.URL("/assessments/" + a.ID) }>{ a.Condition } — { a.RecordedAt.Format("2006-01-02") }</a></li>
+					}
+				</ul>
+			</div>
+			<div>
+				@projectCardSection(c.Dict.Dashboard.TreatmentsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Treatments))
+				<ul class="dashboard-list">
+					for _, t := range card.Treatments {
+						<li><a href={ templ.URL("/treatments/" + t.ID) }>{ t.Title }</a></li>
+					}
+				</ul>
+			</div>
+			<div>
+				@projectCardSection(c.Dict.Dashboard.ReportsCardLabel, c.Dict.Dashboard.NoneYet, len(card.Reports))
+				<ul class="dashboard-list">
+					for _, rep := range card.Reports {
+						<li><a href={ templ.URL("/reports/" + rep.ID) }>{ rep.Title }</a></li>
+					}
+				</ul>
+			</div>
+		</div>
 	</div>
+}
+
+func projectAssetLabel(card projectCard) string {
+	if card.Project.AssetTitle != "" {
+		return card.Project.AssetTitle
+	}
+	return card.Project.AssetReferenceCode
 }
 
 templ projectCardSection(label, emptyLabel string, count int) {
 	<div class="dashboard-project-card-heading">
-		<span class="page-subtitle">{ label }</span>
+		<span class="dashboard-project-card-label">{ label }</span>
 		if count == 0 {
 			<span class="page-subtitle">{ emptyLabel }</span>
 		}

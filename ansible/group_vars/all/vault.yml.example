@@ -4,6 +4,15 @@
 # Never commit an unencrypted vault.yml (it's gitignored as a backstop, but ansible-vault encrypt
 # is what actually makes it safe to keep in version control afterwards, if you choose to).
 
+# The sudo ("become") password for whatever account inventory.ini connects as, if that account
+# needs one - harden.yml's very first bootstrap connection often does (a fresh VPS's provider-set
+# account, or your own login), while the "ansible" user harden.yml creates afterwards has
+# passwordless sudo and never needs this. Leave blank if the connecting account already has
+# passwordless sudo (or you'd rather type it by hand) - `become` then just proceeds without a
+# password, same as if this var were never set. Set it once here and every playbook run stops
+# needing a separate `--ask-become-pass` prompt on top of `--ask-vault-pass`.
+vault_ansible_become_password: ""
+
 vault_studio_auth_secret: "CHANGE_ME"   # openssl rand -hex 32
 vault_studio_seed_example_data: "false"   # fictional demo content - only ever "true" on a throwaway/staging box
 vault_studio_app_url: "https://yourdomain.com"

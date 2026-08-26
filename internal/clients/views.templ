@@ -39,7 +39,7 @@ templ listBody(rows []ListRow, typeLabels map[string]string, clientTypes []setti
 							</div>
 						</div>
 						<div class="row-actions">
-							<span class="badge">{ labelFor(typeLabels, row.Type) }</span>
+							<span class="badge tag-chip" data-el-tag-filter="clientType" data-el-tag-value={ row.Type } role="button" tabindex="0">{ labelFor(typeLabels, row.Type) }</span>
 							<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
 						</div>
 						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
@@ -115,10 +115,10 @@ templ newBody(clientTypes, contactMethods []settings.Classifier, locale i18n.Loc
 				}
 			</div>
 			<div class="form-row-2">
-				@web.Field("Organization", "optional") {
+				@web.Field("Organization", "") {
 					<input class="input" name="organizationName"/>
 				}
-				@web.Field("Contact person", "optional") {
+				@web.Field("Contact person", "") {
 					<input class="input" name="contactPerson"/>
 				}
 			</div>
@@ -148,10 +148,10 @@ templ newBody(clientTypes, contactMethods []settings.Classifier, locale i18n.Loc
 				}
 			</div>
 			<div class="form-row-2">
-				@web.Field("Tax ID", "optional") {
+				@web.Field("Tax ID", "") {
 					<input class="input" name="taxId"/>
 				}
-				@web.Field("Referral source", "optional") {
+				@web.Field("Referral source", "") {
 					<input class="input" name="referralSource"/>
 				}
 			</div>

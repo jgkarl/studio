@@ -46,7 +46,7 @@ templ listBody(rows []ListRow, methodLabels map[string]string, methods []setting
 							</div>
 						</div>
 						<div class="row-actions">
-							<span class="badge">{ methodLabel(methodLabels, row.Method) }</span>
+							<span class="badge tag-chip" data-el-tag-filter="method" data-el-tag-value={ row.Method } role="button" tabindex="0">{ methodLabel(methodLabels, row.Method) }</span>
 							<span class="page-subtitle">{ row.PerformedAt.Format("2006-01-02") }</span>
 						</div>
 					</a>

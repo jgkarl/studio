@@ -49,9 +49,9 @@ templ listBody(rows []ListRow) {
 						</div>
 						<div class="row-actions">
 							if row.Status == "final" {
-								<span class="badge badge-green">Final</span>
+								<span class="badge badge-green tag-chip" data-el-tag-filter="status" data-el-tag-value={ row.Status } role="button" tabindex="0">Final</span>
 							} else {
-								<span class="badge badge-amber">Draft</span>
+								<span class="badge badge-amber tag-chip" data-el-tag-filter="status" data-el-tag-value={ row.Status } role="button" tabindex="0">Draft</span>
 							}
 						</div>
 						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>

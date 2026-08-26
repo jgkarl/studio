@@ -21,6 +21,11 @@
 // A filter <select data-el-filter="assetType"> matches rows by their data-el-asset-type
 // attribute (dataset camelCases "assetType" -> looks up dataset.elAssetType). Same convention
 // for data-el-groupby against data-el-group-<value>.
+//
+// A row's own tag-chip badges (e.g. <span class="badge tag-chip" data-el-tag-filter="assetType"
+// data-el-tag-value="painting">) act as a shortcut into the matching filter <select> above -
+// clicking/activating one sets that select to the chip's value (toggling back to "All" on a
+// repeat click) without navigating the row's own link.
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-el-root]").forEach(initEntityList);
 });
@@ -87,5 +92,35 @@ function initEntityList(root) {
   if (search) search.addEventListener("input", render);
   filters.forEach((sel) => sel.addEventListener("change", render));
   if (groupBy) groupBy.addEventListener("change", render);
+
+  // Tag-chip badges (data-el-tag-filter="condition" data-el-tag-value="Stable") double as
+  // one-click filters into this same grid's matching <select data-el-filter="condition">.
+  // Clicking/activating one sets that select's value (toggling off on a repeat click) and
+  // re-renders - it never navigates the row's own link.
+  function applyTagFilter(chip) {
+    const key = chip.dataset.elTagFilter;
+    const sel = root.querySelector(`[data-el-filter="${key}"]`);
+    if (!sel) return;
+    const value = chip.dataset.elTagValue;
+    sel.value = sel.value === value ? "" : value;
+    sel.dispatchEvent(new Event("change"));
+  }
+
+  list.addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-el-tag-filter]");
+    if (!chip) return;
+    e.preventDefault();
+    e.stopPropagation();
+    applyTagFilter(chip);
+  });
+
+  list.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const chip = e.target.closest("[data-el-tag-filter]");
+    if (!chip) return;
+    e.preventDefault();
+    applyTagFilter(chip);
+  });
+
   render();
 }

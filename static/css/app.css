@@ -696,7 +696,6 @@ html[data-theme="dark"] .navbar-icon-btn {
 .nav-drawer-controls {
   display: flex;
   gap: 8px;
-  margin-top: 14px;
 }
 
 .nav-drawer-controls .navbar-pill-btn,
@@ -709,11 +708,17 @@ html[data-theme="dark"] .navbar-icon-btn {
   padding-top: 16px;
   border-top: 1px solid var(--border);
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nav-drawer-footer-user {
+  display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.nav-drawer-footer form {
+.nav-drawer-footer-user form {
   margin-left: auto;
 }
 
@@ -780,6 +785,11 @@ html[data-theme="dark"] .navbar-icon-btn {
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+  transition: box-shadow 150ms ease;
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-lg);
 }
 
 html[data-theme="dark"] .stat-card {
@@ -842,9 +852,10 @@ html[data-theme="dark"] .stat-card {
   text-decoration: underline;
 }
 
-/* Active-project cards: 1 column by default, 2 at md, 3 at lg — same mobile-first breakpoint
-   convention as .stat-grid/.kanban-board, capped independently by the Settings -> Features
-   "Active projects shown" limit (so this never needs to render more than a handful anyway). */
+/* Active-project cards: one full-container-width card per row (capped independently by the
+   Settings -> Features "Active projects shown" limit, so this never needs to render more than a
+   handful anyway) — each card's own body then splits Assessments/Treatments/Reports horizontally
+   at the md breakpoint. */
 .dashboard-project-cards {
   display: grid;
   grid-template-columns: 1fr;
@@ -852,22 +863,53 @@ html[data-theme="dark"] .stat-card {
   margin-top: 1rem;
 }
 
-@media (min-width: 768px) {
-  .dashboard-project-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .dashboard-project-cards {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
 .dashboard-project-card {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  transition: box-shadow 150ms ease;
+}
+
+.dashboard-project-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.dashboard-project-card-header {
+  margin-bottom: 0.25rem;
+}
+
+.dashboard-project-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-heading);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.dashboard-project-card-title:hover {
+  text-decoration: underline;
+}
+
+.dashboard-project-card-asset {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.dashboard-project-card-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard-project-card-body {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .dashboard-project-card-heading {
@@ -875,6 +917,16 @@ html[data-theme="dark"] .stat-card {
   justify-content: space-between;
   align-items: baseline;
   margin-top: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.dashboard-project-card-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
 /* --- Entity lists (Clients/Assets/etc.) -------------------------------------------------- */
@@ -1080,13 +1132,13 @@ html[data-theme="dark"] .stat-card {
 
 .form-row-2 {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
   grid-template-columns: 1fr;
 }
 
 .form-row-3 {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
   grid-template-columns: 1fr;
 }
 
@@ -1098,6 +1150,13 @@ html[data-theme="dark"] .stat-card {
   .form-row-3 {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+/* Rows already carry their own grid gap, so the fields inside them don't need the standalone
+   .field's bottom margin too — keeps multi-row forms from double-spacing between rows. */
+.form-row-2 > .field,
+.form-row-3 > .field {
+  margin-bottom: 0;
 }
 
 .checkbox-grid {
@@ -1729,6 +1788,58 @@ html[data-theme="dark"] .kanban-card {
 
 .entity-list-group-header:first-child {
   margin-top: 0;
+}
+
+/* --- Module landing grid pages (Clients/Assets/Treatments/Assessments/Reports search+filter
+   lists, all built on the shared [data-el-root]/EntityList* components) — every row reads as its
+   own card: two-tone striping by position, a hover highlight, no border dividers. Scoped under
+   [data-el-root] so plain .entity-list-row usages elsewhere (dashboard/detail sub-lists) are
+   unaffected. */
+[data-el-root] .entity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+[data-el-root] .entity-list-row {
+  border-top: none;
+  border-radius: 6px;
+  padding: 0.875rem 1rem;
+  transition: box-shadow 150ms ease, background-color 150ms ease;
+}
+
+[data-el-root] [data-el-row]:nth-child(odd) > .entity-list-row {
+  background: var(--surface);
+}
+
+[data-el-root] [data-el-row]:nth-child(even) > .entity-list-row {
+  background: var(--neutral-bg);
+}
+
+[data-el-root] .entity-list-row:hover {
+  background: var(--green-bg);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+}
+
+html[data-theme="dark"] [data-el-root] .entity-list-row {
+  border: 1px solid var(--border);
+}
+
+/* Tag-chip badges (condition/method/type/status) double as one-click filters for the same grid —
+   see static/js/entity-list-filter.js's data-el-tag-filter handling. */
+.tag-chip {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tag-chip:hover {
+  filter: brightness(0.95);
+}
+
+.tag-chip:focus-visible {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 2px;
 }
 
 /* --- Settings tab nav -------------------------------------------------------------------------- */

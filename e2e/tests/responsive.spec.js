@@ -26,6 +26,13 @@ async function shoot(page, name) {
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, name), fullPage: true });
 }
 
+// Fills a ClassifierAutocomplete field (internal/web/ui.templ) by its `name` - see the same
+// helper in smoke.spec.js for why a plain <select> locator no longer works here.
+async function fillClassifierAutocomplete(page, name, title) {
+  await page.fill(`input[list="${name}-options"]`, title);
+  await page.locator(`input[list="${name}-options"]`).press("Tab");
+}
+
 test.describe.configure({ mode: "serial" });
 
 let page, assetId;
@@ -41,14 +48,14 @@ test.beforeAll(async ({ browser }) => {
   await expect(page).toHaveURL("/");
 
   await page.goto("/clients/new");
-  await page.selectOption('select[name="type"]', "individual");
+  await fillClassifierAutocomplete(page, "type", "Individual");
   await page.fill('input[name="name"]', "Responsive Test Client");
   await page.click('form[action="/clients"] button[type="submit"]');
   const clientId = page.url().split("/clients/")[1];
 
   await page.goto("/assets/new");
   await page.selectOption('select[name="clientId"]', clientId);
-  await page.selectOption('select[name="assetTypeId"]', { index: 1 });
+  await fillClassifierAutocomplete(page, "assetTypeId", "Painting");
   await page.fill('input[name="referenceCode"]', "RESP-0001");
   await page.fill('input[name="title"]', "Responsive Test Asset");
   await page.click('form[action="/assets"] button[type="submit"]');
