@@ -105,3 +105,4 @@ See `docs/tech-stack.md` for the reasoning behind each:
 - **No dev-login picker.** Every account — the bootstrap admin and any `SEED_EXAMPLE_DATA` demo
   users included — is a real `provider="email"` row with a real password and `emailVerifiedAt`
   already set, signing in through the normal `/login` form like any other account.
+
