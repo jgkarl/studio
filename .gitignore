@@ -15,5 +15,5 @@ e2e/playwright-report/
 # Ansible: real inventory/vars/vault, never the .example templates
 ansible/inventory.ini
 ansible/group_vars/all/all.yml
-#ansible/group_vars/all/vault.yml # vault to be encrypted via git pre-commit hook
+ansible/group_vars/all/vault.yml
 *.retry
