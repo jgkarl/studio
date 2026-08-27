@@ -121,10 +121,17 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 	dataURI := "data:" + file.MimeType + ";base64," + base64.StdEncoding.EncodeToString(file.Data)
 	totalHeight := height + legendHeight
 
+	// The inner <svg>'s viewBox="0 0 100 100" is percent-of-image space (regions are stored that
+	// way - see annotations.go) stretched non-uniformly onto the real width x height box so a
+	// region's percent coordinates land in the right place regardless of the photo's own aspect
+	// ratio. The <image> itself must carry the same preserveAspectRatio="none" (SVG's default for
+	// <image> is "meet", which aspect-fits/letterboxes *before* that outer stretch is applied) or
+	// the two non-uniform scales compose into a visibly stretched/squashed photo instead of
+	// canceling out back to the original proportions.
 	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="%d" height="%d">`+
 		`<rect width="%d" height="%d" fill="#ffffff"/>`+
 		`<svg x="0" y="0" width="%d" height="%d" viewBox="0 0 100 100" preserveAspectRatio="none">`+
-		`<image xlink:href="%s" x="0" y="0" width="100" height="100"/>%s</svg>`+
+		`<image xlink:href="%s" x="0" y="0" width="100" height="100" preserveAspectRatio="none"/>%s</svg>`+
 		`<g transform="translate(0, %d)">%s</g></svg>`,
 		width, totalHeight, width, totalHeight, width, height, dataURI, shapes.String(), height, legend)
 
@@ -259,10 +266,13 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 			bakeSidePadding, dividerY, imgW-2*bakeSidePadding, bakeDividerHeight)
 	}
 
+	// <image preserveAspectRatio="none"> - see the matching comment in RenderAnnotatedImage above;
+	// without it this composite came out visibly stretched/squashed instead of matching the
+	// original photo's proportions, with only the canvas height growing for the divider/legend/note.
 	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="%d" height="%d">`+
 		`<rect width="%d" height="%d" fill="#ffffff"/>`+
 		`<svg x="0" y="0" width="%d" height="%d" viewBox="0 0 100 100" preserveAspectRatio="none">`+
-		`<image xlink:href="%s" x="0" y="0" width="100" height="100"/>%s</svg>`+
+		`<image xlink:href="%s" x="0" y="0" width="100" height="100" preserveAspectRatio="none"/>%s</svg>`+
 		`%s<g transform="translate(0, %d)">%s</g><g transform="translate(0, %d)">%s</g></svg>`,
 		imgW, totalHeight, imgW, totalHeight, imgW, imgH, dataURI, shapes.String(),
 		divider, belowDividerY, legend, noteY, note.String())

@@ -64,7 +64,7 @@ templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []se
 							}
 							<span class="page-subtitle">{ strconv.Itoa(row.ProjectCount) } workflow(s)</span>
 						</div>
-						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+						<span class="material-symbols-outlined icon entity-list-chevron" style="font-size:16px" aria-hidden="true">chevron_right</span>
 					</a>
 				</li>
 			}
@@ -256,7 +256,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 				<input class="input" name="title" required/>
 			}
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Create
 			</button>
 		</form>
@@ -282,11 +282,11 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 					</a>
 					<div class="row-actions">
 						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 						<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
 							<button type="submit" class="row-action-icon" title="Unlink">
-								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+								@web.Icon("close", 14)
 							</button>
 						</form>
 					</div>
@@ -297,7 +297,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 			<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media") } enctype="multipart/form-data" class="form-grid">
 				@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Upload
 				</button>
 			</form>
@@ -325,11 +325,11 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 			<div class="row-actions">
 				@web.OpenBadge(pc.Project.Stage == "completed")
 				<a href={ templ.URL("/projects/" + pc.Project.ID + "/edit") } class="row-action-icon" title="Edit">
-					<img src="/static/icons/edit.svg" width="14" height="14" alt=""/>
+					@web.Icon("edit", 14)
 				</a>
 				<form method="post" action={ templ.URL("/projects/" + pc.Project.ID + "/unlink") } data-confirm={ "Unlink \"" + pc.Project.Title + "\"? It stays in the database but won't show here anymore." }>
 					<button type="submit" class="row-action-icon" title="Unlink">
-						<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+						@web.Icon("close", 14)
 					</button>
 				</form>
 			</div>
@@ -344,7 +344,7 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 						<span class="page-subtitle">{ a.Description }</span>
 						<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
 						<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 					</div>
 				</li>
@@ -359,14 +359,14 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 						<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
 						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
 						<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 						<a href={ templ.URL("/treatments/" + t.ID + "/edit") } class="row-action-icon" title="Edit">
-							<img src="/static/icons/edit.svg" width="14" height="14" alt=""/>
+							@web.Icon("edit", 14)
 						</a>
 						<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Unlink \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
 							<button type="submit" class="row-action-icon" title="Unlink">
-								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+								@web.Icon("close", 14)
 							</button>
 						</form>
 					</div>
@@ -381,11 +381,11 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 					<div class="row-actions">
 						<span class="badge">{ rep.Status }</span>
 						<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 						<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Unlink \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
 							<button type="submit" class="row-action-icon" title="Unlink">
-								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+								@web.Icon("close", 14)
 							</button>
 						</form>
 					</div>
@@ -471,11 +471,11 @@ templ editBody(asset Asset) {
 			}
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>
@@ -485,11 +485,11 @@ templ editBody(asset Asset) {
 
 templ assetActions(asset Asset) {
 	<a class="btn btn-secondary" href={ templ.URL("/assets/" + asset.ID + "/edit") }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("edit", 14)
 		Edit
 	</a>
 	<a class="btn btn-secondary" href={ templ.URL("/projects/new?assetId=" + asset.ID) }>
-		<img src="/static/icons/history.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("history", 14)
 		Start project
 	</a>
 	@web.ExportLinks("asset", asset.ID)

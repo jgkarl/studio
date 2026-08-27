@@ -25,7 +25,7 @@ templ listBody(rows []ListRow, stages []settings.Classifier, locale i18n.Locale)
 	@web.PageHeader("Projects", "Drag a card to move it to the next stage.", web.NewActionLink("/projects/new", "New project"))
 	<div class="list-toolbar">
 		<span class="search-wrap">
-			<img src="/static/icons/search.svg" width="16" height="16" alt="" class="icon"/>
+			@web.Icon("search", 16)
 			<input type="text" id="kanban-search" placeholder="Search by title, asset, client…"/>
 		</span>
 		@web.EntityListFilterSelect("client", "All clients", distinctClientOptions(rows))
@@ -137,7 +137,7 @@ templ newBody(options []AssetOption, conditions []settings.Classifier, preselect
 				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 			</div>
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Create
 			</button>
 		</form>
@@ -196,13 +196,13 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 					</select>
 				}
 				<button type="submit" class="btn btn-secondary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("check_circle", 14)
 					Update stage
 				</button>
 			</form>
 			<form method="post" action={ templ.URL("/projects/" + project.ID + "/finish") } class="form-section" data-confirm="Finish this project? If it has no report yet, one will be drafted automatically for you to review.">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Finish project
 				</button>
 			</form>
@@ -225,7 +225,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 					<div class="row-actions">
 						<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
 						<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 					</div>
 				</li>
@@ -251,7 +251,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 						<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
 						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
 						<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 					</div>
 				</li>
@@ -280,7 +280,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 							<span class="badge badge-amber">Draft</span>
 						}
 						<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 					</div>
 				</li>
@@ -312,11 +312,11 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 					</a>
 					<div class="row-actions">
 						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 						<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
 							<button type="submit" class="row-action-icon" title="Unlink">
-								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+								@web.Icon("close", 14)
 							</button>
 						</form>
 					</div>
@@ -327,7 +327,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 			<form method="post" action={ templ.URL("/projects/" + project.ID + "/media") } enctype="multipart/form-data" class="form-grid">
 				@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Upload
 				</button>
 			</form>
@@ -385,17 +385,17 @@ func stageTitle(stages []settings.Classifier, code string, locale i18n.Locale) s
 templ detailActions(project Project, asset *assets.Asset) {
 	if asset != nil {
 		<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) }>
-			<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+			@web.Icon("chevron_right", 14)
 			View asset
 		</a>
 	}
 	<a class="btn btn-secondary" href={ templ.URL("/projects/" + project.ID + "/edit") }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("edit", 14)
 		Edit
 	</a>
 	<form method="post" action={ templ.URL("/projects/" + project.ID + "/unlink") } data-confirm={ "Unlink \"" + project.Title + "\"? It stays in the database but won't show here anymore." }>
 		<button type="submit" class="btn btn-ghost">
-			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+			@web.Icon("close", 14)
 			Unlink
 		</button>
 	</form>
@@ -415,11 +415,11 @@ templ editBody(project Project) {
 			}
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/projects/" + project.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>

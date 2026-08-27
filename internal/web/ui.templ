@@ -1,5 +1,17 @@
 package web
 
+import "strconv"
+
+// Icon renders one Material Symbols (Outlined) glyph at the given pixel size - the Google Fonts
+// CDN link in Layout/AuthLayout/AppLayout's <head> is what actually loads the font (see
+// static/css/app.css's .material-symbols-outlined). Sized via font-size and colored via
+// currentColor, so a button's own text color already themes the icon correctly on any
+// background/theme - callers never need a separate "inverted" variant the way the old hand-drawn
+// static/icons/*.svg set did.
+templ Icon(name string, size int) {
+	<span class="material-symbols-outlined icon" style={ "font-size:" + strconv.Itoa(size) + "px" } aria-hidden="true">{ name }</span>
+}
+
 // Card and Field are the two truly reusable structural wrappers (spacing/borders are easy to get
 // inconsistent by hand). Buttons/inputs/badges are plain HTML with the .btn/.input/.badge
 // utility classes from static/css/app.css directly in each page's markup — simple templates, no
@@ -27,7 +39,7 @@ templ FileInput(name, label, hint string) {
 	@Field(label, hint) {
 		<input type="file" id={ name + "-input" } name={ name } multiple accept="image/*,video/*" capture="environment" class="sr-only"/>
 		<label for={ name + "-input" } class="btn btn-secondary">
-			<img src="/static/icons/upload.svg" width="14" height="14" alt="" class="icon"/>
+			@Icon("upload", 14)
 			Choose files…
 		</label>
 	}
@@ -44,11 +56,11 @@ templ Alert(tone string) {
 // /api/export/{type}/{id} route.
 templ ExportLinks(exportType, id string) {
 	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=html") }>
-		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+		@Icon("download", 14)
 		Export HTML
 	</a>
 	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=pdf") }>
-		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+		@Icon("download", 14)
 		Export PDF
 	</a>
 }
@@ -68,7 +80,7 @@ templ OpenBadge(completed bool) {
 // match the modalID passed to that Modal. label defaults to "+ Add" when empty.
 templ ModalTrigger(modalID, label string) {
 	<button type="button" class="btn btn-secondary" data-modal-open={ modalID }>
-		<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+		@Icon("add", 14)
 		if label != "" {
 			{ label }
 		} else {
@@ -84,7 +96,7 @@ templ Modal(modalID, title string) {
 	<div id={ modalID } class="modal-overlay" hidden>
 		<div class="modal-panel">
 			<button type="button" class="modal-close" data-modal-close aria-label="Close">
-				<img src="/static/icons/close.svg" width="16" height="16" alt=""/>
+				@Icon("close", 16)
 			</button>
 			if title != "" {
 				<h2 class="modal-panel-title">{ title }</h2>
@@ -106,7 +118,7 @@ type FilterOption struct {
 // contract.
 templ EntityListSearchInput(placeholder string) {
 	<span class="search-wrap">
-		<img src="/static/icons/search.svg" width="16" height="16" alt="" class="icon"/>
+		@Icon("search", 16)
 		<input type="text" data-el-search placeholder={ placeholder }/>
 	</span>
 }
@@ -119,7 +131,7 @@ templ EntityListSearchInput(placeholder string) {
 // on a narrow screen.
 templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
 	<label class="filter-chip">
-		<img src="/static/icons/filter.svg" width="14" height="14" alt="" class="icon"/>
+		@Icon("filter_alt", 14)
 		<select class="filter-chip-select" data-el-filter={ key }>
 			<option value="">{ allLabel }</option>
 			for _, opt := range options {
@@ -133,7 +145,7 @@ templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
 // must match the corresponding row's data-el-group-<value-hyphenated> attribute exactly.
 templ EntityListGroupBySelect(options []FilterOption) {
 	<label class="filter-chip">
-		<img src="/static/icons/filter.svg" width="14" height="14" alt="" class="icon"/>
+		@Icon("filter_alt", 14)
 		<select class="filter-chip-select" data-el-groupby>
 			<option value="">No grouping</option>
 			for _, opt := range options {
@@ -204,7 +216,7 @@ templ PageHeader(title, subtitle string, actions templ.Component) {
 // wrap on a small screen; add/href/aria-label stay meaningful either way.
 templ NewActionLink(href, label string) {
 	<a class="btn btn-primary" href={ templ.URL(href) } aria-label={ label } title={ label }>
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		@Icon("add", 16)
 		<span class="btn-label">{ label }</span>
 	</a>
 }

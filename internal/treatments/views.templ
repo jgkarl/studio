@@ -109,7 +109,7 @@ templ newBody(projects []ProjectOption, methods []settings.Classifier, preselect
 				}
 				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Log treatment
 				</button>
 			</form>
@@ -165,20 +165,20 @@ func methodLabel(labels map[string]string, code string) string {
 
 templ detailActions(treatment DetailRow) {
 	<a class="btn btn-ghost" href={ templ.URL("/projects/" + treatment.ProjectID) }>
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("chevron_right", 14)
 		View project
 	</a>
 	<a class="btn btn-ghost" href={ templ.URL("/assets/" + treatment.AssetID) }>
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("chevron_right", 14)
 		View asset
 	</a>
 	<a class="btn btn-secondary" href={ templ.URL("/treatments/" + treatment.ID + "/edit") }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("edit", 14)
 		Edit
 	</a>
 	<form method="post" action={ templ.URL("/treatments/" + treatment.ID + "/unlink") } data-confirm={ "Unlink \"" + treatment.Title + "\"? It stays in the database but won't show here anymore." }>
 		<button type="submit" class="btn btn-ghost">
-			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+			@web.Icon("close", 14)
 			Unlink
 		</button>
 	</form>
@@ -195,11 +195,11 @@ templ editBody(treatment Treatment, methods []settings.Classifier, locale i18n.L
 			@treatmentFields(treatment.Method, treatment.Title, treatment.Notes, methods, locale)
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/treatments/" + treatment.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>
@@ -243,7 +243,7 @@ templ AddModalBody(projectID string, projects []ProjectOption, methods []setting
 		@treatmentFields("", "", "", methods, locale)
 		@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 		<button type="submit" class="btn btn-primary">
-			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			@web.Icon("check_circle", 14)
 			Log treatment
 		</button>
 	</form>

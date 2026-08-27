@@ -126,7 +126,7 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 				<div class="empty-state" style="padding:3rem 1rem;text-align:center;">
 					<p style="margin:0 0 0.75rem;">Not saved yet — open the editor and mark a region to save this version.</p>
 					<a href={ templ.URL("/media/edit/" + m.ID) } class="btn btn-primary">
-						<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+						@web.Icon("edit", 14)
 						Open editor
 					</a>
 				</div>
@@ -160,7 +160,7 @@ templ annotatedVersionsCard(m Media, derivedVersions []Media) {
 			<h2 class="dashboard-heading">Annotated versions</h2>
 			<form method="post" action={ templ.URL("/media/" + m.ID + "/annotated-versions") }>
 				<button type="submit" class="btn btn-secondary">
-					<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("add", 14)
 					New annotated version
 				</button>
 			</form>
@@ -249,7 +249,7 @@ templ patternLayerLegend(regions []AnnotationRegion, annotationTypes []Annotatio
 						<span>{ OptionByID(annotationTypes, r.AnnotationTypeID).Label }</span>
 						<form method="post" action={ templ.URL("/media/" + r.MediaID + "/annotations/" + r.ID + "/delete") } data-confirm="Remove this region?">
 							<button type="submit" class="tag-pill-remove" aria-label="Remove region">
-								<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
+								@web.Icon("close", 10)
 							</button>
 						</form>
 					</li>
@@ -348,10 +348,10 @@ templ mediaEditBody(m Media, regions []AnnotationRegion, annotationTypes []Annot
 					</label>
 					<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
 						<button type="button" id="pattern-layer-tool-rect" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
-							<img src="/static/icons/rectangle.svg" width="16" height="16" alt="" class="icon"/>
+							@web.Icon("crop_square", 16)
 						</button>
 						<button type="button" id="pattern-layer-tool-freehand" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
-							<img src="/static/icons/brush.svg" width="16" height="16" alt="" class="icon"/>
+							@web.Icon("brush", 16)
 						</button>
 					</div>
 					<label class="pattern-layer-select-field">
@@ -370,7 +370,7 @@ templ mediaEditBody(m Media, regions []AnnotationRegion, annotationTypes []Annot
 			</div>
 			<div class="media-edit-save-row">
 				<button type="button" id="media-edit-save" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<span id="media-edit-save-status" class="page-subtitle" aria-live="polite"></span>
@@ -383,7 +383,7 @@ templ mediaEditBody(m Media, regions []AnnotationRegion, annotationTypes []Annot
 
 templ mediaEditActions(m Media) {
 	<a class="btn btn-ghost" href={ templ.URL("/media/view/" + m.ID) }>
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
+		@web.Icon("chevron_left", 14)
 		Back to view
 	</a>
 }
@@ -409,19 +409,19 @@ func tileSourceID(m Media, source *Media) string {
 templ mediaViewActions(m Media, source *Media) {
 	if !m.IsAnnotatedVersion() {
 		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
-			<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+			@web.Icon("download", 14)
 			Download
 		</a>
 	} else if m.IsBaked() {
 		<span class="split-btn">
 			<a class="btn btn-secondary split-btn-main" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
-				<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+				@web.Icon("download", 14)
 				Download
 			</a>
 			if source != nil {
 				<details class="split-btn-toggle">
 					<summary class="btn btn-secondary split-btn-caret" aria-label="More download options" title="More download options">
-						<img src="/static/icons/chevron-right.svg" width="12" height="12" alt="" class="icon" style="transform: rotate(90deg);"/>
+						@web.Icon("expand_more", 18)
 					</summary>
 					<div class="split-btn-menu">
 						<a class="split-btn-menu-item" href={ templ.URL("/api/media/" + source.ID + "?variant=original") }>
@@ -434,12 +434,12 @@ templ mediaViewActions(m Media, source *Media) {
 	}
 	if m.IsAnnotatedVersion() {
 		<a class="btn btn-secondary" href={ templ.URL("/media/edit/" + m.ID) }>
-			<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+			@web.Icon("edit", 14)
 			Edit
 		</a>
 	}
 	<a class="btn btn-ghost" href="/media">
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
+		@web.Icon("chevron_left", 14)
 		Back
 	</a>
 }

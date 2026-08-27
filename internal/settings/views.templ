@@ -55,7 +55,7 @@ templ featuresBody(limits []FeatureLimitValue, reportableGroups []ReportableGrou
 				}
 			}
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Save limits
 			</button>
 		</form>
@@ -78,7 +78,7 @@ templ featuresBody(limits []FeatureLimitValue, reportableGroups []ReportableGrou
 				</div>
 			}
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Save reportable fields
 			</button>
 		</form>
@@ -130,7 +130,7 @@ templ usersBody(users []auth.User) {
 										}
 									</select>
 									<button type="submit" class="btn btn-secondary">
-										<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+										@web.Icon("check_circle", 14)
 										Save
 									</button>
 								</form>
@@ -162,7 +162,7 @@ templ classifierGroupCard(group ClassifierGroup, locale i18n.Locale) {
 				@annotationSwatchFields(annotationSwatch{Hatch: "hatch-diagonal", Color: "#dc2626"})
 			}
 			<button type="submit" class="btn btn-secondary" aria-label="Add" title="Add">
-				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+				@web.Icon("add", 14)
 				<span class="btn-label">Add</span>
 			</button>
 		</form>
@@ -209,7 +209,7 @@ templ classifierPill(classifierType ClassifierType, row Classifier, locale i18n.
 		{ ClassifierLabel(row, locale) }
 		<details class="annotation-type-edit">
 			<summary aria-label="Edit">
-				<img src="/static/icons/edit.svg" width="10" height="10" alt="" class="icon"/>
+				@web.Icon("edit", 10)
 			</summary>
 			<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/update") } class="annotation-type-edit-form">
 				<input class="input classifier-edit-title" name="title" value={ row.Title } placeholder="Title (English)"/>
@@ -219,13 +219,13 @@ templ classifierPill(classifierType ClassifierType, row Classifier, locale i18n.
 					@annotationSwatchFields(swatch)
 				}
 				<button type="submit" class="btn btn-secondary" aria-label="Save" title="Save">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("check_circle", 14)
 				</button>
 			</form>
 		</details>
 		<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
 			<button type="submit" class="tag-pill-remove" aria-label="Remove">
-				<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
+				@web.Icon("close", 10)
 			</button>
 		</form>
 	</span>

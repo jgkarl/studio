@@ -92,7 +92,7 @@ templ newBody(projects []ProjectOption, conditions []settings.Classifier, presel
 				@assessmentFields("", "", conditions, locale)
 				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save assessment
 				</button>
 			</form>
@@ -150,16 +150,16 @@ func conditionTitle(conditions []settings.Classifier, code string, locale i18n.L
 
 templ detailActions(assessment DetailRow) {
 	<a class="btn btn-ghost" href={ templ.URL("/projects/" + assessment.ProjectID) }>
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("chevron_right", 14)
 		View project
 	</a>
 	<a class="btn btn-secondary" href={ templ.URL("/assessments/" + assessment.ID + "/edit") }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("edit", 14)
 		Edit
 	</a>
 	<form method="post" action={ templ.URL("/assessments/" + assessment.ID + "/unlink") } data-confirm="Unlink this assessment? It stays in the database but won't show here anymore.">
 		<button type="submit" class="btn btn-ghost">
-			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+			@web.Icon("close", 14)
 			Unlink
 		</button>
 	</form>
@@ -176,11 +176,11 @@ templ editBody(assessment Assessment, conditions []settings.Classifier, locale i
 			@assessmentFields(assessment.Condition, assessment.Description, conditions, locale)
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/assessments/" + assessment.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>
@@ -220,7 +220,7 @@ templ AddModalBody(projectID string, projects []ProjectOption, conditions []sett
 		@assessmentFields("", "", conditions, locale)
 		@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 		<button type="submit" class="btn btn-primary">
-			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			@web.Icon("check_circle", 14)
 			Save assessment
 		</button>
 	</form>

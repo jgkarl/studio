@@ -9,6 +9,27 @@
 @font-face { font-family: 'Roboto'; src: url('/static/fonts/Roboto-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Roboto'; src: url('/static/fonts/Roboto-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
 
+/* Material Symbols (Outlined), loaded via Google Fonts CDN (internal/web/layout.templ's/ui.templ's
+   <head>) - replaces the old one-off hand-drawn static/icons/*.svg set app-wide (logo.svg stays,
+   it's the brand mark, not a UI icon) so every icon comes from one consistent, actively-maintained
+   glyph set instead of a growing pile of bespoke SVGs. Rendered as inline <span> glyphs (see
+   web.Icon) sized via font-size and colored via currentColor - a button's own text color already
+   themes its icon correctly in both light and dark, on any background, with no separate "inverted"
+   variant or dark-mode filter hack needed. */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
 :root {
   --font-body: 'Roboto', system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-heading: 'Raleway', 'Roboto', system-ui, sans-serif;
@@ -177,7 +198,12 @@ html[data-theme="dark"] .card {
 
 .btn-primary {
   background: var(--accent);
+  border-color: transparent;
   color: var(--accent-text);
+}
+
+.btn-primary:hover {
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary {
@@ -491,14 +517,7 @@ html[data-theme="dark"] select.input, html[data-theme="dark"] select {
 .icon {
   display: inline-block;
   vertical-align: middle;
-}
-
-html[data-theme="dark"] .icon {
-  filter: invert(0.9);
-}
-
-.icon-invert {
-  filter: invert(1) !important;
+  color: currentColor;
 }
 
 /* Visually hides an element while keeping it in the accessibility tree and clickable via an
@@ -642,8 +661,8 @@ html[data-theme="dark"] .nav-toggle-btn {
   background: transparent;
   border: 1px solid rgba(36, 42, 48, 0.25);
   border-radius: 4px;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -656,12 +675,15 @@ html[data-theme="dark"] .nav-toggle-btn {
   letter-spacing: 0.02em;
 }
 
+/* 40px is Material Design's minimum comfortable touch target for a dense icon button (the navbar
+   row has several side by side, so the full 48px spec target would crowd it) - matches
+   .pattern-layer-tool-btn/.split-btn-caret's own icon-button size for the same reason. */
 .navbar-icon-btn {
   background: transparent;
   border: 1px solid rgba(36, 42, 48, 0.25);
   border-radius: 4px;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1528,6 +1550,7 @@ html[data-theme="dark"] .stat-card {
 .pattern-layer-stage {
   position: relative;
   width: 100%;
+  min-width: 300px;
   height: 55vh;
   min-height: 20rem;
   border-radius: 0.5rem;
@@ -1573,8 +1596,8 @@ html[data-theme="dark"] .stat-card {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1654,8 +1677,13 @@ html[data-theme="dark"] .stat-card {
   display: none;
 }
 
+/* Icon-only, so it gets a square touch target instead of .btn's own text padding (which would
+   leave it oddly wide for just one glyph) - same 40px sizing as the other icon buttons. */
 .split-btn-caret {
+  width: 2.5rem;
   height: 100%;
+  min-height: 40px;
+  padding: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   border-left: 1px solid var(--border);
@@ -1699,11 +1727,13 @@ html[data-theme="dark"] .stat-card {
   margin-top: 0.25rem;
 }
 
-/* Two even columns rather than one flowing list — a legend of loss/damage types reads faster
-   scanned down two short columns than one long one. */
+/* Two columns once there's room, one below that — content-driven via auto-fit/minmax rather than a
+   hard breakpoint, so it tracks the legend's actual (image-width-matched) container instead of the
+   viewport: at the image's 300px floor (.pattern-layer-stage's own min-width) two 130px columns
+   plus the gap don't fit, so it collapses to one; a wider image gets two. */
 .pattern-layer-legend-swatches {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 0.5rem 1rem;
   margin-bottom: 0.5rem;
 }
@@ -1876,7 +1906,7 @@ html[data-theme="dark"] .kanban-card {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  padding: 0.4rem;
+  padding: 0.5rem;
   border: 0;
   border-radius: 999px;
   background: var(--bg);
@@ -1895,8 +1925,8 @@ html[data-theme="dark"] .kanban-card {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -2105,10 +2135,4 @@ html[data-theme="dark"] [data-el-root] .entity-list-row {
 
 .account-menu-item:hover {
   background: var(--neutral-bg);
-}
-
-.account-menu-link {
-  border-top: 1px solid var(--border-light);
-  margin-top: 4px;
-  padding-top: 10px;
 }

@@ -48,7 +48,7 @@ templ listBody(rows []ListRow, typeLabels map[string]string, clientTypes []setti
 							<span class="badge tag-chip" data-el-tag-filter="clientType" data-el-tag-value={ row.Type } role="button" tabindex="0">{ labelFor(typeLabels, row.Type) }</span>
 							<span class="page-subtitle">{ strconv.Itoa(row.AssetCount) } assets</span>
 						</div>
-						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+						<span class="material-symbols-outlined icon entity-list-chevron" style="font-size:16px" aria-hidden="true">chevron_right</span>
 					</a>
 				</li>
 			}
@@ -158,7 +158,7 @@ templ newBody(clientTypes, contactMethods []settings.Classifier, locale i18n.Loc
 				<textarea class="input" name="notes" rows="3"></textarea>
 			}
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Create
 			</button>
 		</form>
@@ -186,7 +186,7 @@ templ detailBody(client Client, typeLabel string, assets []AssetSummary, clientT
 		<div class="card-header-row">
 			<h2 class="dashboard-heading">Assets</h2>
 			<a class="btn btn-secondary" href={ templ.URL("/assets/new?clientId=" + client.ID) }>
-				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+				@web.Icon("add", 14)
 				Add asset
 			</a>
 		</div>
@@ -212,7 +212,7 @@ templ detailBody(client Client, typeLabel string, assets []AssetSummary, clientT
 
 templ clientActions(client Client) {
 	<a class="btn btn-secondary" href={ templ.URL("/clients/edit/" + client.ID) }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+		@web.Icon("edit", 14)
 		Edit
 	</a>
 }
@@ -271,11 +271,11 @@ templ editBody(client Client, clientTypes, contactMethods []settings.Classifier,
 			}
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/clients/" + client.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>
