@@ -31,6 +31,7 @@ type Service struct {
 // access to any account.
 func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /settings", svc.Auth.RequireUser(svc.handleClassifiers))
+	mux.HandleFunc("GET /settings/statistics", svc.Auth.RequireUser(svc.handleStatistics))
 	mux.HandleFunc("GET /settings/features", svc.Auth.RequireUser(svc.handleFeatures))
 	mux.HandleFunc("POST /settings/features", svc.Auth.RequireUser(svc.handleFeaturesUpdate))
 	mux.HandleFunc("POST /settings/reportable", svc.Auth.RequireUser(svc.handleReportableUpdate))
@@ -60,6 +61,22 @@ func (svc *Service) handleClassifiers(w http.ResponseWriter, r *http.Request, us
 	}
 
 	writeHTML(w, r, ClassifiersPage(chromeFor(r, user, "/settings"), groups, user.HasRole(auth.RoleAdmin)))
+}
+
+func (svc *Service) handleStatistics(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	ctx := r.Context()
+	assetTypes, err := LoadAssetTypeStats(ctx, svc.Pool)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	annotationTypes, err := LoadAnnotationTypeStats(ctx, svc.Pool)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	c := chromeFor(r, user, "/settings")
+	writeHTML(w, r, StatisticsPage(c, assetTypes, annotationTypes, user.HasRole(auth.RoleAdmin), c.Locale))
 }
 
 func (svc *Service) handleFeatures(w http.ResponseWriter, r *http.Request, user *auth.User) {

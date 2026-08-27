@@ -149,18 +149,18 @@ func conditionTitle(conditions []settings.Classifier, code string, locale i18n.L
 }
 
 templ detailActions(assessment DetailRow) {
-	<a class="btn btn-ghost" href={ templ.URL("/projects/" + assessment.ProjectID) }>
-		@web.Icon("chevron_right", 14)
-		View project
+	<a class="btn btn-ghost" href={ templ.URL("/projects/" + assessment.ProjectID) } aria-label="View project" title="View project">
+		@web.Icon("history", 14)
+		<span class="btn-label">View</span>
 	</a>
-	<a class="btn btn-secondary" href={ templ.URL("/assessments/" + assessment.ID + "/edit") }>
+	<a class="btn btn-secondary" href={ templ.URL("/assessments/" + assessment.ID + "/edit") } aria-label="Edit" title="Edit">
 		@web.Icon("edit", 14)
-		Edit
+		<span class="btn-label">Edit</span>
 	</a>
-	<form method="post" action={ templ.URL("/assessments/" + assessment.ID + "/unlink") } data-confirm="Unlink this assessment? It stays in the database but won't show here anymore.">
-		<button type="submit" class="btn btn-ghost">
+	<form method="post" action={ templ.URL("/assessments/" + assessment.ID + "/unlink") } data-confirm="Remove this assessment? It stays in the database but won't show here anymore.">
+		<button type="submit" class="btn btn-ghost" aria-label="Remove" title="Remove">
 			@web.Icon("close", 14)
-			Unlink
+			<span class="btn-label">Remove</span>
 		</button>
 	</form>
 }

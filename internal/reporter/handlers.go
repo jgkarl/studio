@@ -231,7 +231,7 @@ func (svc *Service) handleAddAttachments(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	id := r.PathValue("id")
-	if _, err := svc.Media.UploadAllAndAttach(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefReport, id, "attachment"); err != nil {
+	if _, err := svc.Media.UploadAllAndAttachWithCaption(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefReport, id, "attachment", r.FormValue("photosCaption")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

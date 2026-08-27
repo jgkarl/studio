@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"database/sql"
 	"sort"
 	"strconv"
 
@@ -170,7 +171,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 	projectTreatments []treatments.ListRow, treatmentMethodLabels map[string]string, treatmentMethods []settings.Classifier,
 	projectReports []reporter.ListRow, projectMedia []media.ReferenceWithMedia, damageMappingCount int, locale i18n.Locale) {
 	@web.PageHeader(project.Title, "", detailActions(project, asset))
-	<p class="page-subtitle">
+	<p class="subtitle-card">
 		if asset != nil {
 			<a href={ templ.URL("/assets/" + asset.ID) }>{ asset.DisplayName() }</a>
 		}
@@ -183,10 +184,15 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 			@detailField("Stage", stageTitle(stages, project.Stage, locale))
 			@detailField("Priority", project.Priority)
 			@detailField("Assigned to", assignedToName)
+			@detailField("Target review date", nullDateLabel(project.TargetReviewDate))
+			@detailField("Started", nullDateLabel(project.StartedAt))
+			@detailField("Completed", nullDateLabel(project.CompletedAt))
+			@detailField("Created", project.CreatedAt.Format("2006-01-02"))
 		</dl>
 		if project.Stage != "completed" {
 			<form method="post" action={ templ.URL("/projects/" + project.ID + "/stage") } class="inline-edit-form">
-				@web.Field("Move to stage", "") {
+				<label class="pattern-layer-select-field">
+					Move to stage
 					<select class="input" name="stage">
 						for _, stage := range stages {
 							if stage.Code != "completed" {
@@ -194,7 +200,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 							}
 						}
 					</select>
-				}
+				</label>
 				<button type="submit" class="btn btn-secondary">
 					@web.Icon("check_circle", 14)
 					Update stage
@@ -218,7 +224,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectAssessments) == 0 {
 			<p class="empty-state">No assessments recorded yet.</p>
 		}
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, a := range projectAssessments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
@@ -243,7 +249,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectTreatments) == 0 {
 			<p class="empty-state">No treatments logged yet.</p>
 		}
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, t := range projectTreatments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
@@ -269,7 +275,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectReports) == 0 {
 			<p class="empty-state">No reports yet for this project.</p>
 		}
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, rep := range projectReports {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
@@ -299,7 +305,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectMedia) == 0 {
 			<p class="empty-state">No media yet.</p>
 		}
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, ref := range projectMedia {
 				<li class="entity-list-row">
 					<a href={ mediaViewHref(ref) } class="entity-list-name">
@@ -314,8 +320,8 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
 							@web.Icon("chevron_right", 14)
 						</a>
-						<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
-							<button type="submit" class="row-action-icon" title="Unlink">
+						<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Remove this media item? It stays in the database but won't show here anymore.">
+							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
 								@web.Icon("close", 14)
 							</button>
 						</form>
@@ -334,7 +340,6 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		}
 	}
 	<script src="/static/js/modal.js" defer></script>
-	<script src="/static/js/confirm.js" defer></script>
 }
 
 func mediaViewHref(ref media.ReferenceWithMedia) templ.SafeURL {
@@ -373,6 +378,13 @@ templ detailField(label, value string) {
 	</div>
 }
 
+func nullDateLabel(t sql.NullTime) string {
+	if !t.Valid {
+		return ""
+	}
+	return t.Time.Format("2006-01-02")
+}
+
 func stageTitle(stages []settings.Classifier, code string, locale i18n.Locale) string {
 	for _, s := range stages {
 		if s.Code == code {
@@ -384,19 +396,19 @@ func stageTitle(stages []settings.Classifier, code string, locale i18n.Locale) s
 
 templ detailActions(project Project, asset *assets.Asset) {
 	if asset != nil {
-		<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) }>
-			@web.Icon("chevron_right", 14)
-			View asset
+		<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) } aria-label="View asset" title="View asset">
+			@web.Icon("folder", 14)
+			<span class="btn-label">View</span>
 		</a>
 	}
-	<a class="btn btn-secondary" href={ templ.URL("/projects/" + project.ID + "/edit") }>
+	<a class="btn btn-secondary" href={ templ.URL("/projects/" + project.ID + "/edit") } aria-label="Edit" title="Edit">
 		@web.Icon("edit", 14)
-		Edit
+		<span class="btn-label">Edit</span>
 	</a>
-	<form method="post" action={ templ.URL("/projects/" + project.ID + "/unlink") } data-confirm={ "Unlink \"" + project.Title + "\"? It stays in the database but won't show here anymore." }>
-		<button type="submit" class="btn btn-ghost">
+	<form method="post" action={ templ.URL("/projects/" + project.ID + "/unlink") } data-confirm={ "Remove \"" + project.Title + "\"? It stays in the database but won't show here anymore." }>
+		<button type="submit" class="btn btn-ghost" aria-label="Remove" title="Remove">
 			@web.Icon("close", 14)
-			Unlink
+			<span class="btn-label">Remove</span>
 		</button>
 	</form>
 	@web.ExportLinks("project", project.ID)

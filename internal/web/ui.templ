@@ -34,14 +34,24 @@ templ Field(label string, hint string) {
 
 // FileInput replaces a raw <input type="file"> with a styled "Choose files…" trigger — the
 // native input stays functional (multi-select, camera capture on mobile) but visually hidden;
-// clicking the label opens its file picker natively, no JS required.
+// clicking the label opens its file picker natively, no JS required. An optional "Name / caption"
+// text field sits alongside it, submitted as name+"Caption" - the handler on the other end threads
+// it through to media.Service's *WithCaption upload methods (applied to every file in the batch,
+// a multi-file <input> having no way to solicit one caption per file), so a name can be given
+// right here at upload time instead of only ever after, editing each item separately once
+// uploaded. Every module's upload flow (New asset's cover photo, a Project's initial photos, an
+// Asset/Project/Report's "Add media" modal, ...) uses this one component, so browse-name-save
+// works the same way everywhere.
 templ FileInput(name, label, hint string) {
 	@Field(label, hint) {
-		<input type="file" id={ name + "-input" } name={ name } multiple accept="image/*,video/*" capture="environment" class="sr-only"/>
-		<label for={ name + "-input" } class="btn btn-secondary">
-			@Icon("upload", 14)
-			Choose files…
-		</label>
+		<div class="file-input-row">
+			<input type="file" id={ name + "-input" } name={ name } multiple accept="image/*,video/*" capture="environment" class="sr-only"/>
+			<label for={ name + "-input" } class="btn btn-secondary">
+				@Icon("upload", 14)
+				Choose files…
+			</label>
+			<input type="text" class="input" name={ name + "Caption" } placeholder="Name / caption (optional)"/>
+		</div>
 	}
 }
 
@@ -191,32 +201,37 @@ func selectedLabelFor(options []ClassifierOption, valueKey, selected string) str
 	return ""
 }
 
-// PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page
+// PageHeader is the top-of-page title/subtitle/actions block every in-app module list/detail page
 // uses. actions is a slot for buttons/links — pass templ.NopComponent when there are none. Title
-// and actions always share one row (see .page-header's flex-wrap:nowrap) at every breakpoint,
-// down to a smaller h1 on a narrow screen rather than ever wrapping the primary action underneath.
+// and actions always share their own row (.page-header-row, flex-wrap:nowrap, vertically
+// centered) at every breakpoint, down to a smaller h1 on a narrow screen rather than ever wrapping
+// the primary action underneath; subtitle (when present) is its own row below that pair, not
+// stacked inside the same flex item as the title, so centering the title/actions row against just
+// the title's own height (not title+subtitle combined) actually lines them up.
 templ PageHeader(title, subtitle string, actions templ.Component) {
 	<div class="page-header">
-		<div>
+		<div class="page-header-row">
 			<h1>{ title }</h1>
-			if subtitle != "" {
-				<p class="page-subtitle">{ subtitle }</p>
-			}
+			<div class="actions">
+				@actions
+			</div>
 		</div>
-		<div class="actions">
-			@actions
-		</div>
+		if subtitle != "" {
+			<p class="page-subtitle">{ subtitle }</p>
+		}
 	</div>
 }
 
-// NewActionLink is the "+ New X" primary button every module list page's PageHeader actions slot
+// NewActionLink is the "+ New" primary button every module list page's PageHeader actions slot
 // uses (New client/asset/treatment/.../New intake on the dashboard) - one shared component instead
-// of six near-identical copies. The label collapses to just the icon under .btn-label's narrow-
-// screen rule (static/css/app.css) so the button never forces PageHeader's title+action row to
-// wrap on a small screen; add/href/aria-label stay meaningful either way.
+// of six near-identical copies. label carries the full "New client"/"New asset"/... wording only
+// for aria-label/title (a screen reader or tooltip still gets the specific noun); the visible text
+// is always the plain "New" - the model name is redundant next to a page titled "Clients" - and
+// collapses to icon-only under .btn-label's narrow-screen rule (static/css/app.css) so the button
+// never forces PageHeader's title+action row to wrap on a small screen.
 templ NewActionLink(href, label string) {
 	<a class="btn btn-primary" href={ templ.URL(href) } aria-label={ label } title={ label }>
 		@Icon("add", 16)
-		<span class="btn-label">{ label }</span>
+		<span class="btn-label">New</span>
 	</a>
 }

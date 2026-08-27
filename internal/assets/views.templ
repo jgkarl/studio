@@ -96,7 +96,7 @@ templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes []settings.C
 templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string, locale i18n.Locale) {
 	@web.PageHeader("New asset", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/assets" class="form-grid">
+		<form method="post" action="/assets" enctype="multipart/form-data" class="form-grid">
 			<div class="form-row-2">
 				@web.Field("Client", "") {
 					<select class="input" name="clientId" required>
@@ -164,6 +164,7 @@ templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, pre
 			@web.Field("Location in studio", "") {
 				<input class="input" name="locationInStudio" placeholder="e.g. Shelf B3, Wet Room"/>
 			}
+			@web.FileInput("cover", "Cover image", "Optional — the first photo shown for this asset. On a phone this opens your camera directly.")
 			<p class="hint">Next you'll start this asset's first project — that's where its intake condition gets recorded.</p>
 			<button type="submit" class="btn btn-primary">Create asset</button>
 		</form>
@@ -188,7 +189,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 	treatmentMethods []settings.Classifier, stageLabels map[string]string, assetMedia []media.ReferenceWithMedia, locale i18n.Locale) {
 	@web.PageHeader(asset.DisplayName(), asset.ReferenceCode+" · "+assetTypeTitle(assetType, locale), assetActions(asset))
 	if client != nil {
-		<p class="page-subtitle" style="margin-top:-0.75rem;margin-bottom:1rem;">
+		<p class="subtitle-card">
 			Owner: <a href={ templ.URL("/clients/" + client.ID) }>{ client.Name }</a>
 		</p>
 	}
@@ -244,7 +245,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 		if len(assetMedia) == 0 {
 			<p class="empty-state">No media yet.</p>
 		}
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, ref := range assetMedia {
 				<li class="entity-list-row">
 					<a href={ mediaViewHref(ref) } class="entity-list-name">
@@ -259,8 +260,8 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
 							@web.Icon("chevron_right", 14)
 						</a>
-						<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
-							<button type="submit" class="row-action-icon" title="Unlink">
+						<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Remove this media item? It stays in the database but won't show here anymore.">
+							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
 								@web.Icon("close", 14)
 							</button>
 						</form>
@@ -329,8 +330,8 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 				<a href={ templ.URL("/projects/" + pc.Project.ID + "/edit") } class="row-action-icon" title="Edit">
 					@web.Icon("edit", 14)
 				</a>
-				<form method="post" action={ templ.URL("/projects/" + pc.Project.ID + "/unlink") } data-confirm={ "Unlink \"" + pc.Project.Title + "\"? It stays in the database but won't show here anymore." }>
-					<button type="submit" class="row-action-icon" title="Unlink">
+				<form method="post" action={ templ.URL("/projects/" + pc.Project.ID + "/unlink") } data-confirm={ "Remove \"" + pc.Project.Title + "\"? It stays in the database but won't show here anymore." }>
+					<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
 						@web.Icon("close", 14)
 					</button>
 				</form>
@@ -338,7 +339,7 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 		</div>
 		<div class="page-subtitle">{ stageLabel(stageLabels, pc.Project.Stage) }</div>
 		@assetProjectCardSection("Assessments", "No assessments recorded yet.", len(pc.Assessments))
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, a := range pc.Assessments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
@@ -353,7 +354,7 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 			}
 		</ul>
 		@assetProjectCardSection("Treatments", "No treatments logged yet.", len(pc.Treatments))
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, t := range pc.Treatments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
@@ -366,8 +367,8 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 						<a href={ templ.URL("/treatments/" + t.ID + "/edit") } class="row-action-icon" title="Edit">
 							@web.Icon("edit", 14)
 						</a>
-						<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Unlink \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
-							<button type="submit" class="row-action-icon" title="Unlink">
+						<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Remove \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
+							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
 								@web.Icon("close", 14)
 							</button>
 						</form>
@@ -376,7 +377,7 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 			}
 		</ul>
 		@assetProjectCardSection("Reports", "No reports yet for this object.", len(pc.Reports))
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, rep := range pc.Reports {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
@@ -385,8 +386,8 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 						<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
 							@web.Icon("chevron_right", 14)
 						</a>
-						<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Unlink \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
-							<button type="submit" class="row-action-icon" title="Unlink">
+						<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Remove \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
+							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
 								@web.Icon("close", 14)
 							</button>
 						</form>
@@ -486,13 +487,13 @@ templ editBody(asset Asset) {
 }
 
 templ assetActions(asset Asset) {
-	<a class="btn btn-secondary" href={ templ.URL("/assets/" + asset.ID + "/edit") }>
+	<a class="btn btn-secondary" href={ templ.URL("/assets/" + asset.ID + "/edit") } aria-label="Edit" title="Edit">
 		@web.Icon("edit", 14)
-		Edit
+		<span class="btn-label">Edit</span>
 	</a>
-	<a class="btn btn-secondary" href={ templ.URL("/projects/new?assetId=" + asset.ID) }>
+	<a class="btn btn-secondary" href={ templ.URL("/projects/new?assetId=" + asset.ID) } aria-label="Start project" title="Start project">
 		@web.Icon("history", 14)
-		Start project
+		<span class="btn-label">Start</span>
 	</a>
 	@web.ExportLinks("asset", asset.ID)
 }

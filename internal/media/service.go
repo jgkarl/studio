@@ -137,9 +137,16 @@ func nullIfZero(n int) any {
 }
 
 func (s *Service) AttachMediaReference(ctx context.Context, mediaID string, refType ReferencingType, refID, role string, sortOrder int) error {
+	return s.AttachMediaReferenceWithCaption(ctx, mediaID, refType, refID, role, "", sortOrder)
+}
+
+// AttachMediaReferenceWithCaption is AttachMediaReference plus an upfront caption - lets an
+// upload set its own name/caption in the same step instead of always needing a separate
+// after-the-fact edit (see web.FileInput's optional caption field).
+func (s *Service) AttachMediaReferenceWithCaption(ctx context.Context, mediaID string, refType ReferencingType, refID, role, caption string, sortOrder int) error {
 	_, err := studiodb.Execute(ctx, s.Pool,
-		"INSERT INTO MediaReference (id, mediaId, referencingType, referencingId, role, sortOrder) VALUES (?, ?, ?, ?, ?, ?)",
-		studiodb.NewID(), mediaID, refType, refID, nullIfEmptyStr(role), sortOrder)
+		"INSERT INTO MediaReference (id, mediaId, referencingType, referencingId, role, caption, sortOrder) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		studiodb.NewID(), mediaID, refType, refID, nullIfEmptyStr(role), nullIfEmptyStr(caption), sortOrder)
 	return err
 }
 
@@ -168,6 +175,12 @@ type UploadedFile struct {
 // UploadAndAttach uploads one file (if non-empty) and immediately attaches it to a target
 // record.
 func (s *Service) UploadAndAttach(ctx context.Context, file *UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role string) (*Media, error) {
+	return s.UploadAndAttachWithCaption(ctx, file, uploadedByUserID, refType, refID, role, "")
+}
+
+// UploadAndAttachWithCaption is UploadAndAttach plus an upfront caption for the new reference -
+// see AttachMediaReferenceWithCaption.
+func (s *Service) UploadAndAttachWithCaption(ctx context.Context, file *UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role, caption string) (*Media, error) {
 	if file == nil || len(file.Data) == 0 {
 		return nil, nil
 	}
@@ -175,7 +188,7 @@ func (s *Service) UploadAndAttach(ctx context.Context, file *UploadedFile, uploa
 	if err != nil {
 		return nil, err
 	}
-	if err := s.AttachMediaReference(ctx, m.ID, refType, refID, role, 0); err != nil {
+	if err := s.AttachMediaReferenceWithCaption(ctx, m.ID, refType, refID, role, caption, 0); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -183,9 +196,16 @@ func (s *Service) UploadAndAttach(ctx context.Context, file *UploadedFile, uploa
 
 // UploadAllAndAttach is UploadAndAttach for every file in a multi-file <input>.
 func (s *Service) UploadAllAndAttach(ctx context.Context, files []*UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role string) ([]*Media, error) {
+	return s.UploadAllAndAttachWithCaption(ctx, files, uploadedByUserID, refType, refID, role, "")
+}
+
+// UploadAllAndAttachWithCaption is UploadAllAndAttach, giving every file in the batch the same
+// caption - the one web.FileInput's optional name/caption field collects for the whole picker,
+// not a separate per-file name (a multi-file <input> has no way to solicit one per file).
+func (s *Service) UploadAllAndAttachWithCaption(ctx context.Context, files []*UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role, caption string) ([]*Media, error) {
 	var out []*Media
 	for _, f := range files {
-		m, err := s.UploadAndAttach(ctx, f, uploadedByUserID, refType, refID, role)
+		m, err := s.UploadAndAttachWithCaption(ctx, f, uploadedByUserID, refType, refID, role, caption)
 		if err != nil {
 			return nil, err
 		}

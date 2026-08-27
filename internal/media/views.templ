@@ -106,7 +106,7 @@ templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Ref
 templ mediaViewBody(m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media, derivedVersions []Media) {
 	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m, source))
 	if m.IsAnnotatedVersion() && source != nil {
-		<p class="page-subtitle" style="margin-top:-0.75rem;margin-bottom:1rem;">
+		<p class="subtitle-card">
 			Annotated from <a href={ templ.URL("/media/view/" + source.ID) }>{ mediaViewTitle(*source, nil) }</a>
 		</p>
 	}
@@ -168,7 +168,7 @@ templ annotatedVersionsCard(m Media, derivedVersions []Media) {
 		if len(derivedVersions) == 0 {
 			<p class="empty-state">No annotated versions yet.</p>
 		} else {
-			<ul class="entity-list">
+			<ul class="entity-list entity-list-cards">
 				for _, v := range derivedVersions {
 					<li class="entity-list-row">
 						<a href={ templ.URL("/media/view/" + v.ID) } class="entity-list-name">{ v.DerivedLabel.String }</a>
@@ -382,9 +382,9 @@ templ mediaEditBody(m Media, regions []AnnotationRegion, annotationTypes []Annot
 }
 
 templ mediaEditActions(m Media) {
-	<a class="btn btn-ghost" href={ templ.URL("/media/view/" + m.ID) }>
+	<a class="btn btn-ghost" href={ templ.URL("/media/view/" + m.ID) } aria-label="Back to view" title="Back to view">
 		@web.Icon("chevron_left", 14)
-		Back to view
+		<span class="btn-label">Back</span>
 	</a>
 }
 
@@ -408,15 +408,15 @@ func tileSourceID(m Media, source *Media) string {
 // draft has nothing to download yet, but still needs its Edit entry point.
 templ mediaViewActions(m Media, source *Media) {
 	if !m.IsAnnotatedVersion() {
-		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
+		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") } aria-label="Download" title="Download">
 			@web.Icon("download", 14)
-			Download
+			<span class="btn-label">Download</span>
 		</a>
 	} else if m.IsBaked() {
 		<span class="split-btn">
-			<a class="btn btn-secondary split-btn-main" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
+			<a class="btn btn-secondary split-btn-main" href={ templ.URL("/api/media/" + m.ID + "?variant=original") } aria-label="Download" title="Download">
 				@web.Icon("download", 14)
-				Download
+				<span class="btn-label">Download</span>
 			</a>
 			if source != nil {
 				<details class="split-btn-toggle">
@@ -433,14 +433,14 @@ templ mediaViewActions(m Media, source *Media) {
 		</span>
 	}
 	if m.IsAnnotatedVersion() {
-		<a class="btn btn-secondary" href={ templ.URL("/media/edit/" + m.ID) }>
+		<a class="btn btn-secondary" href={ templ.URL("/media/edit/" + m.ID) } aria-label="Edit" title="Edit">
 			@web.Icon("edit", 14)
-			Edit
+			<span class="btn-label">Edit</span>
 		</a>
 	}
-	<a class="btn btn-ghost" href="/media">
+	<a class="btn btn-ghost" href="/media" aria-label="Back" title="Back">
 		@web.Icon("chevron_left", 14)
-		Back
+		<span class="btn-label">Back</span>
 	</a>
 }
 

@@ -16,11 +16,59 @@ import (
 templ tabNav(active string, showUsers bool) {
 	<div class="tab-nav">
 		<a href="/settings" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "classifiers") }>Classifiers</a>
+		<a href="/settings/statistics" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "statistics") }>Statistics</a>
 		<a href="/settings/features" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "features") }>Features</a>
 		if showUsers {
 			<a href="/settings/users" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "users") }>Users</a>
 		}
 	</div>
+}
+
+// StatisticsPage is the Settings -> Statistics tab: read-only counters over the two classifier
+// families it's genuinely useful to see usage totals for - Asset Types (how many Assets of each)
+// and Annotation Types (how many pattern-layer regions have been drawn with each, and how many
+// distinct Assets carry at least one) - see LoadAssetTypeStats/LoadAnnotationTypeStats.
+templ StatisticsPage(c web.Chrome, assetTypes []AssetTypeStat, annotationTypes []AnnotationTypeStat, isAdmin bool, locale i18n.Locale) {
+	@web.AppLayout("Settings", c, statisticsBody(assetTypes, annotationTypes, isAdmin, locale))
+}
+
+templ statisticsBody(assetTypes []AssetTypeStat, annotationTypes []AnnotationTypeStat, isAdmin bool, locale i18n.Locale) {
+	@web.PageHeader("Settings", "Usage counters across the app.", templ.NopComponent)
+	@tabNav("statistics", isAdmin)
+	@web.Card() {
+		<h2 class="dashboard-heading">Asset types</h2>
+		if len(assetTypes) == 0 {
+			<p class="empty-state">No asset types configured yet.</p>
+		} else {
+			<ul class="stat-list">
+				for _, s := range assetTypes {
+					<li class="stat-list-row">
+						<span>{ ClassifierLabel(s.Classifier, locale) }</span>
+						<span class="badge">{ strconv.Itoa(s.AssetCount) } asset(s)</span>
+					</li>
+				}
+			</ul>
+		}
+	}
+	@web.Card() {
+		<h2 class="dashboard-heading">Annotation types</h2>
+		<p class="page-subtitle">Region count is every drawn region of that type; asset count is how many distinct assets carry at least one.</p>
+		if len(annotationTypes) == 0 {
+			<p class="empty-state">No annotation types configured yet.</p>
+		} else {
+			<ul class="stat-list">
+				for _, s := range annotationTypes {
+					<li class="stat-list-row">
+						<span>{ ClassifierLabel(s.Classifier, locale) }</span>
+						<span class="row-actions">
+							<span class="badge">{ strconv.Itoa(s.RegionCount) } region(s)</span>
+							<span class="badge">{ strconv.Itoa(s.AssetCount) } asset(s)</span>
+						</span>
+					</li>
+				}
+			</ul>
+		}
+	}
 }
 
 templ ClassifiersPage(c web.Chrome, groups []ClassifierGroup, isAdmin bool) {

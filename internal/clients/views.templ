@@ -193,7 +193,7 @@ templ detailBody(client Client, typeLabel string, assets []AssetSummary, clientT
 		if len(assets) == 0 {
 			<p class="empty-state">No assets yet.</p>
 		}
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, a := range assets {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/assets/" + a.ID) }>
@@ -211,9 +211,9 @@ templ detailBody(client Client, typeLabel string, assets []AssetSummary, clientT
 }
 
 templ clientActions(client Client) {
-	<a class="btn btn-secondary" href={ templ.URL("/clients/edit/" + client.ID) }>
+	<a class="btn btn-secondary" href={ templ.URL("/clients/edit/" + client.ID) } aria-label="Edit" title="Edit">
 		@web.Icon("edit", 14)
-		Edit
+		<span class="btn-label">Edit</span>
 	</a>
 }
 
