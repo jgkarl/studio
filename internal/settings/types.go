@@ -90,9 +90,11 @@ func ClassifierAutocompleteOptions(classifiers []Classifier, locale i18n.Locale)
 // headline groups (Asset Types, Condition States, Treatment Methods, Project Stages, Priority)
 // first, then Client Types and Contact Methods — real, still-used picklists (the New Client
 // form's Type/Preferred-contact-method fields) that aren't part of the mockup's 5 but would lose
-// their only admin UI if dropped entirely. activity_type is deliberately excluded: the Activity
-// Notebook it fed is retired (Treatments replaced it), so nothing creates activity_type rows
-// through the app anymore.
+// their only admin UI if dropped entirely — and finally Annotation Types, whose color/hatch pair
+// (internal/media/annotations.go's AnnotationTypeData) is only actually editable through this
+// page's annotationTypePill/annotationSwatchFields (see views.templ). activity_type is
+// deliberately excluded: the Activity Notebook it fed is retired (Treatments replaced it), so
+// nothing creates activity_type rows through the app anymore.
 var SettingsManagedTypes = []ClassifierType{
 	ClassifierAssetType,
 	ClassifierConditionState,
@@ -101,6 +103,7 @@ var SettingsManagedTypes = []ClassifierType{
 	ClassifierPriority,
 	ClassifierClientType,
 	ClassifierContactMethod,
+	ClassifierAnnotationType,
 }
 
 func IsSettingsManagedType(t ClassifierType) bool {

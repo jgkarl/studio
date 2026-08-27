@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"database/sql"
+	"encoding/json"
 	"strconv"
 
 	"studio/internal/auth"
@@ -149,14 +151,18 @@ templ classifierGroupCard(group ClassifierGroup, locale i18n.Locale) {
 		}
 		<div class="tag-pills">
 			for _, row := range group.Rows {
-				<span class="tag-pill">
-					{ ClassifierLabel(row, locale) }
-					<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
-						<button type="submit" class="tag-pill-remove" aria-label="Remove">
-							<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
-						</button>
-					</form>
-				</span>
+				if group.Type == ClassifierAnnotationType {
+					@annotationTypePill(group.Type, row, locale)
+				} else {
+					<span class="tag-pill">
+						{ ClassifierLabel(row, locale) }
+						<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
+							<button type="submit" class="tag-pill-remove" aria-label="Remove">
+								<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
+							</button>
+						</form>
+					</span>
+				}
 			}
 		</div>
 		<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type)) } class="inline-edit-form">
@@ -166,10 +172,81 @@ templ classifierGroupCard(group ClassifierGroup, locale i18n.Locale) {
 			@web.Field("Title (Estonian)", "") {
 				<input class="input" name="titleEt" placeholder="Eestikeelne nimi"/>
 			}
+			if group.Type == ClassifierAnnotationType {
+				@annotationSwatchFields(annotationSwatch{Hatch: "hatch-diagonal", Color: "#dc2626"})
+			}
 			<button type="submit" class="btn btn-secondary">
 				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
 				Add
 			</button>
 		</form>
 	}
+}
+
+// annotationSwatch is the {"hatch","color"} shape a Classifier.Data JSON holds for the
+// annotation_type group - internal/media/annotations.go's AnnotationTypeData decodes the exact
+// same shape server-side when rendering the pattern layer; duplicated here (rather than imported)
+// since internal/media already imports internal/settings, and settings importing media back would
+// be circular.
+type annotationSwatch struct {
+	Hatch string `json:"hatch"`
+	Color string `json:"color"`
+}
+
+var hatchOptions = []struct{ Value, Label string }{
+	{"hatch-horizontal", "Horizontal"},
+	{"hatch-vertical", "Vertical"},
+	{"hatch-diagonal", "Diagonal"},
+	{"hatch-antidiagonal", "Antidiagonal"},
+}
+
+func decodeAnnotationSwatch(data sql.NullString) annotationSwatch {
+	out := annotationSwatch{Hatch: "hatch-diagonal", Color: "#dc2626"}
+	if data.Valid && data.String != "" {
+		_ = json.Unmarshal([]byte(data.String), &out)
+	}
+	return out
+}
+
+// annotationTypePill is one annotation_type's pill: a color+hatch swatch preview, its label, and
+// (behind a <details> disclosure, no JS needed) an inline edit form for the color/hatch pair -
+// this is the only manageable place for those two, previously only settable by hand-editing the
+// Classifier.Data column.
+templ annotationTypePill(classifierType ClassifierType, row Classifier, locale i18n.Locale) {
+	{{ swatch := decodeAnnotationSwatch(row.Data) }}
+	<span class="tag-pill annotation-type-pill">
+		<span class="pattern-layer-swatch" style={ "background-color:" + swatch.Color }></span>
+		{ ClassifierLabel(row, locale) }
+		<details class="annotation-type-edit">
+			<summary aria-label="Edit color/pattern">
+				<img src="/static/icons/edit.svg" width="10" height="10" alt="" class="icon"/>
+			</summary>
+			<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/update") } class="annotation-type-edit-form">
+				<input type="hidden" name="title" value={ row.Title }/>
+				<input type="hidden" name="titleEt" value={ row.TitleEt.String }/>
+				@annotationSwatchFields(swatch)
+				<button type="submit" class="btn btn-secondary">Save</button>
+			</form>
+		</details>
+		<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
+			<button type="submit" class="tag-pill-remove" aria-label="Remove">
+				<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
+			</button>
+		</form>
+	</span>
+}
+
+templ annotationSwatchFields(swatch annotationSwatch) {
+	<label class="pattern-layer-select-field">
+		Color
+		<input type="color" name="color" value={ swatch.Color }/>
+	</label>
+	<label class="pattern-layer-select-field">
+		Pattern
+		<select name="hatch" class="input">
+			for _, opt := range hatchOptions {
+				<option value={ opt.Value } selected?={ opt.Value == swatch.Hatch }>{ opt.Label }</option>
+			}
+		</select>
+	</label>
 }

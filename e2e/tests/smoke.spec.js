@@ -218,6 +218,12 @@ test.describe("Studio golden path", () => {
     await firstImage.click();
     await expect(page).toHaveURL(/\/media\/view\/[a-f0-9-]+$/);
 
+    // A true original's own lightbox is view-only (deep zoom, no annotation toolbar) - annotating
+    // it means starting an annotated version first (see internal/media/views.templ's
+    // annotatedVersionsCard/CreateAnnotatedVersion), which gets its own page to actually draw on.
+    await page.click('form[action*="/annotated-versions"] button[type="submit"]');
+    await expect(page).toHaveURL(/\/media\/view\/[a-f0-9-]+$/);
+
     await page.click("#lightbox-trigger");
     await expect(page.locator("#lightbox-overlay")).toBeVisible();
     // Add-region mode is armed by default (see static/js/lightbox.js) - confirm the toolbar it

@@ -107,6 +107,17 @@ func CreateClassifier(ctx context.Context, q studiodb.Querier, in ClassifierInpu
 	return id, err
 }
 
+// UpdateClassifier saves title/titleEt/data for an existing classifier - used by the Settings ->
+// Classifiers -> Annotation Types inline edit (color/hatch pattern, see AnnotationTypeData) so
+// those are actually manageable through the UI instead of only settable at seed time. Code/type/
+// sequence/isActive aren't touched here; there's no UI need to change those yet.
+func UpdateClassifier(ctx context.Context, q studiodb.Querier, id, title, titleEt, data string) error {
+	_, err := studiodb.Execute(ctx, q,
+		"UPDATE Classifier SET title = ?, titleEt = ?, data = ?, updatedAt = ? WHERE id = ?",
+		title, nullIfEmpty(titleEt), nullIfEmpty(data), time.Now(), id)
+	return err
+}
+
 func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil

@@ -93,6 +93,42 @@ func (s *Service) UploadMedia(ctx context.Context, data []byte, mimeType, upload
 	return GetByID(ctx, s.Pool, id)
 }
 
+// CreateAnnotatedVersion starts a new annotation session on an original image: inserts a draft
+// Media row (EditedFromID pointing at the original, DerivedLabel computed via NextDerivedLabel) so
+// the drag-to-draw editor has something to attach regions to via POST /media/{id}/annotations
+// immediately - it has no real file/thumbnail on disk yet (SizeBytes 0, Width/Height NULL; see
+// Media.IsBaked) until the first BakeAnnotatedVersion call, which happens when the editor closes
+// (static/js/lightbox.js). Every MediaReference the original has is copied onto the new draft too,
+// so the annotated version shows up in the same Asset/Project/etc. context the original does, not
+// just reachable by drilling in from the original's own page.
+func (s *Service) CreateAnnotatedVersion(ctx context.Context, original Media, uploadedByUserID string) (*Media, error) {
+	label, err := NextDerivedLabel(ctx, s.Pool, original.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	id := studiodb.NewID()
+	placeholderKey := id + "/original.png"
+	if _, err := studiodb.Execute(ctx, s.Pool,
+		`INSERT INTO Media (id, storageKey, kind, mimeType, sizeBytes, checksum, uploadedByUserId, editedFromId, derivedLabel)
+		 VALUES (?, ?, ?, 'image/png', 0, '', ?, ?, ?)`,
+		id, placeholderKey, KindImage, uploadedByUserID, original.ID, label); err != nil {
+		return nil, err
+	}
+
+	refs, err := studiodb.Query(ctx, s.Pool, "SELECT "+referenceColumns+" FROM MediaReference WHERE mediaId = ?", scanReference, original.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, ref := range refs {
+		if err := s.AttachMediaReference(ctx, id, ref.ReferencingType, ref.ReferencingID, ref.Role.String, ref.SortOrder); err != nil {
+			return nil, err
+		}
+	}
+
+	return GetByID(ctx, s.Pool, id)
+}
+
 func nullIfZero(n int) any {
 	if n == 0 {
 		return nil

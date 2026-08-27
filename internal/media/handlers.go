@@ -29,6 +29,8 @@ func Mount(mux *http.ServeMux, svc *HandlerService) {
 	mux.HandleFunc("POST /media/{id}/annotations", svc.Auth.RequireUser(svc.handleCreateAnnotation))
 	mux.HandleFunc("POST /media/{id}/annotations/{regionId}/delete", svc.Auth.RequireUser(svc.handleDeleteAnnotation))
 	mux.HandleFunc("POST /media/{id}/description", svc.Auth.RequireUser(svc.handleUpdateDescription))
+	mux.HandleFunc("POST /media/{id}/annotated-versions", svc.Auth.RequireUser(svc.handleCreateAnnotatedVersion))
+	mux.HandleFunc("POST /media/{id}/bake", svc.Auth.RequireUser(svc.handleBakeAnnotatedVersion))
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
@@ -107,20 +109,36 @@ func (svc *HandlerService) handleMediaView(w http.ResponseWriter, r *http.Reques
 	chrome := chromeFor(r, user, "/media")
 	var regions []AnnotationRegion
 	var annotationTypes []AnnotationTypeOption
+	var source *Media
+	var derivedVersions []Media
 	if m.Kind == KindImage {
-		regions, err = ListRegionsForMedia(ctx, svc.Pool, id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 		classifiers, err := settings.GetClassifiers(ctx, svc.Pool, settings.ClassifierAnnotationType)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		annotationTypes = BuildAnnotationTypeOptions(classifiers, chrome.Locale)
+
+		if m.IsAnnotatedVersion() {
+			regions, err = ListRegionsForMedia(ctx, svc.Pool, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			source, err = GetByID(ctx, svc.Pool, m.EditedFromID.String)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			derivedVersions, err = ListDerivedVersions(ctx, svc.Pool, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 	}
-	writeHTML(w, r, MediaViewPage(chrome, *m, uploadedByName, reference, regions, annotationTypes))
+	writeHTML(w, r, MediaViewPage(chrome, *m, uploadedByName, reference, regions, annotationTypes, source, derivedVersions))
 }
 
 // --- Pattern-layer annotation regions (session required) ---------------------------------------
@@ -183,6 +201,52 @@ func (svc *HandlerService) handleUpdateDescription(w http.ResponseWriter, r *htt
 		return
 	}
 	http.Redirect(w, r, "/media/view/"+id, http.StatusSeeOther)
+}
+
+// handleCreateAnnotatedVersion starts a new annotation session on a true original image (see
+// CreateAnnotatedVersion) and redirects straight into that new version's own media view page,
+// where its lightbox editor is what actually gets annotated. There is no separate "continue"
+// action - continuing an existing version is just opening its own page (its regions already
+// belong to it), this route always starts a fresh one.
+func (svc *HandlerService) handleCreateAnnotatedVersion(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	id := r.PathValue("id")
+	original, err := GetByID(r.Context(), svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if original == nil || original.Kind != KindImage {
+		http.NotFound(w, r)
+		return
+	}
+	version, err := svc.CreateAnnotatedVersion(r.Context(), *original, user.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/media/view/"+version.ID, http.StatusSeeOther)
+}
+
+// handleBakeAnnotatedVersion is called by static/js/lightbox.js when the editor closes on an
+// annotated version that had at least one region added/removed during the session - flattens the
+// current region set into a real file (BakeAnnotatedVersion) and responds 204, same fetch
+// convention as handleCreateAnnotation.
+func (svc *HandlerService) handleBakeAnnotatedVersion(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	id := r.PathValue("id")
+	target, err := GetByID(r.Context(), svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if target == nil || !target.IsAnnotatedVersion() {
+		http.Error(w, "not an annotated version", http.StatusBadRequest)
+		return
+	}
+	if err := svc.BakeAnnotatedVersion(r.Context(), *target, i18n.GetLocale(r)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (svc *HandlerService) handleDeleteAnnotation(w http.ResponseWriter, r *http.Request, user *auth.User) {

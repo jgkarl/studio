@@ -1123,6 +1123,62 @@ html[data-theme="dark"] .stat-card {
   opacity: 1;
 }
 
+/* Settings -> Classifiers -> Annotation Types: the swatch preview + inline color/hatch edit
+   disclosure (internal/settings/views.templ's annotationTypePill). */
+.annotation-type-pill {
+  position: relative;
+}
+
+.annotation-type-edit summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.7;
+  list-style: none;
+}
+
+.annotation-type-edit summary::-webkit-details-marker {
+  display: none;
+}
+
+.annotation-type-edit summary:hover {
+  opacity: 1;
+}
+
+.annotation-type-edit[open] summary {
+  opacity: 1;
+}
+
+.annotation-type-edit-form {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+
+.annotation-type-edit-form input[type="color"] {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.125rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
 /* --- Forms ----------------------------------------------------------------------------------- */
 
 .form-grid {

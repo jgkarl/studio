@@ -64,6 +64,9 @@ templ albumCard(item AlbumItem) {
 				} else {
 					{ string(item.Kind) }
 				}
+				if item.DerivedLabel.Valid {
+					<span class="page-subtitle">({ item.DerivedLabel.String })</span>
+				}
 			</div>
 			<div class="album-card-sub">
 				if item.AssetTitle.Valid {
@@ -96,12 +99,17 @@ func albumSearchHaystack(item AlbumItem) string {
 	return out
 }
 
-templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
-	@web.AppLayout(mediaViewTitle(m, reference), c, mediaViewBody(m, uploadedByName, reference, regions, annotationTypes))
+templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media, derivedVersions []Media) {
+	@web.AppLayout(mediaViewTitle(m, reference), c, mediaViewBody(m, uploadedByName, reference, regions, annotationTypes, source, derivedVersions))
 }
 
-templ mediaViewBody(m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
-	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m))
+templ mediaViewBody(m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media, derivedVersions []Media) {
+	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m, source))
+	if m.IsAnnotatedVersion() && source != nil {
+		<p class="page-subtitle" style="margin-top:-0.75rem;margin-bottom:1rem;">
+			Annotated from <a href={ templ.URL("/media/view/" + source.ID) }>{ mediaViewTitle(*source, nil) }</a>
+		</p>
+	}
 	@web.Card() {
 		<div class="row-actions" style="margin-bottom: 0.75rem;">
 			<span class="badge">{ string(m.Kind) }</span>
@@ -115,9 +123,19 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 		</div>
 		if m.Kind == KindImage {
 			<button type="button" id="lightbox-trigger" class="lightbox-trigger" data-media-id={ m.ID } aria-label="Open image viewer">
-				<img src={ "/api/media/" + m.ID } alt=""/>
+				if m.IsAnnotatedVersion() && !m.IsBaked() {
+					<p class="empty-state" style="margin:0;padding:3rem 1rem;">Not saved yet — open the editor, mark a region, then close it to save this version.</p>
+				} else {
+					<img src={ "/api/media/" + m.ID } alt=""/>
+				}
 			</button>
-			<p class="page-subtitle" style="text-align: center; margin-top: 0.5rem;">Click to open · zoom, annotate</p>
+			<p class="page-subtitle" style="text-align: center; margin-top: 0.5rem;">
+				if m.IsAnnotatedVersion() {
+					Click to open · zoom, annotate
+				} else {
+					Click to open · zoom
+				}
+			</p>
 		}
 		if m.Kind == KindVideo {
 			<video controls class="media-view-video" src={ "/api/media/" + m.ID + "?variant=original" }></video>
@@ -126,22 +144,65 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 			<p class="page-subtitle">No preview available for this file type.</p>
 		}
 	}
+	if !m.IsAnnotatedVersion() && m.Kind == KindImage {
+		@annotatedVersionsCard(m, derivedVersions)
+	}
 	if m.Kind == KindImage {
-		@lightboxModal(m.ID, m.Description.String, regions, annotationTypes)
+		@lightboxModal(m, regions, annotationTypes, source)
 		<script src="/static/openseadragon/openseadragon.min.js" defer></script>
 		<script src="/static/js/lightbox.js" defer></script>
 	}
 }
 
+// annotatedVersionsCard lists a true original's annotated versions (each its own persisted Media
+// - see CreateAnnotatedVersion/BakeAnnotatedVersion) and the entry point to start another one.
+// There's no separate "continue" action here: continuing an existing version is just opening its
+// own page, since its regions already belong to it.
+templ annotatedVersionsCard(m Media, derivedVersions []Media) {
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Annotated versions</h2>
+			<form method="post" action={ templ.URL("/media/" + m.ID + "/annotated-versions") }>
+				<button type="submit" class="btn btn-secondary">
+					<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+					New annotated version
+				</button>
+			</form>
+		</div>
+		if len(derivedVersions) == 0 {
+			<p class="empty-state">No annotated versions yet.</p>
+		} else {
+			<ul class="entity-list">
+				for _, v := range derivedVersions {
+					<li class="entity-list-row">
+						<a href={ templ.URL("/media/view/" + v.ID) } class="entity-list-name">{ v.DerivedLabel.String }</a>
+						<div class="row-actions">
+							if !v.IsBaked() {
+								<span class="badge badge-amber">Not saved yet</span>
+							}
+						</div>
+					</li>
+				}
+			</ul>
+		}
+	}
+}
+
+// hatchTileSize is the pattern tile's size in the shared 0-100 (percent-of-image) coordinate
+// space region shapes live in - smaller means more stripes packed into the same area. 2 (was 6)
+// roughly triples the stripe count so damage/loss patterns stay readable at both a glance and
+// zoomed in, rather than thinning out to near-solid on a large photo.
+const hatchTileSize = "2"
+
 templ hatchPatternDef(t AnnotationTypeOption) {
 	<pattern
 		id={ "pattern-" + t.ID }
-		width="6"
-		height="6"
+		width={ hatchTileSize }
+		height={ hatchTileSize }
 		patternUnits="userSpaceOnUse"
 		patternTransform={ "rotate(" + strconv.Itoa(HatchAngle(t.Hatch)) + ")" }
 	>
-		<line x1="0" y1="3" x2="6" y2="3" stroke={ t.Color } stroke-width="1.5"></line>
+		<line x1="0" y1="1" x2="2" y2="1" stroke={ t.Color } stroke-width="0.9"></line>
 	</pattern>
 }
 
@@ -223,14 +284,20 @@ func formatPct(n float64) string {
 // live in this modal). This used to be two disconnected modals (a flat-image editor with no real
 // zoom, and a separate read-only deep-zoom viewer with no editing) - one viewing surface now
 // carries every feature.
-templ lightboxModal(mediaID, description string, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+templ lightboxModal(m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media) {
 	<div id="lightbox-overlay" class="lightbox-overlay" hidden>
 		<div class="lightbox-modal">
 			<button type="button" id="lightbox-close" class="lightbox-close" aria-label="Close">
 				<img src="/static/icons/close.svg" width="18" height="18" alt="" class="icon"/>
 			</button>
 			<div class="lightbox-image-wrap">
-				<div class="pattern-layer-stage" id="pattern-layer-wrap" data-media-id={ mediaID } data-info-url={ "/api/iiif/" + mediaID + "/info.json" }>
+				<div
+					class="pattern-layer-stage"
+					id="pattern-layer-wrap"
+					data-media-id={ m.ID }
+					data-bake-if-annotated={ strconv.FormatBool(m.IsAnnotatedVersion()) }
+					data-info-url={ "/api/iiif/" + tileSourceID(m, source) + "/info.json" }
+				>
 					<div id="osd-viewer" class="osd-viewer"></div>
 					<svg id="pattern-layer-svg" class="osd-annotation-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
 						<defs>
@@ -244,59 +311,83 @@ templ lightboxModal(mediaID, description string, regions []AnnotationRegion, ann
 					</svg>
 				</div>
 			</div>
-			@patternLayerLegend(regions, annotationTypes)
-			<div class="lightbox-controls">
-				if len(annotationTypes) == 0 {
-					<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
-				} else {
-					<div class="lightbox-control-row pattern-layer-toolbar">
-						<label class="checkbox-field">
-							<input type="checkbox" id="pattern-layer-add-toggle" checked/>
-							+ Add region
-						</label>
-						<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
-							<button type="button" id="pattern-layer-tool-rect" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
-								<img src="/static/icons/rectangle.svg" width="16" height="16" alt="" class="icon"/>
-							</button>
-							<button type="button" id="pattern-layer-tool-freehand" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
-								<img src="/static/icons/brush.svg" width="16" height="16" alt="" class="icon"/>
-							</button>
+			if m.IsAnnotatedVersion() {
+				@patternLayerLegend(regions, annotationTypes)
+				<div class="lightbox-controls">
+					if len(annotationTypes) == 0 {
+						<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
+					} else {
+						<div class="lightbox-control-row pattern-layer-toolbar">
+							<label class="checkbox-field">
+								<input type="checkbox" id="pattern-layer-add-toggle" checked/>
+								+ Add region
+							</label>
+							<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
+								<button type="button" id="pattern-layer-tool-rect" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
+									<img src="/static/icons/rectangle.svg" width="16" height="16" alt="" class="icon"/>
+								</button>
+								<button type="button" id="pattern-layer-tool-freehand" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
+									<img src="/static/icons/brush.svg" width="16" height="16" alt="" class="icon"/>
+								</button>
+							</div>
+							<label class="pattern-layer-select-field">
+								Type
+								<select id="pattern-layer-type" class="input">
+									for _, t := range annotationTypes {
+										<option value={ t.ID }>{ t.Label }</option>
+									}
+								</select>
+							</label>
 						</div>
-						<label class="pattern-layer-select-field">
-							Type
-							<select id="pattern-layer-type" class="input">
-								for _, t := range annotationTypes {
-									<option value={ t.ID }>{ t.Label }</option>
-								}
-							</select>
-						</label>
-					</div>
-				}
-				<form id="lightbox-description-form" class="lightbox-note-row" data-media-id={ mediaID }>
-					<label for="lightbox-description">Note</label>
-					<input type="text" id="lightbox-description" name="description" class="input" placeholder="Add a note…" value={ description }/>
-					<button type="submit" class="btn btn-secondary" title="Save note" aria-label="Save note">
-						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
-					</button>
-				</form>
-			</div>
+					}
+					<form id="lightbox-description-form" class="lightbox-note-row" data-media-id={ m.ID }>
+						<label for="lightbox-description">Note</label>
+						<input type="text" id="lightbox-description" name="description" class="input" placeholder="Add a note…" value={ m.Description.String }/>
+						<button type="submit" class="btn btn-secondary" title="Save note" aria-label="Save note">
+							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+						</button>
+					</form>
+				</div>
+			}
 		</div>
 	</div>
 }
 
-// mediaViewActions is the only place download links appear (the lightbox editor itself has none)
-// - "Download" defaults to the annotated variant (falls back to the plain image server-side when
-// there's nothing marked, see handleGetMedia's variant=annotated branch), with "Download original"
-// alongside it for the unmodified file regardless of what's marked.
-templ mediaViewActions(m Media) {
-	<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=annotated") }>
-		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-		Download
-	</a>
-	<a class="btn btn-ghost" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
-		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-		Download original
-	</a>
+// tileSourceID is whose IIIF endpoint the deep-zoom stage tiles against: an annotated version
+// always shows its true original's (grayscale, see static/js/lightbox.js) pixels live while
+// editing - the version's own file only exists once baked, and even then the editor always edits
+// against the original, never a previously-baked-with-legend copy of itself.
+func tileSourceID(m Media, source *Media) string {
+	if source != nil {
+		return source.ID
+	}
+	return m.ID
+}
+
+// mediaViewActions is the only place download links appear (the lightbox editor itself has none).
+// A true original just downloads itself. An annotated version downloads its own baked file by
+// default (the composited PNG - see BakeAnnotatedVersion), with "Download original" alongside it
+// for the un-annotated source. Multiple annotated versions can exist per original now, so there's
+// no single "the annotated variant" of an original to default to any more - that's what each
+// version's own page is for.
+templ mediaViewActions(m Media, source *Media) {
+	if m.IsAnnotatedVersion() && m.IsBaked() {
+		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
+			<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+			Download
+		</a>
+		if source != nil {
+			<a class="btn btn-ghost" href={ templ.URL("/api/media/" + source.ID + "?variant=original") }>
+				<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+				Download original
+			</a>
+		}
+	} else if !m.IsAnnotatedVersion() {
+		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
+			<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+			Download
+		</a>
+	}
 	<a class="btn btn-ghost" href="/media">
 		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
 		Back
@@ -304,10 +395,14 @@ templ mediaViewActions(m Media) {
 }
 
 func mediaViewTitle(m Media, reference *Reference) string {
+	base := string(m.Kind)
 	if reference != nil && reference.Role.Valid && reference.Role.String != "" {
-		return reference.Role.String
+		base = reference.Role.String
 	}
-	return string(m.Kind)
+	if m.DerivedLabel.Valid {
+		return base + " (" + m.DerivedLabel.String + ")"
+	}
+	return base
 }
 
 func mediaViewSubtitle(m Media, uploadedByName string) string {

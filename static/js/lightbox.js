@@ -19,6 +19,19 @@
 // before it's POSTed, so a region is stored (and replayed) in the same percent-of-image space
 // regardless of what zoom/pan it was drawn at. Drawing is armed by default (the "+ Add region"
 // checkbox starts checked) - unarm it to pan/zoom around the image with the mouse instead.
+//
+// The tile source always requests quality=gray from the IIIF endpoint (internal/iiif) - a real
+// pixel-level grayscale conversion, not a CSS filter - fetched and injected here rather than
+// passed as a plain URL, since OpenSeadragon's IIIFTileSource only honors a tileQuality override
+// when it's already present on the parsed info.json object passed in, not derivable from a bare
+// info.json URL string.
+//
+// On close, if this is an annotated version (data-bake-if-annotated="true" - a true original's
+// lightbox is view-only, see internal/media/views.templ's lightboxModal), POST /media/{id}/bake
+// flattens whatever the current region set is into that version's own saved file
+// (BakeAnnotatedVersion) - unconditionally, not just when this session actually changed anything,
+// since a region deleted via its own confirm-and-reload form (not this script) would otherwise be
+// missed by any client-side "did anything change" tracking.
 document.addEventListener("DOMContentLoaded", () => {
   const trigger = document.getElementById("lightbox-trigger");
   const overlay = document.getElementById("lightbox-overlay");
@@ -26,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const wrap = document.getElementById("pattern-layer-wrap");
   const closeBtn = document.getElementById("lightbox-close");
+  const shouldBakeOnClose = wrap && wrap.dataset.bakeIfAnnotated === "true";
 
   let viewer = null;
   let imageReady = false;
@@ -34,25 +48,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function ensureViewer() {
     if (viewer) return;
+    viewer = "loading";
 
-    viewer = OpenSeadragon({
-      id: "osd-viewer",
-      prefixUrl: "/static/openseadragon/images/",
-      tileSources: wrap.dataset.infoUrl,
-      showNavigator: false,
-      showNavigationControl: false,
-      gestureSettingsMouse: { clickToZoom: false },
-    });
+    fetch(wrap.dataset.infoUrl)
+      .then((res) => res.json())
+      .then((info) => {
+        info.tileQuality = "gray";
+        viewer = OpenSeadragon({
+          id: "osd-viewer",
+          prefixUrl: "/static/openseadragon/images/",
+          tileSources: info,
+          showNavigator: false,
+          showNavigationControl: false,
+          gestureSettingsMouse: { clickToZoom: false },
+        });
 
-    viewer.addHandler("open", () => {
-      imageReady = true;
-      const svg = document.getElementById("pattern-layer-svg");
-      const tiledImage = viewer.world.getItemAt(0);
-      if (svg) {
-        viewer.addOverlay({ element: svg, location: tiledImage.getBounds() });
-      }
-      viewer.setMouseNavEnabled(addToggle ? !addToggle.checked : true);
-    });
+        viewer.addHandler("open", () => {
+          imageReady = true;
+          const svg = document.getElementById("pattern-layer-svg");
+          const tiledImage = viewer.world.getItemAt(0);
+          if (svg) {
+            viewer.addOverlay({ element: svg, location: tiledImage.getBounds() });
+          }
+          viewer.setMouseNavEnabled(addToggle ? !addToggle.checked : true);
+        });
+      });
   }
 
   function open() {
@@ -64,7 +84,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function close() {
     overlay.hidden = true;
     document.body.style.overflow = "";
-    if (viewer) viewer.viewport.goHome(true);
+    if (viewer && viewer !== "loading") viewer.viewport.goHome(true);
+    if (shouldBakeOnClose) {
+      fetch(`/media/${wrap.dataset.mediaId}/bake`, { method: "POST", headers: { "X-Requested-With": "fetch" } });
+    }
   }
 
   trigger.addEventListener("click", open);

@@ -37,6 +37,7 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("GET /settings/users", svc.Auth.RequireAdmin(svc.handleUsers))
 	mux.HandleFunc("POST /settings/classifiers/{type}", svc.Auth.RequireUser(svc.handleClassifierCreate))
 	mux.HandleFunc("POST /settings/classifiers/{type}/find-or-create", svc.Auth.RequireUser(svc.handleClassifierFindOrCreate))
+	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/update", svc.Auth.RequireUser(svc.handleClassifierUpdate))
 	mux.HandleFunc("POST /settings/classifiers/{type}/{id}/delete", svc.Auth.RequireUser(svc.handleClassifierDelete))
 	mux.HandleFunc("POST /settings/users/{id}/role", svc.Auth.RequireAdmin(svc.handleUpdateUserRole))
 }
@@ -148,9 +149,80 @@ func (svc *Service) handleClassifierCreate(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	data := ""
+	if t == ClassifierAnnotationType {
+		data = buildAnnotationTypeData(r.FormValue("hatch"), r.FormValue("color"))
+	}
 	if _, err := CreateClassifier(ctx, svc.Pool, ClassifierInput{
-		Type: t, Code: code, Title: title, TitleEt: titleEt, Sequence: count, IsActive: true,
+		Type: t, Code: code, Title: title, TitleEt: titleEt, Sequence: count, IsActive: true, Data: data,
 	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+// buildAnnotationTypeData JSON-encodes an annotation type's pattern-layer color + hatch direction
+// (internal/media/annotations.go's AnnotationTypeData decodes the exact same {"hatch","color"}
+// shape) - "" (no Data at all) when both are blank, so a plain classifier type untouched by this
+// form still gets media's documented fallback (red diagonal hatch) rather than an empty object.
+func buildAnnotationTypeData(hatch, color string) string {
+	hatch = strings.TrimSpace(hatch)
+	color = strings.TrimSpace(color)
+	if hatch == "" && color == "" {
+		return ""
+	}
+	if hatch == "" {
+		hatch = "hatch-diagonal"
+	}
+	if color == "" {
+		color = "#dc2626"
+	}
+	b, _ := json.Marshal(struct {
+		Hatch string `json:"hatch"`
+		Color string `json:"color"`
+	}{hatch, color})
+	return string(b)
+}
+
+// handleClassifierUpdate saves title/titleEt (and, for annotation types, the color/hatch pair -
+// see buildAnnotationTypeData) for an existing classifier. Code/sequence/isActive aren't editable
+// here yet.
+func (svc *Service) handleClassifierUpdate(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	t := ClassifierType(r.PathValue("type"))
+	if !IsSettingsManagedType(t) {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	ctx := r.Context()
+	id := r.PathValue("id")
+	existing, err := GetClassifierByID(ctx, svc.Pool, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if existing == nil || existing.Type != t {
+		http.NotFound(w, r)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	if title == "" {
+		title = existing.Title
+	}
+	titleEt := strings.TrimSpace(r.FormValue("titleEt"))
+	if titleEt == "" {
+		titleEt = existing.TitleEt.String
+	}
+	data := existing.Data.String
+	if t == ClassifierAnnotationType {
+		data = buildAnnotationTypeData(r.FormValue("hatch"), r.FormValue("color"))
+	}
+	if err := UpdateClassifier(ctx, svc.Pool, id, title, titleEt, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

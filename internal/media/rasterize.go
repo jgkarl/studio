@@ -3,12 +3,20 @@ package media
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"html"
+	"log"
+	"math"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/davidbyttow/govips/v2/vips"
 
+	studiodb "studio/internal/db"
 	"studio/internal/i18n"
 	"studio/internal/settings"
 )
@@ -88,4 +96,189 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 		return nil, "", fmt.Errorf("exporting annotated PNG: %w", err)
 	}
 	return png, "image/png", nil
+}
+
+// Layout constants for BakeAnnotatedVersion's composited image: the original photo, a solid black
+// divider (inset from both edges by sidePadding, with its own vertical breathing room above/below),
+// then the region-type legend, then the whole-image note as wrapped text - see the "Annotated
+// versions" design in internal/media/views.templ for the corresponding read-only rendering.
+const (
+	bakeMaxDimension  = 4000 // cap on the long edge - a real deliverable, not a thumbnail, but still bounded against pathological raw-camera-file memory use
+	bakeSidePadding   = 24
+	bakeDividerGap    = 16
+	bakeDividerHeight = 6
+	bakeNoteFontSize  = 15
+	bakeNoteLineGap   = 6
+	bakeNoteCharWidth = 8 // rough average glyph advance at bakeNoteFontSize, for word-wrap width estimation
+)
+
+// BakeAnnotatedVersion renders the *current* full set of regions (internal/media/annotations.go)
+// on `target` (an annotated-version Media row created by CreateAnnotatedVersion, or re-baked again
+// after further edits) into one complete PNG and persists it as that Media's own file - unlike
+// RenderAnnotatedImage above (which is a pure on-demand, never-saved flatten, still used by
+// "download annotated" on media with regions attached the old way and by internal/export), this is
+// the "edit session finished" save: the original image, converted to grayscale (matching what the
+// editor showed while drawing - see static/js/lightbox.js's IIIF tileQuality=gray), at its own full
+// resolution (capped at bakeMaxDimension) rather than the "web" thumbnail, canvas width kept
+// exactly equal to the image's own width so the photo itself is never stretched - only the
+// (taller) canvas grows to fit the divider/legend/note beneath it. If `target` already has a
+// baked file from an earlier session, that file is preserved on disk first (a timestamped
+// "-old-<unix>" sibling key) before being overwritten, never silently discarded.
+func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale i18n.Locale) error {
+	if !target.EditedFromID.Valid {
+		return fmt.Errorf("bake annotated version: %s is not an annotated version (no editedFromId)", target.ID)
+	}
+	source, err := GetByID(ctx, s.Pool, target.EditedFromID.String)
+	if err != nil {
+		return err
+	}
+	if source == nil {
+		return fmt.Errorf("bake annotated version: source media %s not found", target.EditedFromID.String)
+	}
+
+	regions, err := ListRegionsForMedia(ctx, s.Pool, target.ID)
+	if err != nil {
+		return err
+	}
+	classifiers, err := settings.GetClassifiers(ctx, s.Pool, settings.ClassifierAnnotationType)
+	if err != nil {
+		return err
+	}
+	annotationTypes := BuildAnnotationTypeOptions(classifiers, locale)
+
+	original, err := s.Storage.Get(source.StorageKey)
+	if err != nil {
+		return fmt.Errorf("reading source original: %w", err)
+	}
+	img, err := vips.NewImageFromBuffer(original)
+	if err != nil {
+		return fmt.Errorf("decoding source original: %w", err)
+	}
+	defer img.Close()
+	if err := img.AutoRotate(); err != nil {
+		return fmt.Errorf("auto-rotating: %w", err)
+	}
+	if err := img.ToColorSpace(vips.InterpretationBW); err != nil {
+		return fmt.Errorf("converting to grayscale: %w", err)
+	}
+	if w, h := img.Width(), img.Height(); w > bakeMaxDimension || h > bakeMaxDimension {
+		scale := math.Min(float64(bakeMaxDimension)/float64(w), float64(bakeMaxDimension)/float64(h))
+		if err := img.Resize(scale, vips.KernelAuto); err != nil {
+			return fmt.Errorf("resizing to bake bounds: %w", err)
+		}
+	}
+	imgW, imgH := img.Width(), img.Height()
+	grayPng, _, err := img.ExportPng(vips.NewPngExportParams())
+	if err != nil {
+		return fmt.Errorf("exporting grayscale base: %w", err)
+	}
+
+	var shapes bytes.Buffer
+	if err := regionsAndDefsFragment(regions, annotationTypes).Render(ctx, &shapes); err != nil {
+		return err
+	}
+
+	usedTypes := UsedTypeOptions(regions, annotationTypes)
+	legendHeight := 0
+	var legend bytes.Buffer
+	if len(usedTypes) > 0 {
+		legendHeight = legendRowHeight/2 + len(usedTypes)*legendRowHeight
+		for i, t := range usedTypes {
+			fmt.Fprintf(&legend, `<g transform="translate(%d, %d)"><rect width="16" height="16" fill="%s"/><text x="24" y="13" font-family="sans-serif" font-size="15" fill="#111111">%s</text></g>`,
+				bakeSidePadding, i*legendRowHeight, html.EscapeString(t.Color), html.EscapeString(t.Label))
+		}
+	}
+
+	noteLines := wrapText(target.Description.String, (imgW-2*bakeSidePadding)/bakeNoteCharWidth)
+	noteHeight := 0
+	var note bytes.Buffer
+	if len(noteLines) > 0 {
+		noteHeight = len(noteLines)*(bakeNoteFontSize+bakeNoteLineGap) + bakeNoteLineGap
+		for i, line := range noteLines {
+			fmt.Fprintf(&note, `<text x="%d" y="%d" font-family="sans-serif" font-size="%d" fill="#333333">%s</text>`,
+				bakeSidePadding, bakeNoteLineGap+(i+1)*(bakeNoteFontSize+bakeNoteLineGap)-bakeNoteLineGap, bakeNoteFontSize, html.EscapeString(line))
+		}
+	}
+
+	dividerY := imgH + bakeDividerGap
+	belowDividerY := dividerY + bakeDividerHeight + bakeDividerGap
+	totalHeight := belowDividerY + legendHeight + noteHeight
+	if legendHeight == 0 && noteHeight == 0 {
+		// Nothing to caption - just the (grayscale) image itself, no divider floating with
+		// nothing underneath it.
+		totalHeight = imgH
+	}
+
+	dataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(grayPng)
+	var divider string
+	if legendHeight > 0 || noteHeight > 0 {
+		divider = fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#000000"/>`,
+			bakeSidePadding, dividerY, imgW-2*bakeSidePadding, bakeDividerHeight)
+	}
+
+	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="%d" height="%d">`+
+		`<rect width="%d" height="%d" fill="#ffffff"/>`+
+		`<svg x="0" y="0" width="%d" height="%d" viewBox="0 0 100 100" preserveAspectRatio="none">`+
+		`<image xlink:href="%s" x="0" y="0" width="100" height="100"/>%s</svg>`+
+		`%s<g transform="translate(0, %d)">%s</g><g transform="translate(0, %d)">%s</g></svg>`,
+		imgW, totalHeight, imgW, totalHeight, imgW, imgH, dataURI, shapes.String(),
+		divider, belowDividerY, legend.String(), belowDividerY+legendHeight, note.String())
+
+	rendered, err := vips.NewImageFromBuffer([]byte(svg))
+	if err != nil {
+		return fmt.Errorf("rasterizing baked image: %w", err)
+	}
+	defer rendered.Close()
+	baked, _, err := rendered.ExportPng(vips.NewPngExportParams())
+	if err != nil {
+		return fmt.Errorf("exporting baked PNG: %w", err)
+	}
+
+	// Preserve whatever was there from an earlier bake, rather than silently discarding it.
+	if existing, err := s.Storage.Get(target.StorageKey); err == nil && len(existing) > 0 {
+		backupKey := fmt.Sprintf("%s-old-%d", strings.TrimSuffix(target.StorageKey, filepath.Ext(target.StorageKey)), time.Now().UnixNano()) + filepath.Ext(target.StorageKey)
+		if err := s.Storage.Put(backupKey, existing); err != nil {
+			log.Printf("media: backing up previous bake of %s: %v", target.ID, err)
+		}
+	}
+	if err := s.Storage.Put(target.StorageKey, baked); err != nil {
+		return fmt.Errorf("storing baked image: %w", err)
+	}
+	s.storeImageVariants(target.ID, baked)
+
+	sum := sha256.Sum256(baked)
+	_, err = studiodb.Execute(ctx, s.Pool,
+		"UPDATE Media SET mimeType = 'image/png', sizeBytes = ?, width = ?, height = ?, checksum = ? WHERE id = ?",
+		len(baked), imgW, totalHeight, hex.EncodeToString(sum[:]), target.ID)
+	return err
+}
+
+// wrapText is a plain word-wrap for the note baked under the legend - no font metrics available
+// server-side, so it estimates each line's capacity from bakeNoteCharWidth's rough average glyph
+// advance rather than measuring exactly. Good enough for a short caption; not meant for long prose.
+func wrapText(text string, maxCharsPerLine int) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	if maxCharsPerLine < 10 {
+		maxCharsPerLine = 10
+	}
+	words := strings.Fields(text)
+	var lines []string
+	var cur strings.Builder
+	for _, w := range words {
+		if cur.Len() > 0 && cur.Len()+1+len(w) > maxCharsPerLine {
+			lines = append(lines, cur.String())
+			cur.Reset()
+		}
+		if cur.Len() > 0 {
+			cur.WriteByte(' ')
+		}
+		cur.WriteString(w)
+	}
+	if cur.Len() > 0 {
+		lines = append(lines, cur.String())
+	}
+	return lines
 }
