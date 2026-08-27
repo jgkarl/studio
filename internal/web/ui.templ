@@ -57,11 +57,11 @@ templ Alert(tone string) {
 templ ExportLinks(exportType, id string) {
 	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=html") }>
 		@Icon("download", 14)
-		Export HTML
+		HTML
 	</a>
 	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=pdf") }>
 		@Icon("download", 14)
-		Export PDF
+		PDF
 	</a>
 }
 

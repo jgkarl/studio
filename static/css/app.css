@@ -59,7 +59,7 @@
   --blue-text: #014682;
   --neutral-bg: var(--gray-100);
   --neutral-text: var(--text);
-  --stripe-even: #FBF3E0;
+  --stripe-even: #E8F0F9;
 
   --header-bg: linear-gradient(96.04deg, var(--yellow-100) -17.14%, var(--blue-100) 94.45%);
   --shadow-sm: 0px 10px 80px rgba(0,0,0,0.02275), 0px 5.0625px 34.875px rgba(0,0,0,0.035), 0px 2px 13px rgba(0,0,0,0.04725), 0px 0.4375px 4.625px rgba(0,0,0,0.07);
@@ -78,7 +78,7 @@ html[data-theme="dark"] {
   --accent: var(--green-500);
   --accent-text: #ffffff;
   --neutral-bg: var(--gray-700);
-  --stripe-even: #3A331F;
+  --stripe-even: #313B46;
   --header-bg: linear-gradient(96.04deg, var(--yellow-900) -17.14%, var(--blue-900) 94.45%);
   --shadow: none;
   --shadow-sm: none;
@@ -178,6 +178,18 @@ html[data-theme="dark"] .card {
 }
 
 .card + .card {
+  margin-top: 1rem;
+}
+
+/* A bare header-row + content block sitting directly on the page background between two .card
+   elements (e.g. Asset detail's "Projects" section, a list of its own per-project cards rather
+   than one enclosing card) - .card + .card's margin-top can't reach across it, so it carries its
+   own top margin, and hands the same margin on to whatever .card follows it. */
+.detail-section {
+  margin-top: 1rem;
+}
+
+.detail-section + .card {
   margin-top: 1rem;
 }
 
@@ -690,6 +702,7 @@ html[data-theme="dark"] .nav-toggle-btn {
   cursor: pointer;
   font-size: 15px;
   color: var(--text);
+  text-decoration: none;
 }
 
 .navbar-pill-btn:hover,
@@ -1995,7 +2008,7 @@ html[data-theme="dark"] .kanban-card {
 
 [data-el-root] .entity-list-row:hover {
   background: var(--green-bg);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
 }
 

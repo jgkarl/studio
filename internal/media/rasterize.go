@@ -149,14 +149,18 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 }
 
 // Layout constants for BakeAnnotatedVersion's composited image: the original photo, a solid black
-// divider (inset from both edges by sidePadding, with its own vertical breathing room above/below),
-// then the region-type legend, then the whole-image note as wrapped text - see the "Annotated
-// versions" design in internal/media/views.templ for the corresponding read-only rendering.
+// divider spanning the image's full width, then the region-type legend, then the whole-image note
+// as wrapped text - see the "Annotated versions" design in internal/media/views.templ for the
+// corresponding read-only rendering.
 const (
-	bakeMaxDimension  = 4000 // cap on the long edge - a real deliverable, not a thumbnail, but still bounded against pathological raw-camera-file memory use
-	bakeSidePadding   = 24
-	bakeDividerGap    = 16 // breathing room both above the divider (before it) and below the legend (after it) - the same gap on both sides of that section
-	bakeDividerHeight = 1  // a hairline rule, not a thick color bar - see BakeAnnotatedVersion
+	bakeMaxDimension = 4000 // cap on the long edge - a real deliverable, not a thumbnail, but still bounded against pathological raw-camera-file memory use
+	bakeSidePadding  = 24   // left/right inset for the legend/note *text* only - the divider itself runs edge to edge
+
+	bakeDividerTopGap    = 6                     // breathing room between the image and the divider line above the legend
+	bakeLegendPad        = bakeDividerTopGap * 2 // gap between the divider and the legend content itself
+	bakeDividerBottomGap = bakeDividerTopGap     // gap after the legend (before the note), matching the gap above the divider
+
+	bakeDividerHeight = 1 // a hairline rule, not a thick color bar - see BakeAnnotatedVersion
 	bakeNoteFontSize  = 15
 	bakeNoteLineGap   = 6
 	bakeNoteCharWidth = 8 // rough average glyph advance at bakeNoteFontSize, for word-wrap width estimation
@@ -230,12 +234,12 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 
 	usedTypes := UsedTypeOptions(regions, annotationTypes)
 	legend, legendHeight := legendMarkup(usedTypes, imgW, bakeSidePadding)
-	// The same gap that separates the image from the divider ("top of legend") also separates the
-	// legend from whatever follows ("bottom of legend") - symmetric breathing room around the
-	// whole legend block, not just above it.
+	// bakeDividerBottomGap (== bakeDividerTopGap) separates the legend from whatever follows it,
+	// mirroring the gap above the divider - symmetric breathing room around the whole legend block,
+	// not just above it.
 	legendBottomPad := 0
 	if legendHeight > 0 {
-		legendBottomPad = bakeDividerGap
+		legendBottomPad = bakeDividerBottomGap
 	}
 
 	noteLines := wrapText(target.Description.String, (imgW-2*bakeSidePadding)/bakeNoteCharWidth)
@@ -249,8 +253,8 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 		}
 	}
 
-	dividerY := imgH + bakeDividerGap
-	belowDividerY := dividerY + bakeDividerHeight + bakeDividerGap
+	dividerY := imgH + bakeDividerTopGap
+	belowDividerY := dividerY + bakeDividerHeight + bakeLegendPad
 	noteY := belowDividerY + legendHeight + legendBottomPad
 	totalHeight := noteY + noteHeight
 	if legendHeight == 0 && noteHeight == 0 {
@@ -262,8 +266,10 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 	dataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(grayPng)
 	var divider string
 	if legendHeight > 0 || noteHeight > 0 {
-		divider = fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#000000"/>`,
-			bakeSidePadding, dividerY, imgW-2*bakeSidePadding, bakeDividerHeight)
+		// Full width, edge to edge - not inset by bakeSidePadding like the legend/note text above
+		// and below it.
+		divider = fmt.Sprintf(`<rect x="0" y="%d" width="%d" height="%d" fill="#000000"/>`,
+			dividerY, imgW, bakeDividerHeight)
 	}
 
 	// <image preserveAspectRatio="none"> - see the matching comment in RenderAnnotatedImage above;

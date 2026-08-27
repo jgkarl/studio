@@ -216,9 +216,30 @@ func (svc *Service) GetReportExportData(ctx context.Context, id string) (*Doc, e
 		sections = append(sections, Section{Heading: "Recommendations", Paragraphs: []string{report.Recommendations.String}})
 	}
 
+	// "Standard + gallery" (report.LayoutStyle == "gallery") swaps this report's own Attachments
+	// for every image/video connected anywhere on the project (reporter.BuildGallery - the same
+	// asset/project-wide gallery the "Customize layout" cover-image picker draws from), which
+	// already includes this report's own attachments among everything else, so it replaces rather
+	// than adds to them.
+	heading := "Attachments"
 	images, videos := svc.mediaFor(ctx, media.RefReport, report.ID)
+	if report.LayoutStyle == "gallery" {
+		if galleryItems, err := reporter.BuildGallery(ctx, svc.Media, svc.Pool, report.ProjectID); err == nil {
+			heading = "Gallery"
+			images, videos = nil, nil
+			for _, item := range galleryItems {
+				img := Image{MediaID: item.MediaID, Caption: item.Caption.String}
+				switch item.Media.Kind {
+				case media.KindImage:
+					images = append(images, img)
+				case media.KindVideo:
+					videos = append(videos, img)
+				}
+			}
+		}
+	}
 	if len(images) > 0 || len(videos) > 0 {
-		sections = append(sections, Section{Heading: "Attachments", Images: images, Videos: videos})
+		sections = append(sections, Section{Heading: heading, Images: images, Videos: videos})
 	}
 	if len(sections) == 0 {
 		sections = []Section{{Heading: "Report", Paragraphs: []string{"(empty)"}}}

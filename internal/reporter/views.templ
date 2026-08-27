@@ -326,19 +326,19 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 			@web.Card() {
 				<h2 class="dashboard-heading">Customize layout</h2>
 				<form method="post" action={ templ.URL("/reports/" + report.ID + "/layout") } class="form-grid">
-					@web.Field("Layout style", "") {
+					@web.Field("Layout style", "Standard + gallery adds every connected image (assessments, treatments, this report's own attachments) to the export, not just what's uploaded here.") {
 						<select class="input" name="layoutStyle">
-							for _, style := range []string{"standard", "compact", "gallery"} {
+							for _, style := range []string{"standard", "gallery"} {
 								<option value={ style } selected?={ style == report.LayoutStyle }>{ layoutStyleLabel(style) }</option>
 							}
 						</select>
 					}
-					if len(attachments) > 0 {
-						@web.Field("Cover image", "") {
+					if len(gallery) > 0 {
+						@web.Field("Cover image", "Pulled from this asset's whole image gallery, not just this report's own attachments.") {
 							<select class="input" name="coverMediaId">
 								<option value="">None</option>
-								for _, ref := range attachments {
-									<option value={ ref.MediaID } selected?={ report.CoverMediaID.Valid && report.CoverMediaID.String == ref.MediaID }>{ ref.MediaID }</option>
+								for _, item := range gallery {
+									<option value={ item.MediaID } selected?={ report.CoverMediaID.Valid && report.CoverMediaID.String == item.MediaID }>{ galleryOptionLabel(item) }</option>
 								}
 							</select>
 						}
@@ -397,11 +397,19 @@ templ infoFieldList(label, href string, fields []InfoField) {
 
 func layoutStyleLabel(style string) string {
 	switch style {
-	case "compact":
-		return "Compact"
 	case "gallery":
-		return "Gallery"
+		return "Standard + gallery"
 	default:
 		return "Standard"
 	}
+}
+
+// galleryOptionLabel is one <option>'s text in the "Cover image" picker - the item's own caption
+// when it has one (matching what the Image gallery section itself shows as its editable caption),
+// falling back to its timestamp so every image is still distinguishable without one.
+func galleryOptionLabel(item GalleryItem) string {
+	if item.Caption.Valid && item.Caption.String != "" {
+		return item.Caption.String
+	}
+	return item.CreatedAt.Format("2006-01-02 15:04")
 }

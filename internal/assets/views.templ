@@ -213,54 +213,29 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 			<p class="detail-paragraph"><strong>Provenance:</strong> { asset.Provenance.String }</p>
 		}
 	}
-	<div class="card-header-row">
-		<h2 class="dashboard-heading">Projects</h2>
-		<div class="row-actions">
-			if len(assessmentProjects) > 0 {
-				@web.ModalTrigger("modal-assessment", "Assessment")
-			}
-			if len(treatmentProjects) > 0 {
-				@web.ModalTrigger("modal-treatment", "Treatment")
-			}
-			if len(reportProjects) > 0 {
-				@web.ModalTrigger("modal-report", "Report")
-			}
-			@web.ModalTrigger("modal-project", "Project")
+	<div class="detail-section">
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Projects</h2>
+			<div class="row-actions">
+				if len(assessmentProjects) > 0 {
+					@web.ModalTrigger("modal-assessment", "Assessment")
+				}
+				if len(treatmentProjects) > 0 {
+					@web.ModalTrigger("modal-treatment", "Treatment")
+				}
+				if len(reportProjects) > 0 {
+					@web.ModalTrigger("modal-report", "Report")
+				}
+				@web.ModalTrigger("modal-project", "Project")
+			</div>
 		</div>
+		if len(projectCards) == 0 {
+			<p class="empty-state">No projects yet.</p>
+		}
+		for _, pc := range projectCards {
+			@assetProjectCard(pc, conditions, treatmentMethodLabels, stageLabels, locale)
+		}
 	</div>
-	if len(projectCards) == 0 {
-		<p class="empty-state">No projects yet.</p>
-	}
-	for _, pc := range projectCards {
-		@assetProjectCard(pc, conditions, treatmentMethodLabels, stageLabels, locale)
-	}
-	if len(assessmentProjects) > 0 {
-		@web.Modal("modal-assessment", "Add: Assessment") {
-			@assessments.AddModalBody("", assessmentProjects, conditions, locale)
-		}
-	}
-	if len(treatmentProjects) > 0 {
-		@web.Modal("modal-treatment", "Add: Treatments") {
-			@treatments.AddModalBody("", treatmentProjects, treatmentMethods, locale)
-		}
-	}
-	if len(reportProjects) > 0 {
-		@web.Modal("modal-report", "Add: Reports") {
-			@reporter.AddModalBody("", reportProjects)
-		}
-	}
-	@web.Modal("modal-project", "Add: Projects") {
-		<form method="post" action="/projects" enctype="multipart/form-data" class="form-grid">
-			<input type="hidden" name="assetId" value={ asset.ID }/>
-			@web.Field("Title", "e.g. \"Cleaning and varnish removal\"") {
-				<input class="input" name="title" required/>
-			}
-			<button type="submit" class="btn btn-primary">
-				@web.Icon("check_circle", 14)
-				Create
-			</button>
-		</form>
-	}
 	@web.Card() {
 		<div class="card-header-row">
 			<h2 class="dashboard-heading">Media</h2>
@@ -302,6 +277,33 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 				</button>
 			</form>
 		}
+	}
+	if len(assessmentProjects) > 0 {
+		@web.Modal("modal-assessment", "Add: Assessment") {
+			@assessments.AddModalBody("", assessmentProjects, conditions, locale)
+		}
+	}
+	if len(treatmentProjects) > 0 {
+		@web.Modal("modal-treatment", "Add: Treatments") {
+			@treatments.AddModalBody("", treatmentProjects, treatmentMethods, locale)
+		}
+	}
+	if len(reportProjects) > 0 {
+		@web.Modal("modal-report", "Add: Reports") {
+			@reporter.AddModalBody("", reportProjects)
+		}
+	}
+	@web.Modal("modal-project", "Add: Projects") {
+		<form method="post" action="/projects" enctype="multipart/form-data" class="form-grid">
+			<input type="hidden" name="assetId" value={ asset.ID }/>
+			@web.Field("Title", "e.g. \"Cleaning and varnish removal\"") {
+				<input class="input" name="title" required/>
+			}
+			<button type="submit" class="btn btn-primary">
+				@web.Icon("check_circle", 14)
+				Create
+			</button>
+		</form>
 	}
 	<script src="/static/js/modal.js" defer></script>
 }
