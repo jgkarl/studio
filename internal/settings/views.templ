@@ -151,33 +151,19 @@ templ classifierGroupCard(group ClassifierGroup, locale i18n.Locale) {
 		}
 		<div class="tag-pills">
 			for _, row := range group.Rows {
-				if group.Type == ClassifierAnnotationType {
-					@annotationTypePill(group.Type, row, locale)
-				} else {
-					<span class="tag-pill">
-						{ ClassifierLabel(row, locale) }
-						<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
-							<button type="submit" class="tag-pill-remove" aria-label="Remove">
-								<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
-							</button>
-						</form>
-					</span>
-				}
+				@classifierPill(group.Type, row, locale)
 			}
 		</div>
-		<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type)) } class="inline-edit-form">
-			@web.Field("Title (English)", "") {
-				<input class="input" name="title" required placeholder="New option name"/>
-			}
-			@web.Field("Title (Estonian)", "") {
-				<input class="input" name="titleEt" placeholder="Eestikeelne nimi"/>
-			}
+		<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type)) } class="inline-edit-form inline-edit-form-row">
+			<input class="input" name="title" required placeholder="Title (English)"/>
+			<input class="input" name="titleEt" placeholder="Title (Estonian)"/>
+			<input class="input classifier-sequence-input" type="number" name="sequence" placeholder="Order"/>
 			if group.Type == ClassifierAnnotationType {
 				@annotationSwatchFields(annotationSwatch{Hatch: "hatch-diagonal", Color: "#dc2626"})
 			}
-			<button type="submit" class="btn btn-secondary">
+			<button type="submit" class="btn btn-secondary" aria-label="Add" title="Add">
 				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-				Add
+				<span class="btn-label">Add</span>
 			</button>
 		</form>
 	}
@@ -208,24 +194,33 @@ func decodeAnnotationSwatch(data sql.NullString) annotationSwatch {
 	return out
 }
 
-// annotationTypePill is one annotation_type's pill: a color+hatch swatch preview, its label, and
-// (behind a <details> disclosure, no JS needed) an inline edit form for the color/hatch pair -
-// this is the only manageable place for those two, previously only settable by hand-editing the
-// Classifier.Data column.
-templ annotationTypePill(classifierType ClassifierType, row Classifier, locale i18n.Locale) {
+// classifierPill is one classifier row's pill - its label (plus, for annotation_type, a color/hatch
+// swatch preview), and (behind a <details> disclosure, no JS needed) an inline edit form for
+// Title EN/ET + Sequence, with the color/hatch pair added on for annotation_type only. Sequence is
+// what every <select> built from GetClassifiers/GetAllClassifiers orders by, so this is how an
+// admin reorders any picklist in the app, not just annotation types.
+templ classifierPill(classifierType ClassifierType, row Classifier, locale i18n.Locale) {
+	{{ isAnnotation := classifierType == ClassifierAnnotationType }}
 	{{ swatch := decodeAnnotationSwatch(row.Data) }}
-	<span class="tag-pill annotation-type-pill">
-		<span class="pattern-layer-swatch" style={ "background-color:" + swatch.Color }></span>
+	<span class={ "tag-pill", templ.KV("annotation-type-pill", isAnnotation) }>
+		if isAnnotation {
+			<span class="pattern-layer-swatch" style={ "background-color:" + swatch.Color }></span>
+		}
 		{ ClassifierLabel(row, locale) }
 		<details class="annotation-type-edit">
-			<summary aria-label="Edit color/pattern">
+			<summary aria-label="Edit">
 				<img src="/static/icons/edit.svg" width="10" height="10" alt="" class="icon"/>
 			</summary>
 			<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/update") } class="annotation-type-edit-form">
-				<input type="hidden" name="title" value={ row.Title }/>
-				<input type="hidden" name="titleEt" value={ row.TitleEt.String }/>
-				@annotationSwatchFields(swatch)
-				<button type="submit" class="btn btn-secondary">Save</button>
+				<input class="input classifier-edit-title" name="title" value={ row.Title } placeholder="Title (English)"/>
+				<input class="input classifier-edit-title" name="titleEt" value={ row.TitleEt.String } placeholder="Title (Estonian)"/>
+				<input class="input classifier-sequence-input" type="number" name="sequence" value={ strconv.Itoa(row.Sequence) } placeholder="Order"/>
+				if isAnnotation {
+					@annotationSwatchFields(swatch)
+				}
+				<button type="submit" class="btn btn-secondary" aria-label="Save" title="Save">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+				</button>
 			</form>
 		</details>
 		<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
@@ -237,16 +232,10 @@ templ annotationTypePill(classifierType ClassifierType, row Classifier, locale i
 }
 
 templ annotationSwatchFields(swatch annotationSwatch) {
-	<label class="pattern-layer-select-field">
-		Color
-		<input type="color" name="color" value={ swatch.Color }/>
-	</label>
-	<label class="pattern-layer-select-field">
-		Pattern
-		<select name="hatch" class="input">
-			for _, opt := range hatchOptions {
-				<option value={ opt.Value } selected?={ opt.Value == swatch.Hatch }>{ opt.Label }</option>
-			}
-		</select>
-	</label>
+	<input type="color" name="color" value={ swatch.Color } aria-label="Color" title="Color"/>
+	<select name="hatch" class="input" aria-label="Pattern" title="Pattern">
+		for _, opt := range hatchOptions {
+			<option value={ opt.Value } selected?={ opt.Value == swatch.Hatch }>{ opt.Label }</option>
+		}
+	</select>
 }

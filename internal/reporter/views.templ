@@ -14,7 +14,7 @@ templ ListPage(c web.Chrome, rows []ListRow) {
 }
 
 templ listBody(rows []ListRow) {
-	@web.PageHeader("Reports", "Conservation write-ups.", newReportLink())
+	@web.PageHeader("Reports", "Conservation write-ups.", web.NewActionLink("/reports/new", "New report"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, asset, author…")
@@ -90,13 +90,6 @@ func reportSearchHaystack(row ListRow) string {
 		author = row.AuthorName.String
 	}
 	return row.Title + " " + assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + author
-}
-
-templ newReportLink() {
-	<a class="btn btn-primary" href="/reports/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New report
-	</a>
 }
 
 templ NewPage(c web.Chrome, projects []ProjectOption, preselectedProjectID string) {

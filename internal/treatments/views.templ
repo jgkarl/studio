@@ -14,7 +14,7 @@ templ ListPage(c web.Chrome, rows []ListRow, methodLabels map[string]string, met
 }
 
 templ listBody(rows []ListRow, methodLabels map[string]string, methods []settings.Classifier) {
-	@web.PageHeader("Treatments", "Conservation work performed, per object.", newTreatmentLink())
+	@web.PageHeader("Treatments", "Conservation work performed, per object.", web.NewActionLink("/treatments/new", "New treatment"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, asset, client…")
@@ -82,13 +82,6 @@ func assetLabel(title sql.NullString, referenceCode string) string {
 
 func treatmentSearchHaystack(row ListRow, methodLabels map[string]string) string {
 	return row.Title + " " + assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + methodLabel(methodLabels, row.Method)
-}
-
-templ newTreatmentLink() {
-	<a class="btn btn-primary" href="/treatments/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New treatment
-	</a>
 }
 
 templ NewPage(c web.Chrome, projects []ProjectOption, methods []settings.Classifier, preselectedProjectID string) {

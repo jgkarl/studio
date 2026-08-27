@@ -107,14 +107,17 @@ func CreateClassifier(ctx context.Context, q studiodb.Querier, in ClassifierInpu
 	return id, err
 }
 
-// UpdateClassifier saves title/titleEt/data for an existing classifier - used by the Settings ->
-// Classifiers -> Annotation Types inline edit (color/hatch pattern, see AnnotationTypeData) so
-// those are actually manageable through the UI instead of only settable at seed time. Code/type/
-// sequence/isActive aren't touched here; there's no UI need to change those yet.
-func UpdateClassifier(ctx context.Context, q studiodb.Querier, id, title, titleEt, data string) error {
+// UpdateClassifier saves title/titleEt/sequence/data for an existing classifier - used by the
+// Settings -> Classifiers inline edit (every managed type gets title/sequence; Annotation Types
+// additionally get the color/hatch pattern, see AnnotationTypeData) so those are actually
+// manageable through the UI instead of only settable at creation/seed time. sequence is what every
+// <select> built from GetClassifiers/GetAllClassifiers orders by - editing it is how an admin
+// reorders a picklist. Code/type/isActive aren't touched here; there's no UI need to change those
+// yet.
+func UpdateClassifier(ctx context.Context, q studiodb.Querier, id, title, titleEt string, sequence int, data string) error {
 	_, err := studiodb.Execute(ctx, q,
-		"UPDATE Classifier SET title = ?, titleEt = ?, data = ?, updatedAt = ? WHERE id = ?",
-		title, nullIfEmpty(titleEt), nullIfEmpty(data), time.Now(), id)
+		"UPDATE Classifier SET title = ?, titleEt = ?, sequence = ?, data = ?, updatedAt = ? WHERE id = ?",
+		title, nullIfEmpty(titleEt), sequence, nullIfEmpty(data), time.Now(), id)
 	return err
 }
 

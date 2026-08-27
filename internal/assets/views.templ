@@ -19,7 +19,7 @@ templ ListPage(c web.Chrome, rows []ListRow, assetTypes []settings.Classifier, c
 }
 
 templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []settings.Classifier, locale i18n.Locale) {
-	@web.PageHeader("Assets", "The physical objects being conserved.", newAssetLink())
+	@web.PageHeader("Assets", "The physical objects being conserved.", web.NewActionLink("/assets/new", "New asset"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, artist, reference code…")
@@ -87,13 +87,6 @@ func assetSearchHaystack(row ListRow) string {
 		title = row.Title.String
 	}
 	return title + " " + row.ReferenceCode + " " + row.AssetTypeTitle + " " + row.ClientName
-}
-
-templ newAssetLink() {
-	<a class="btn btn-primary" href="/assets/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New asset
-	</a>
 }
 
 templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string) {

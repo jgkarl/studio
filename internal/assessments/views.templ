@@ -14,7 +14,7 @@ templ ListPage(c web.Chrome, rows []ListRow, conditions []settings.Classifier) {
 }
 
 templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Locale) {
-	@web.PageHeader("Assessments", "Condition-status records, per object.", newAssessmentLink())
+	@web.PageHeader("Assessments", "Condition-status records, per object.", web.NewActionLink("/assessments/new", "New assessment"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by asset, client…")
@@ -64,13 +64,6 @@ func assetLabel(title sql.NullString, referenceCode string) string {
 
 func assessmentSearchHaystack(row ListRow) string {
 	return assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + row.Description
-}
-
-templ newAssessmentLink() {
-	<a class="btn btn-primary" href="/assessments/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New assessment
-	</a>
 }
 
 func projectOptionLabel(p ProjectOption) string {

@@ -149,12 +149,16 @@ func (svc *Service) handleClassifierCreate(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	sequence := count
+	if seqVal, err := strconv.Atoi(strings.TrimSpace(r.FormValue("sequence"))); err == nil {
+		sequence = seqVal
+	}
 	data := ""
 	if t == ClassifierAnnotationType {
 		data = buildAnnotationTypeData(r.FormValue("hatch"), r.FormValue("color"))
 	}
 	if _, err := CreateClassifier(ctx, svc.Pool, ClassifierInput{
-		Type: t, Code: code, Title: title, TitleEt: titleEt, Sequence: count, IsActive: true, Data: data,
+		Type: t, Code: code, Title: title, TitleEt: titleEt, Sequence: sequence, IsActive: true, Data: data,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -218,11 +222,15 @@ func (svc *Service) handleClassifierUpdate(w http.ResponseWriter, r *http.Reques
 	if titleEt == "" {
 		titleEt = existing.TitleEt.String
 	}
+	sequence := existing.Sequence
+	if seqVal, err := strconv.Atoi(strings.TrimSpace(r.FormValue("sequence"))); err == nil {
+		sequence = seqVal
+	}
 	data := existing.Data.String
 	if t == ClassifierAnnotationType {
 		data = buildAnnotationTypeData(r.FormValue("hatch"), r.FormValue("color"))
 	}
-	if err := UpdateClassifier(ctx, svc.Pool, id, title, titleEt, data); err != nil {
+	if err := UpdateClassifier(ctx, svc.Pool, id, title, titleEt, sequence, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

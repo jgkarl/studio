@@ -113,9 +113,13 @@ templ EntityListSearchInput(placeholder string) {
 
 // EntityListFilterSelect renders one filter <select data-el-filter="key">. Each option's Value
 // must match the corresponding row's data-el-<key-hyphenated> attribute exactly (e.g. key
-// "assetType" matches data-el-asset-type).
+// "assetType" matches data-el-asset-type). The funnel icon is purely visual (matching
+// EntityListSearchInput's own leading icon) - it's what "All types"/"All conditions" reads as a
+// filter rather than a plain picklist at a glance, especially once the label itself has less room
+// on a narrow screen.
 templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
 	<label class="filter-chip">
+		<img src="/static/icons/filter.svg" width="14" height="14" alt="" class="icon"/>
 		<select class="filter-chip-select" data-el-filter={ key }>
 			<option value="">{ allLabel }</option>
 			for _, opt := range options {
@@ -129,6 +133,7 @@ templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
 // must match the corresponding row's data-el-group-<value-hyphenated> attribute exactly.
 templ EntityListGroupBySelect(options []FilterOption) {
 	<label class="filter-chip">
+		<img src="/static/icons/filter.svg" width="14" height="14" alt="" class="icon"/>
 		<select class="filter-chip-select" data-el-groupby>
 			<option value="">No grouping</option>
 			for _, opt := range options {
@@ -175,7 +180,9 @@ func selectedLabelFor(options []ClassifierOption, valueKey, selected string) str
 }
 
 // PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page
-// uses. actions is a slot for buttons/links — pass templ.NopComponent when there are none.
+// uses. actions is a slot for buttons/links — pass templ.NopComponent when there are none. Title
+// and actions always share one row (see .page-header's flex-wrap:nowrap) at every breakpoint,
+// down to a smaller h1 on a narrow screen rather than ever wrapping the primary action underneath.
 templ PageHeader(title, subtitle string, actions templ.Component) {
 	<div class="page-header">
 		<div>
@@ -188,4 +195,16 @@ templ PageHeader(title, subtitle string, actions templ.Component) {
 			@actions
 		</div>
 	</div>
+}
+
+// NewActionLink is the "+ New X" primary button every module list page's PageHeader actions slot
+// uses (New client/asset/treatment/.../New intake on the dashboard) - one shared component instead
+// of six near-identical copies. The label collapses to just the icon under .btn-label's narrow-
+// screen rule (static/css/app.css) so the button never forces PageHeader's title+action row to
+// wrap on a small screen; add/href/aria-label stay meaningful either way.
+templ NewActionLink(href, label string) {
+	<a class="btn btn-primary" href={ templ.URL(href) } aria-label={ label } title={ label }>
+		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
+		<span class="btn-label">{ label }</span>
+	</a>
 }

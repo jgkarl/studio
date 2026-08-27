@@ -16,7 +16,7 @@ templ Page(c web.Chrome,
 templ pageBody(c web.Chrome,
 	clientActive, clientAll, assetActive, assetAll, projectActive, projectAll, reportDraft, reportFinal int,
 	cards []projectCard) {
-	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, newIntakeLink())
+	@web.PageHeader(c.Dict.Dashboard.Title, c.Dict.Dashboard.Subtitle, web.NewActionLink("/assets/new", "New intake"))
 	<div class="stat-grid">
 		@dualStatCard(clientActive, clientAll, c.Dict.Dashboard.ClientsLabel, "/clients")
 		@dualStatCard(assetActive, assetAll, c.Dict.Dashboard.AssetsLabel, "/assets")
@@ -32,13 +32,6 @@ templ pageBody(c web.Chrome,
 			@projectCardView(card, c)
 		}
 	</div>
-}
-
-templ newIntakeLink() {
-	<a class="btn btn-primary" href="/assets/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New intake
-	</a>
 }
 
 templ dualStatCard(primary, secondary int, label, href string) {

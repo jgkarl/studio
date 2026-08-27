@@ -14,7 +14,7 @@ templ ListPage(c web.Chrome, rows []ListRow, typeLabels map[string]string, clien
 }
 
 templ listBody(rows []ListRow, typeLabels map[string]string, clientTypes []settings.Classifier) {
-	@web.PageHeader("Clients", "Every client, with their assets at a glance.", newClientLink())
+	@web.PageHeader("Clients", "Every client, with their assets at a glance.", web.NewActionLink("/clients/new", "New client"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by name, email…")
@@ -95,13 +95,6 @@ func clientInitials(name string) string {
 		out += strings.ToUpper(f[:1])
 	}
 	return out
-}
-
-templ newClientLink() {
-	<a class="btn btn-primary" href="/clients/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New client
-	</a>
 }
 
 templ NewPage(c web.Chrome, clientTypes, contactMethods []settings.Classifier) {
