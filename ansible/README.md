@@ -84,8 +84,22 @@ ansible-vault encrypt group_vars/all/vault.yml
 
 `inventory.ini`, `group_vars/all/all.yml`, and `group_vars/all/vault.yml` are all gitignored - only
 the `.example` templates are tracked. Encrypting `vault.yml` means it's safe to keep around (or
-even commit) afterwards; you'll need the vault password (`--ask-vault-pass`, or a
-`--vault-password-file`) for every playbook run.
+even commit) afterwards; you'll need the vault password for every playbook run.
+
+**The vault password** (decrypts `vault.yml` itself - a different password from
+`vault_ansible_become_password`, which is just one value stored inside it) is supplied via a
+password file, not typed by hand each time. `ansible.cfg` already points at `ansible/.vault-pass`
+(gitignored); create it once:
+
+```bash
+openssl rand -base64 32 > .vault-pass   # or reuse whatever password you already encrypted vault.yml with
+chmod 600 .vault-pass
+```
+
+Every `ansible-playbook` command below then just works with no extra flag. If you'd rather type
+the password by hand instead of keeping it in a file, delete `.vault-pass` and add
+`--ask-vault-pass` to each command (or remove `vault_password_file` from `ansible.cfg` to make that
+the default again).
 
 **Sudo ("become") password**: both playbooks run every task via `become: true`. If the account
 `inventory.ini` connects as already has passwordless sudo (true of the dedicated `ansible` user
@@ -101,7 +115,7 @@ Already have a `vault.yml` from before this variable existed? Add the one line w
 ## 1. Harden the host (once, before the first deploy)
 
 ```bash
-ansible-playbook harden.yml --ask-vault-pass
+ansible-playbook harden.yml
 ```
 
 Fully idempotent, safe to re-run any time (e.g. after adding a name to
@@ -117,7 +131,7 @@ yourself out, since `AllowUsers` takes effect the moment this run finishes.
 ## 2. Deploy the app (first time, and any time packages/config need to change)
 
 ```bash
-ansible-playbook deploy.yml --ask-vault-pass
+ansible-playbook deploy.yml
 ```
 
 Fully idempotent - installs libvips42 + Caddy, creates the `studio` system user and
@@ -128,7 +142,7 @@ re-run any time; only touches what's actually out of date.
 ## Update to a newer release
 
 ```bash
-ansible-playbook update.yml --ask-vault-pass
+ansible-playbook update.yml
 ```
 
 Fetches whatever `studio_release_version` resolves to (default `"latest"`, tracking the most
@@ -150,7 +164,7 @@ find /opt/app/studio/backups -name '*.tar.gz' -mtime +30 -delete
 Pin an exact version instead of always tracking latest:
 
 ```bash
-ansible-playbook update.yml --ask-vault-pass -e studio_release_version=v1.2.3
+ansible-playbook update.yml -e studio_release_version=v1.2.3
 ```
 
 (or set `studio_release_version: "v1.2.3"` in `group_vars/all/all.yml` to make the pin permanent).

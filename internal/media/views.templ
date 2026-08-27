@@ -101,7 +101,7 @@ templ MediaViewPage(c web.Chrome, m Media, uploadedByName string, reference *Ref
 }
 
 templ mediaViewBody(m Media, uploadedByName string, reference *Reference, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
-	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m, len(regions) > 0))
+	@web.PageHeader(mediaViewTitle(m, reference), mediaViewSubtitle(m, uploadedByName), mediaViewActions(m))
 	@web.Card() {
 		<div class="row-actions" style="margin-bottom: 0.75rem;">
 			<span class="badge">{ string(m.Kind) }</span>
@@ -117,7 +117,7 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 			<button type="button" id="lightbox-trigger" class="lightbox-trigger" data-media-id={ m.ID } aria-label="Open image viewer">
 				<img src={ "/api/media/" + m.ID } alt=""/>
 			</button>
-			<p class="page-subtitle" style="text-align: center; margin-top: 0.5rem;">Click to open · zoom, rotate, adjust, annotate</p>
+			<p class="page-subtitle" style="text-align: center; margin-top: 0.5rem;">Click to open · zoom, annotate</p>
 		}
 		if m.Kind == KindVideo {
 			<video controls class="media-view-video" src={ "/api/media/" + m.ID + "?variant=original" }></video>
@@ -209,19 +209,20 @@ func formatPct(n float64) string {
 // lightboxModal is the media module's one image viewer/editor: real OpenSeadragon deep zoom
 // (static/openseadragon/, vendored — the one deliberate exception to this app's usual
 // "no vendored libraries" rule, see static/js/lightbox.js's header comment) against the real IIIF
-// Image API (internal/iiif) as the viewing surface, combined with rotate (a plain CSS transform
-// on the whole stage - see static/js/lightbox.js's header comment for why) + brightness/contrast
-// filters, download, the pattern layer (a percentage-coordinate SVG overlay of stored regions -
-// rect or freehand-brush outlines, see AnnotationRegion - added as an OpenSeadragon overlay so it
-// tracks pan/zoom automatically), a rectangle/brush draw tool with a type dropdown ("the
-// reason" for a marked area), a legend that's always rendered underneath, whether or not there's
-// anything marked yet, and a whole-image note (Media.Description) with its own Save button -
-// persisted via POST /media/{id}/description, unlike the region shapes (already auto-saved
-// per-draw). No raster editing, no undo stack - regions are rows (internal/media/annotations.go),
-// never baked into a new image (that only happens server-side, on demand, for downloads/exports -
-// see internal/media/rasterize.go). This used to be two disconnected modals (a flat-image editor
-// with no real zoom, and a separate read-only deep-zoom viewer with no editing) - one viewing
-// surface now carries every feature.
+// Image API (internal/iiif) as the viewing surface - a clean canvas with no OpenSeadragon toolbar/
+// navigator, just the image and the pattern layer on top of it - combined with the pattern layer
+// (a percentage-coordinate SVG overlay of stored regions - rect or freehand-brush outlines, see
+// AnnotationRegion - added as an OpenSeadragon overlay so it tracks pan/zoom automatically), a
+// rectangle/brush draw tool (armed by default) with a type dropdown ("the reason" for a marked
+// area), a legend directly under the image (whether or not there's anything marked yet), and a
+// whole-image note (Media.Description) as a single inline row with its own save button - persisted
+// via POST /media/{id}/description, unlike the region shapes (already auto-saved per-draw). No
+// raster editing, no undo stack - regions are rows (internal/media/annotations.go), never baked
+// into a new image (that only happens server-side, on demand, for downloads/exports - see
+// internal/media/rasterize.go, and mediaViewActions above for the only download buttons - none
+// live in this modal). This used to be two disconnected modals (a flat-image editor with no real
+// zoom, and a separate read-only deep-zoom viewer with no editing) - one viewing surface now
+// carries every feature.
 templ lightboxModal(mediaID, description string, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
 	<div id="lightbox-overlay" class="lightbox-overlay" hidden>
 		<div class="lightbox-modal">
@@ -229,58 +230,38 @@ templ lightboxModal(mediaID, description string, regions []AnnotationRegion, ann
 				<img src="/static/icons/close.svg" width="18" height="18" alt="" class="icon"/>
 			</button>
 			<div class="lightbox-image-wrap">
-				<div class="pattern-layer-rotate-wrap" id="pattern-layer-rotate-wrap">
-					<div class="pattern-layer-stage" id="pattern-layer-wrap" data-media-id={ mediaID } data-info-url={ "/api/iiif/" + mediaID + "/info.json" }>
-						<div id="osd-viewer" class="osd-viewer"></div>
-						<svg id="pattern-layer-svg" class="osd-annotation-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-							<defs>
-								for _, t := range UsedTypeOptions(regions, annotationTypes) {
-									@hatchPatternDef(t)
-								}
-							</defs>
-							for _, r := range regions {
-								@regionShape(r, OptionByID(annotationTypes, r.AnnotationTypeID))
+				<div class="pattern-layer-stage" id="pattern-layer-wrap" data-media-id={ mediaID } data-info-url={ "/api/iiif/" + mediaID + "/info.json" }>
+					<div id="osd-viewer" class="osd-viewer"></div>
+					<svg id="pattern-layer-svg" class="osd-annotation-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+						<defs>
+							for _, t := range UsedTypeOptions(regions, annotationTypes) {
+								@hatchPatternDef(t)
 							}
-						</svg>
-					</div>
+						</defs>
+						for _, r := range regions {
+							@regionShape(r, OptionByID(annotationTypes, r.AnnotationTypeID))
+						}
+					</svg>
 				</div>
 			</div>
+			@patternLayerLegend(regions, annotationTypes)
 			<div class="lightbox-controls">
-				<div class="lightbox-control-row">
-					<label class="lightbox-slider-field">
-						Brightness
-						<input type="range" id="lightbox-brightness" min="50" max="150" value="100"/>
-					</label>
-					<label class="lightbox-slider-field">
-						Contrast
-						<input type="range" id="lightbox-contrast" min="50" max="150" value="100"/>
-					</label>
-					<button type="button" id="lightbox-rotate" class="btn btn-secondary">
-						Rotate
-					</button>
-					<button type="button" id="lightbox-reset" class="btn btn-ghost">
-						Reset
-					</button>
-					<a id="lightbox-download" class="btn btn-secondary" href={ templ.URL("/api/media/" + mediaID + "?variant=original") } download>
-						<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-						Download
-					</a>
-				</div>
 				if len(annotationTypes) == 0 {
 					<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
 				} else {
 					<div class="lightbox-control-row pattern-layer-toolbar">
 						<label class="checkbox-field">
-							<input type="checkbox" id="pattern-layer-add-toggle"/>
+							<input type="checkbox" id="pattern-layer-add-toggle" checked/>
 							+ Add region
 						</label>
-						<label class="pattern-layer-select-field">
-							Tool
-							<select id="pattern-layer-tool" class="input">
-								<option value="rect">Rectangle</option>
-								<option value="freehand">Freehand brush</option>
-							</select>
-						</label>
+						<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
+							<button type="button" id="pattern-layer-tool-rect" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
+								<img src="/static/icons/rectangle.svg" width="16" height="16" alt="" class="icon"/>
+							</button>
+							<button type="button" id="pattern-layer-tool-freehand" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
+								<img src="/static/icons/brush.svg" width="16" height="16" alt="" class="icon"/>
+							</button>
+						</div>
 						<label class="pattern-layer-select-field">
 							Type
 							<select id="pattern-layer-type" class="input">
@@ -291,30 +272,31 @@ templ lightboxModal(mediaID, description string, regions []AnnotationRegion, ann
 						</label>
 					</div>
 				}
-				<form id="lightbox-description-form" class="row-actions" data-media-id={ mediaID }>
-					<textarea id="lightbox-description" name="description" class="input" rows="2" placeholder="Add a note…">{ description }</textarea>
-					<button type="submit" class="btn btn-secondary" title="Save note">
+				<form id="lightbox-description-form" class="lightbox-note-row" data-media-id={ mediaID }>
+					<label for="lightbox-description">Note</label>
+					<input type="text" id="lightbox-description" name="description" class="input" placeholder="Add a note…" value={ description }/>
+					<button type="submit" class="btn btn-secondary" title="Save note" aria-label="Save note">
 						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
-						Save
 					</button>
 				</form>
 			</div>
-			@patternLayerLegend(regions, annotationTypes)
 		</div>
 	</div>
 }
 
-templ mediaViewActions(m Media, hasRegions bool) {
-	<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
+// mediaViewActions is the only place download links appear (the lightbox editor itself has none)
+// - "Download" defaults to the annotated variant (falls back to the plain image server-side when
+// there's nothing marked, see handleGetMedia's variant=annotated branch), with "Download original"
+// alongside it for the unmodified file regardless of what's marked.
+templ mediaViewActions(m Media) {
+	<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=annotated") }>
 		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
 		Download
 	</a>
-	if hasRegions {
-		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=annotated") }>
-			<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-			Download annotated
-		</a>
-	}
+	<a class="btn btn-ghost" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
+		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
+		Download original
+	</a>
 	<a class="btn btn-ghost" href="/media">
 		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
 		Back

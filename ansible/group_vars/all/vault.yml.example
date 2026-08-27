@@ -3,6 +3,8 @@
 #   ansible-vault encrypt group_vars/vault.yml
 # Never commit an unencrypted vault.yml (it's gitignored as a backstop, but ansible-vault encrypt
 # is what actually makes it safe to keep in version control afterwards, if you choose to).
+# #################
+# .vault-pass is a file containing the password to decrypt vault.yml, and is gitignored.
 
 # The sudo ("become") password for whatever account inventory.ini connects as, if that account
 # needs one - harden.yml's very first bootstrap connection often does (a fresh VPS's provider-set

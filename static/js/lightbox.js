@@ -1,12 +1,13 @@
 // Media view's one image viewer/editor (internal/media/views.templ's lightboxModal). Used to be
-// two disconnected overlays - a flat <img> editor (rotate/brightness/contrast/annotate, no real
-// zoom) and a separate read-only OpenSeadragon deep-zoom viewer (annotations rendered, nothing
-// editable) - now merged: OpenSeadragon (static/openseadragon/, vendored - the one deliberate
-// exception to this app's usual "no vendored libraries" convention, since a real IIIF deep-zoom
-// experience needs its tile scheduling/caching rather than something worth hand-rolling) is the
-// single viewing surface, tiling against the existing IIIF Image API info.json (internal/iiif) via
-// its built-in IIIF tile-source support, with rotate/brightness/contrast/draw/description layered
-// on top of that same surface instead of a plain image.
+// two disconnected overlays - a flat <img> editor (annotate, no real zoom) and a separate
+// read-only OpenSeadragon deep-zoom viewer (annotations rendered, nothing editable) - now merged:
+// OpenSeadragon (static/openseadragon/, vendored - the one deliberate exception to this app's
+// usual "no vendored libraries" convention, since a real IIIF deep-zoom experience needs its tile
+// scheduling/caching rather than something worth hand-rolling) is the single viewing surface,
+// tiling against the existing IIIF Image API info.json (internal/iiif) via its built-in IIIF
+// tile-source support. Its own toolbar/navigator are turned off (showNavigationControl/
+// showNavigator: false) - a clean canvas with just the image and the pattern layer on top of it,
+// nothing else.
 //
 // The stored annotation regions (internal/media/annotations.go) are rendered server-side into one
 // 0-100 viewBox <svg id="pattern-layer-svg"> sibling of the OSD mount div. Rather than hand-
@@ -16,54 +17,20 @@
 // directly on this same surface (see the drawing section below): every coordinate a drag produces
 // is converted from on-screen pixels to image-percentage via viewport.viewerElementToImageCoordinates
 // before it's POSTed, so a region is stored (and replayed) in the same percent-of-image space
-// regardless of what zoom/pan it was drawn at.
-//
-// Rotate is a plain CSS transform on #pattern-layer-rotate-wrap, one DOM level above the stage
-// OpenSeadragon actually mounts into and measures (#pattern-layer-wrap) - never on the stage
-// itself, since OpenSeadragon sizes its canvas/tiles from that element's own bounding box, and a
-// transform on the element being measured skews that math (its rotated bounding rect swaps
-// width/height, which visibly confuses OSD's internal layout). Wrapping one level up leaves
-// OpenSeadragon measuring an always-unrotated box and just visually spins the whole
-// already-correctly-rendered result. This also isn't OpenSeadragon's own viewport.setRotation -
-// the vendored 6.1.0 build doesn't actually apply that rotation to anything it renders (confirmed
-// against a bare, from-scratch viewer instance too - not an integration bug here, an upstream
-// limitation). Because of the wrapper approach, rotate and the draw tool are mutually exclusive:
-// entering "+ Add region" mode snaps rotation back to 0 first (drawing math assumes an unrotated
-// stage), and rotating drops out of add-mode if it was armed.
+// regardless of what zoom/pan it was drawn at. Drawing is armed by default (the "+ Add region"
+// checkbox starts checked) - unarm it to pan/zoom around the image with the mouse instead.
 document.addEventListener("DOMContentLoaded", () => {
   const trigger = document.getElementById("lightbox-trigger");
   const overlay = document.getElementById("lightbox-overlay");
   if (!trigger || !overlay) return;
 
   const wrap = document.getElementById("pattern-layer-wrap");
-  const rotateWrap = document.getElementById("pattern-layer-rotate-wrap");
-  const brightness = document.getElementById("lightbox-brightness");
-  const contrast = document.getElementById("lightbox-contrast");
-  const rotateBtn = document.getElementById("lightbox-rotate");
-  const resetBtn = document.getElementById("lightbox-reset");
   const closeBtn = document.getElementById("lightbox-close");
 
   let viewer = null;
   let imageReady = false;
-  let rotation = 0;
 
   // --- Viewer lifecycle -----------------------------------------------------------------------
-
-  function filterTarget() {
-    // The actual tile-drawing surface (canvas, or an SVG in svg-drawer mode) - not
-    // viewer.canvas, which also contains the annotation overlay as a child; filtering that too
-    // would dull the hatch strokes/legend along with the image.
-    return (viewer.drawer && viewer.drawer.canvas) || viewer.canvas;
-  }
-
-  function applyFilters() {
-    if (!viewer) return;
-    filterTarget().style.filter = `brightness(${brightness.value}%) contrast(${contrast.value}%)`;
-  }
-
-  function applyRotation() {
-    rotateWrap.style.transform = rotation ? `rotate(${rotation}deg)` : "";
-  }
 
   function ensureViewer() {
     if (viewer) return;
@@ -72,8 +39,8 @@ document.addEventListener("DOMContentLoaded", () => {
       id: "osd-viewer",
       prefixUrl: "/static/openseadragon/images/",
       tileSources: wrap.dataset.infoUrl,
-      showNavigator: true,
-      navigatorPosition: "BOTTOM_RIGHT",
+      showNavigator: false,
+      showNavigationControl: false,
       gestureSettingsMouse: { clickToZoom: false },
     });
 
@@ -84,17 +51,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (svg) {
         viewer.addOverlay({ element: svg, location: tiledImage.getBounds() });
       }
-      applyFilters();
+      viewer.setMouseNavEnabled(addToggle ? !addToggle.checked : true);
     });
-  }
-
-  function reset() {
-    brightness.value = 100;
-    contrast.value = 100;
-    applyFilters();
-    rotation = 0;
-    applyRotation();
-    if (viewer) viewer.viewport.goHome(true);
   }
 
   function open() {
@@ -106,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function close() {
     overlay.hidden = true;
     document.body.style.overflow = "";
-    reset();
+    if (viewer) viewer.viewport.goHome(true);
   }
 
   trigger.addEventListener("click", open);
@@ -117,18 +75,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !overlay.hidden) close();
   });
-
-  brightness.addEventListener("input", applyFilters);
-  contrast.addEventListener("input", applyFilters);
-  rotateBtn.addEventListener("click", () => {
-    rotation = (rotation + 90) % 360;
-    applyRotation();
-    if (addToggle && addToggle.checked) {
-      addToggle.checked = false;
-      addToggle.dispatchEvent(new Event("change"));
-    }
-  });
-  resetBtn.addEventListener("click", reset);
 
   // --- Whole-image description note ------------------------------------------------------------
 
@@ -150,21 +96,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Pattern-layer draw tool ------------------------------------------------------------------
-  // An "+ Add region" checkbox arms drawing (and freezes OpenSeadragon's own pan/zoom while
-  // armed, so a draw-drag doesn't also move the viewport), a Tool dropdown picks rectangle vs.
-  // freehand brush, and a Type dropdown picks the annotation type ("the reason" for the marked
-  // area) — see internal/media/annotations.go's CreateRegion/CreateFreehandRegion.
+  // The "+ Add region" checkbox (armed by default) freezes OpenSeadragon's own pan/zoom while
+  // checked, so a draw-drag doesn't also move the viewport - uncheck it to pan/zoom instead. Two
+  // icon-toggle buttons pick rectangle vs. freehand brush; a Type <select> picks the annotation
+  // type ("the reason" for the marked area) — see internal/media/annotations.go's
+  // CreateRegion/CreateFreehandRegion.
 
   const addToggle = document.getElementById("pattern-layer-add-toggle");
-  const toolSelect = document.getElementById("pattern-layer-tool");
+  const toolButtons = document.querySelectorAll(".pattern-layer-tool-btn");
   const typeSelect = document.getElementById("pattern-layer-type");
   if (!wrap || !addToggle || !typeSelect) return;
 
+  let currentTool = "rect";
+  toolButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentTool = btn.dataset.tool;
+      toolButtons.forEach((b) => b.classList.toggle("is-active", b === btn));
+    });
+  });
+
+  wrap.classList.toggle("is-add-mode", addToggle.checked);
   addToggle.addEventListener("change", () => {
-    if (addToggle.checked && rotation !== 0) {
-      rotation = 0;
-      applyRotation();
-    }
     wrap.classList.toggle("is-add-mode", addToggle.checked);
     if (viewer) viewer.setMouseNavEnabled(!addToggle.checked);
   });
@@ -210,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // A drag's on-screen pixel position, resolved to a percentage of the full (untiled) image —
-  // stable across whatever zoom/pan/rotation the viewport happens to be at.
+  // stable across whatever zoom/pan the viewport happens to be at.
   function pixelToImagePct(clientX, clientY) {
     const rect = wrap.getBoundingClientRect();
     const point = new OpenSeadragon.Point(clientX - rect.left, clientY - rect.top);
@@ -321,7 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wrap.addEventListener("mousedown", (e) => {
     if (!addToggle.checked || !typeSelect.value || !imageReady) return;
     e.preventDefault();
-    if (toolSelect && toolSelect.value === "freehand") {
+    if (currentTool === "freehand") {
       startFreehandDrag(e);
     } else {
       startRectDrag(e);

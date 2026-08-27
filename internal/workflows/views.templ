@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"sort"
 	"strconv"
 
 	"studio/internal/assessments"
@@ -27,6 +28,7 @@ templ listBody(rows []ListRow, stages []settings.Classifier, locale i18n.Locale)
 			<img src="/static/icons/search.svg" width="16" height="16" alt="" class="icon"/>
 			<input type="text" id="kanban-search" placeholder="Search by title, asset, client…"/>
 		</span>
+		@web.EntityListFilterSelect("client", "All clients", distinctClientOptions(rows))
 	</div>
 	<div class="kanban-board" id="kanban-board" data-url-template="/projects/{id}/stage" data-status-field="stage">
 		for _, stage := range stages {
@@ -49,7 +51,7 @@ templ listBody(rows []ListRow, stages []settings.Classifier, locale i18n.Locale)
 }
 
 templ kanbanCard(row ListRow) {
-	<div class="kanban-card" draggable="true" data-item-id={ row.ID } data-search={ kanbanCardSearchHaystack(row) } data-href={ "/projects/" + row.ID }>
+	<div class="kanban-card" draggable="true" data-item-id={ row.ID } data-search={ kanbanCardSearchHaystack(row) } data-href={ "/projects/" + row.ID } data-el-client={ row.ClientName }>
 		<a href={ templ.URL("/projects/" + row.ID) } class="entity-list-name">{ row.Title }</a>
 		<div class="page-subtitle">
 			if row.AssetTitle.Valid {
@@ -57,9 +59,31 @@ templ kanbanCard(row ListRow) {
 			} else {
 				{ row.AssetReferenceCode }
 			}
-			· owner: { row.ClientName }
 		</div>
+		<span class="badge tag-chip" data-el-tag-filter="client" data-el-tag-value={ row.ClientName } role="button" tabindex="0">{ row.ClientName }</span>
 	</div>
+}
+
+// distinctClientOptions builds the "All clients" filter's options from whatever client names
+// actually appear across the board's rows (there's no separate Client classifier to draw from
+// here, unlike the method/condition/status filters other module list pages use) - sorted
+// alphabetically so the dropdown stays predictable as projects come and go.
+func distinctClientOptions(rows []ListRow) []web.FilterOption {
+	seen := make(map[string]bool)
+	var names []string
+	for _, row := range rows {
+		if row.ClientName == "" || seen[row.ClientName] {
+			continue
+		}
+		seen[row.ClientName] = true
+		names = append(names, row.ClientName)
+	}
+	sort.Strings(names)
+	out := make([]web.FilterOption, len(names))
+	for i, name := range names {
+		out[i] = web.FilterOption{Value: name, Label: name}
+	}
+	return out
 }
 
 func kanbanCardSearchHaystack(row ListRow) string {

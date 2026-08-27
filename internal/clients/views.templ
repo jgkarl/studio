@@ -19,13 +19,19 @@ templ listBody(rows []ListRow, typeLabels map[string]string, clientTypes []setti
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by name, email…")
 			@web.EntityListFilterSelect("clientType", "All types", classifierFilterOptionsFromLabels(clientTypes, typeLabels))
+			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "clientType", Label: "Type"}})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No clients yet.</p>
 		}
 		<ul class="entity-list" data-el-list>
 			for _, row := range rows {
-				<li data-el-row data-el-search={ clientSearchHaystack(row, typeLabels) } data-el-client-type={ row.Type }>
+				<li
+					data-el-row
+					data-el-search={ clientSearchHaystack(row, typeLabels) }
+					data-el-client-type={ row.Type }
+					data-el-group-client-type={ labelFor(typeLabels, row.Type) }
+				>
 					<a href={ templ.URL("/clients/" + row.ID) } class="entity-list-row">
 						<span class="avatar-chip">{ clientInitials(row.Name) }</span>
 						<div>

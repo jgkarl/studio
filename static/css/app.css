@@ -38,6 +38,7 @@
   --blue-text: #014682;
   --neutral-bg: var(--gray-100);
   --neutral-text: var(--text);
+  --stripe-even: #FBF3E0;
 
   --header-bg: linear-gradient(96.04deg, var(--yellow-100) -17.14%, var(--blue-100) 94.45%);
   --shadow-sm: 0px 10px 80px rgba(0,0,0,0.02275), 0px 5.0625px 34.875px rgba(0,0,0,0.035), 0px 2px 13px rgba(0,0,0,0.04725), 0px 0.4375px 4.625px rgba(0,0,0,0.07);
@@ -56,6 +57,7 @@ html[data-theme="dark"] {
   --accent: var(--green-500);
   --accent-text: #ffffff;
   --neutral-bg: var(--gray-700);
+  --stripe-even: #3A331F;
   --header-bg: linear-gradient(96.04deg, var(--yellow-900) -17.14%, var(--blue-900) 94.45%);
   --shadow: none;
   --shadow-sm: none;
@@ -555,8 +557,13 @@ html[data-theme="dark"] .nav-toggle-btn {
 .navbar-pill-btn {
   background: transparent;
   border: 1px solid rgba(36, 42, 48, 0.25);
-  border-radius: 9999px;
-  padding: 8px 12px;
+  border-radius: 4px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -1395,14 +1402,6 @@ html[data-theme="dark"] .stat-card {
   gap: 1rem;
 }
 
-.lightbox-slider-field {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
 .media-view-video {
   max-height: 60vh;
   width: 100%;
@@ -1452,16 +1451,6 @@ html[data-theme="dark"] .stat-card {
    math — new regions are drawn directly on this same surface. A legend is always rendered
    underneath, whether or not anything's marked yet. */
 
-/* Rotate is applied to this wrapper, one level above .pattern-layer-stage - never to the stage
-   itself, since OpenSeadragon measures that element's own box for its canvas/tile layout, and a
-   transform on the element being measured skews its bounding-rect-based size math. Keeping the
-   transform one level up leaves OpenSeadragon measuring an always-unrotated box, and just visually
-   spins the whole already-correctly-sized result. */
-.pattern-layer-rotate-wrap {
-  width: 100%;
-  transition: transform 0.2s ease;
-}
-
 .pattern-layer-stage {
   position: relative;
   width: 100%;
@@ -1499,6 +1488,37 @@ html[data-theme="dark"] .stat-card {
   align-items: center;
 }
 
+.pattern-layer-tool-group {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+/* Icon-toggle buttons picking rect vs. freehand-brush - same is-active/accent-highlight
+   convention as .album-kind-btn (internal/media/views.templ's albumBody kind filter). */
+.pattern-layer-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pattern-layer-tool-btn:hover {
+  background: var(--neutral-bg);
+}
+
+.pattern-layer-tool-btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
 .pattern-layer-select-field {
   display: flex;
   align-items: center;
@@ -1509,6 +1529,28 @@ html[data-theme="dark"] .stat-card {
 
 .pattern-layer-select-field select {
   width: auto;
+}
+
+/* Whole-image description note: label, field, and the save button all on one row. */
+.lightbox-note-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lightbox-note-row label {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.lightbox-note-row input {
+  flex: 1;
+}
+
+.lightbox-note-row button {
+  flex-shrink: 0;
+  padding: 0.5rem;
 }
 
 .pattern-layer-swatch {
@@ -1565,8 +1607,8 @@ html[data-theme="dark"] .stat-card {
 
 /* Full-bleed 5-column board (Orders) - breaks out of .container's 1200px max-width to use the
    full viewport instead of horizontal-scrolling fixed-width columns. */
-/* Mobile-first: 1 column by default, 2 at sm (a phone in landscape or a small tablet), 3 at md
-   (tablet portrait — 5 stages wrap 3/2), 5 — one row — at lg and up, where there's finally room. */
+/* Mobile-first: a single column below lg (no cramped 2/3-column in-between state — 5 real stage
+   columns need real width), all 5 stage columns in one row at lg and up. */
 .kanban-board {
   display: grid;
   grid-template-columns: 1fr;
@@ -1580,18 +1622,6 @@ html[data-theme="dark"] .stat-card {
   margin-right: -50vw;
   padding-inline: 1.5rem;
   box-sizing: border-box;
-}
-
-@media (min-width: 640px) {
-  .kanban-board {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 768px) {
-  .kanban-board {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 @media (min-width: 1024px) {
@@ -1794,7 +1824,7 @@ html[data-theme="dark"] .kanban-card {
 }
 
 [data-el-root] [data-el-row]:nth-child(even) > .entity-list-row {
-  background: var(--neutral-bg);
+  background: var(--stripe-even);
 }
 
 [data-el-root] .entity-list-row:hover {

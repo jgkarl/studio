@@ -19,7 +19,11 @@ templ listBody(rows []ListRow, methodLabels map[string]string, methods []setting
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, asset, client…")
 			@web.EntityListFilterSelect("method", "All methods", classifierFilterOptionsFromLabels(methods, methodLabels))
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "asset", Label: "Asset"},
+				{Value: "client", Label: "Client"},
+				{Value: "method", Label: "Method"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No treatments logged yet.</p>
@@ -32,6 +36,7 @@ templ listBody(rows []ListRow, methodLabels map[string]string, methods []setting
 					data-el-method={ row.Method }
 					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
 					data-el-group-client={ row.ClientName }
+					data-el-group-method={ methodLabel(methodLabels, row.Method) }
 				>
 					<a href={ templ.URL("/treatments/" + row.ID) } class="entity-list-row">
 						<div>

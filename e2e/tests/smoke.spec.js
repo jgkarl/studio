@@ -220,7 +220,9 @@ test.describe("Studio golden path", () => {
 
     await page.click("#lightbox-trigger");
     await expect(page.locator("#lightbox-overlay")).toBeVisible();
-    await page.click("#lightbox-rotate");
+    // Add-region mode is armed by default (see static/js/lightbox.js) - confirm the toolbar it
+    // shows/hides reflects that.
+    await expect(page.locator("#pattern-layer-add-toggle")).toBeChecked();
     await shoot(page, "18-media-lightbox.png");
     await page.click("#lightbox-close");
     await expect(page.locator("#lightbox-overlay")).toBeHidden();

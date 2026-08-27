@@ -19,7 +19,11 @@ templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Loc
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by asset, client…")
 			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "asset", Label: "Asset"},
+				{Value: "client", Label: "Client"},
+				{Value: "condition", Label: "Condition"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No assessments recorded yet.</p>
@@ -32,6 +36,7 @@ templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Loc
 					data-el-condition={ row.Condition }
 					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
 					data-el-group-client={ row.ClientName }
+					data-el-group-condition={ row.Condition }
 				>
 					<a href={ templ.URL("/assessments/" + row.ID) } class="entity-list-row">
 						<div>

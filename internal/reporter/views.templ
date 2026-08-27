@@ -19,7 +19,11 @@ templ listBody(rows []ListRow) {
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, asset, author…")
 			@web.EntityListFilterSelect("status", "All statuses", []web.FilterOption{{Value: "draft", Label: "Draft"}, {Value: "final", Label: "Final"}})
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "asset", Label: "Asset"},
+				{Value: "client", Label: "Client"},
+				{Value: "status", Label: "Status"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No reports yet.</p>
@@ -32,6 +36,7 @@ templ listBody(rows []ListRow) {
 					data-el-status={ row.Status }
 					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
 					data-el-group-client={ row.ClientName }
+					data-el-group-status={ statusLabel(row.Status) }
 				>
 					<a href={ templ.URL("/reports/" + row.ID) } class="entity-list-row">
 						<div>
@@ -68,6 +73,15 @@ func assetLabel(title sql.NullString, referenceCode string) string {
 		return title.String
 	}
 	return referenceCode
+}
+
+// statusLabel is the "Group by Status" group header text for a report row - mirrors the
+// Final/Draft badge label the row itself already shows, rather than the raw "final"/"draft" code.
+func statusLabel(status string) string {
+	if status == "final" {
+		return "Final"
+	}
+	return "Draft"
 }
 
 func reportSearchHaystack(row ListRow) string {

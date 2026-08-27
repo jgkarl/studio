@@ -25,7 +25,11 @@ templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []se
 			@web.EntityListSearchInput("Search by title, artist, reference code…")
 			@web.EntityListFilterSelect("assetType", "All types", settings.ClassifierFilterOptions(assetTypes, locale))
 			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "client", Label: "Client"},
+				{Value: "assetType", Label: "Type"},
+				{Value: "condition", Label: "Condition"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No assets yet.</p>
@@ -38,6 +42,8 @@ templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []se
 					data-el-asset-type={ row.AssetTypeCode }
 					data-el-condition={ row.CurrentStateCondition.String }
 					data-el-group-client={ row.ClientName }
+					data-el-group-asset-type={ row.AssetTypeTitle }
+					data-el-group-condition={ row.CurrentStateCondition.String }
 				>
 					<a href={ templ.URL("/assets/" + row.ID) } class="entity-list-row">
 						@assetThumb(row)
@@ -49,9 +55,10 @@ templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []se
 									{ row.ReferenceCode }
 								}
 							</span>
-							<div class="page-subtitle">{ row.ReferenceCode } · { row.AssetTypeTitle } · owner: { row.ClientName }</div>
+							<div class="page-subtitle">{ row.ReferenceCode } · owner: { row.ClientName }</div>
 						</div>
 						<div class="row-actions">
+							<span class="badge tag-chip" data-el-tag-filter="assetType" data-el-tag-value={ row.AssetTypeCode } role="button" tabindex="0">{ row.AssetTypeTitle }</span>
 							if row.CurrentStateCondition.Valid {
 								<span class="badge badge-amber tag-chip" data-el-tag-filter="condition" data-el-tag-value={ row.CurrentStateCondition.String } role="button" tabindex="0">{ row.CurrentStateCondition.String }</span>
 							}
