@@ -1652,6 +1652,11 @@ html[data-theme="dark"] .stat-card {
   border-radius: 0.5rem;
   overflow: hidden;
   background: var(--bg);
+  /* Hands every touch gesture over this stage to JS (OpenSeadragon's own pan/pinch-zoom,
+     static/js/media-editor.js's touch region-drawing) instead of the browser's default touch
+     handling - without it, mobile Safari/Chrome can intercept a drag as a page-scroll/pull-to-
+     refresh gesture (or add its own tap-recognition delay) before either ever sees it. */
+  touch-action: none;
 }
 
 .osd-viewer {

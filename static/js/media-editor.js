@@ -290,4 +290,73 @@ document.addEventListener("DOMContentLoaded", () => {
     if (dragBox) endRectDrag(e);
     else if (freehandPoints) endFreehandDrag();
   });
+
+  // --- Touch wiring (phone/tablet) -------------------------------------------------------------
+  // Mirrors the mouse wiring above exactly rather than duplicating the drag logic - every start/
+  // move/end helper only ever reads clientX/clientY off whatever event it's given, so a touch's
+  // own coordinates thread straight through unchanged via this tiny adapter. preventDefault is
+  // only called once a draw is actually happening, so it never blocks normal page scrolling; while
+  // it is, it also stops OpenSeadragon's own touch pan/zoom from fighting the same gesture - moot
+  // in practice since setMouseNavEnabled(false) (the addToggle "change" handler above) already
+  // disables OSD's tracker for both mouse and touch input whenever add-mode is armed, but the two
+  // together make the intent explicit.
+
+  function touchPoint(touchEvent, list) {
+    const t = touchEvent[list][0];
+    return { clientX: t.clientX, clientY: t.clientY };
+  }
+
+  function abandonTouchDraw() {
+    if (dragBox) {
+      dragBox.remove();
+      dragBox = null;
+      dragStartClient = null;
+    }
+    if (previewPolyline) {
+      previewPolyline.remove();
+      previewPolyline = null;
+      freehandPoints = null;
+    }
+  }
+
+  wrap.addEventListener(
+    "touchstart",
+    (e) => {
+      if (!addToggle.checked || !typeSelect.value || !imageReady || e.touches.length !== 1) return;
+      e.preventDefault();
+      const point = touchPoint(e, "touches");
+      if (currentTool === "freehand") {
+        startFreehandDrag(point);
+      } else {
+        startRectDrag(point);
+      }
+    },
+    { passive: false }
+  );
+
+  window.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!dragBox && !freehandPoints) return;
+      if (e.touches.length > 1) {
+        // A second finger showed up mid-draw (a pinch-zoom attempt, most likely) - abandon the
+        // in-progress region rather than keep drawing from a now-ambiguous single touch point.
+        abandonTouchDraw();
+        return;
+      }
+      e.preventDefault();
+      const point = touchPoint(e, "touches");
+      if (dragBox) moveRectDrag(point);
+      else if (freehandPoints) moveFreehandDrag(point);
+    },
+    { passive: false }
+  );
+
+  window.addEventListener("touchend", (e) => {
+    if (!dragBox && !freehandPoints) return;
+    if (dragBox) endRectDrag(touchPoint(e, "changedTouches"));
+    else if (freehandPoints) endFreehandDrag();
+  });
+
+  window.addEventListener("touchcancel", abandonTouchDraw);
 });
