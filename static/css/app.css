@@ -1460,79 +1460,7 @@ html[data-theme="dark"] .stat-card {
   text-overflow: ellipsis;
 }
 
-/* --- Media view image + lightbox + video --------------------------------------------------- */
-
-.lightbox-trigger {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: zoom-in;
-}
-
-.lightbox-trigger img {
-  display: block;
-  max-height: 60vh;
-  width: 100%;
-  object-fit: contain;
-  border-radius: 0.5rem;
-  background: #1c1917;
-}
-
-.lightbox-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.85);
-}
-
-.lightbox-overlay:not([hidden]) {
-  display: flex;
-}
-
-.lightbox-modal {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 80vw;
-  max-width: 80vw;
-  height: 80vh;
-  max-height: 80vh;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: var(--surface);
-  overflow-y: auto;
-}
-
-.lightbox-close {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 10;
-  padding: 0.4rem;
-  border: 0;
-  border-radius: 999px;
-  background: var(--bg);
-  cursor: pointer;
-}
-
-.lightbox-close:hover {
-  background: var(--neutral-bg);
-}
-
-.lightbox-image-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-}
+/* --- Media view image + video ---------------------------------------------------------------- */
 
 .lightbox-controls {
   display: flex;
@@ -1588,13 +1516,14 @@ html[data-theme="dark"] .stat-card {
 }
 
 /* --- Pattern layer / deep-zoom viewer ----------------------------------------------------------
-   The media view's one image viewer/editor (static/js/lightbox.js): OpenSeadragon deep zoom
-   against the IIIF Image API is the viewing surface (.osd-viewer), with the stored annotation
-   regions (internal/media/annotations.go — rectangles or freehand-brush outlines) rendered into a
-   0-100 viewBox SVG that OpenSeadragon manages as one of its own overlays (viewer.addOverlay) so
-   it tracks pan/zoom/rotation automatically instead of needing hand-rolled viewport-transform
-   math — new regions are drawn directly on this same surface. A legend is always rendered
-   underneath, whether or not anything's marked yet. */
+   Shared by the plain view page (static/js/media-viewer.js, read-only, no overlay/toolbar) and the
+   edit page (static/js/media-editor.js): OpenSeadragon deep zoom against the IIIF Image API is the
+   viewing surface (.osd-viewer), with, on the edit page only, the stored annotation regions
+   (internal/media/annotations.go — rectangles or freehand-brush outlines) rendered into a 0-100
+   viewBox SVG that OpenSeadragon manages as one of its own overlays (viewer.addOverlay) so it
+   tracks pan/zoom automatically instead of needing hand-rolled viewport-transform math — new
+   regions are drawn directly on this same surface. A legend is always rendered underneath the
+   editor's image, whether or not anything's marked yet. */
 
 .pattern-layer-stage {
   position: relative;
@@ -1676,7 +1605,8 @@ html[data-theme="dark"] .stat-card {
   width: auto;
 }
 
-/* Whole-image description note: label, field, and the save button all on one row. */
+/* Whole-image description note: label + field on one row — saved together with the region set by
+   the edit page's one general Save button (.media-edit-save-row), not its own inline button. */
 .lightbox-note-row {
   display: flex;
   align-items: center;
@@ -1693,16 +1623,75 @@ html[data-theme="dark"] .stat-card {
   flex: 1;
 }
 
-.lightbox-note-row button {
-  flex-shrink: 0;
-  padding: 0.5rem;
+.media-edit-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Download-with-a-secondary-option split button (media view's "Download" / "Original") - a plain
+   <details> disclosure for the caret side, no JS needed, same no-framework convention as Settings'
+   annotation-type-edit popout. */
+.split-btn {
+  position: relative;
+  display: inline-flex;
+}
+
+.split-btn-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.split-btn-toggle summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+}
+
+.split-btn-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.split-btn-caret {
+  height: 100%;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.split-btn-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.split-btn-menu-item {
+  display: block;
+  padding: 0.5rem 0.625rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.split-btn-menu-item:hover {
+  background: var(--neutral-bg);
 }
 
 .pattern-layer-swatch {
   display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 0.1875rem;
+  width: 1.375rem;
+  height: 1.375rem;
   flex: none;
 }
 
@@ -1710,10 +1699,12 @@ html[data-theme="dark"] .stat-card {
   margin-top: 0.25rem;
 }
 
+/* Two even columns rather than one flowing list — a legend of loss/damage types reads faster
+   scanned down two short columns than one long one. */
 .pattern-layer-legend-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem 1rem;
   margin-bottom: 0.5rem;
 }
 

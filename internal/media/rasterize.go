@@ -21,7 +21,58 @@ import (
 	"studio/internal/settings"
 )
 
-const legendRowHeight = 26
+const (
+	legendRowHeight  = 34 // taller than a plain 16px color swatch to fit legendSwatchSize's pattern preview
+	legendSwatchSize = 22 // was a flat 16x16 solid-color square - big enough now to actually show the hatch, not just the color
+	legendColGap     = 24
+)
+
+// legendMarkup renders the "used annotation types" legend as SVG fragments - shared by
+// RenderAnnotatedImage's on-demand flatten and BakeAnnotatedVersion's saved composite so both
+// present regions the same way: each swatch is its own small tiled-pattern rect (not a flat color
+// fill) so the legend actually distinguishes types by pattern as well as color, matching what's
+// drawn on the image itself. Lays out two columns once there's more than one type to list (a
+// single column would waste half the available width), one otherwise. containerWidth/sidePadding
+// describe the horizontal space the legend has to fill; height is the vertical space it took up,
+// for the caller to lay out whatever comes next.
+func legendMarkup(usedTypes []AnnotationTypeOption, containerWidth, sidePadding int) (markup string, height int) {
+	if len(usedTypes) == 0 {
+		return "", 0
+	}
+	cols := 1
+	if len(usedTypes) > 1 {
+		cols = 2
+	}
+	colWidth := containerWidth - 2*sidePadding
+	if cols == 2 {
+		colWidth = (colWidth - legendColGap) / 2
+	}
+	rows := (len(usedTypes) + cols - 1) / cols
+	height = legendRowHeight/2 + rows*legendRowHeight
+
+	var defs, items strings.Builder
+	for i, t := range usedTypes {
+		col, row := i%cols, i/cols
+		x := sidePadding + col*(colWidth+legendColGap)
+		y := row * legendRowHeight
+		patID := fmt.Sprintf("legend-pattern-%d", i)
+		fmt.Fprintf(&defs,
+			`<pattern id="%s" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(%d)">`+
+				`<line x1="0" y1="1" x2="4" y2="1" stroke="%s" stroke-width="1.4"/></pattern>`,
+			patID, HatchAngle(t.Hatch), html.EscapeString(t.Color))
+		fmt.Fprintf(&items,
+			`<g transform="translate(%d, %d)">`+
+				`<rect width="%d" height="%d" rx="5" fill="url(#%s)" fill-opacity="0.8"/>`+
+				`<rect x="1" y="1" width="%d" height="%d" rx="4" fill="none" stroke="%s" stroke-width="1.5"/>`+
+				`<text x="%d" y="%d" font-family="sans-serif" font-size="15" fill="#111111">%s</text>`+
+				`</g>`,
+			x, y,
+			legendSwatchSize, legendSwatchSize, patID,
+			legendSwatchSize-2, legendSwatchSize-2, html.EscapeString(t.Color),
+			legendSwatchSize+8, legendSwatchSize-6, html.EscapeString(t.Label))
+	}
+	return "<defs>" + defs.String() + "</defs>" + items.String(), height
+}
 
 // RenderAnnotatedImage flattens a Media image's drawn regions (see annotations.go) and their
 // legend into the image itself: builds one standalone SVG (the "web" variant as a data: URI, the
@@ -65,15 +116,7 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 	}
 
 	usedTypes := UsedTypeOptions(regions, annotationTypes)
-	legendHeight := 0
-	var legend bytes.Buffer
-	if len(usedTypes) > 0 {
-		legendHeight = legendRowHeight/2 + len(usedTypes)*legendRowHeight
-		for i, t := range usedTypes {
-			fmt.Fprintf(&legend, `<g transform="translate(16, %d)"><rect width="16" height="16" fill="%s"/><text x="24" y="13" font-family="sans-serif" font-size="15" fill="#111111">%s</text></g>`,
-				i*legendRowHeight, html.EscapeString(t.Color), html.EscapeString(t.Label))
-		}
-	}
+	legend, legendHeight := legendMarkup(usedTypes, width, 16)
 
 	dataURI := "data:" + file.MimeType + ";base64," + base64.StdEncoding.EncodeToString(file.Data)
 	totalHeight := height + legendHeight
@@ -83,7 +126,7 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 		`<svg x="0" y="0" width="%d" height="%d" viewBox="0 0 100 100" preserveAspectRatio="none">`+
 		`<image xlink:href="%s" x="0" y="0" width="100" height="100"/>%s</svg>`+
 		`<g transform="translate(0, %d)">%s</g></svg>`,
-		width, totalHeight, width, totalHeight, width, height, dataURI, shapes.String(), height, legend.String())
+		width, totalHeight, width, totalHeight, width, height, dataURI, shapes.String(), height, legend)
 
 	rendered, err := vips.NewImageFromBuffer([]byte(svg))
 	if err != nil {
@@ -105,8 +148,8 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 const (
 	bakeMaxDimension  = 4000 // cap on the long edge - a real deliverable, not a thumbnail, but still bounded against pathological raw-camera-file memory use
 	bakeSidePadding   = 24
-	bakeDividerGap    = 16
-	bakeDividerHeight = 6
+	bakeDividerGap    = 16 // breathing room both above the divider (before it) and below the legend (after it) - the same gap on both sides of that section
+	bakeDividerHeight = 1  // a hairline rule, not a thick color bar - see BakeAnnotatedVersion
 	bakeNoteFontSize  = 15
 	bakeNoteLineGap   = 6
 	bakeNoteCharWidth = 8 // rough average glyph advance at bakeNoteFontSize, for word-wrap width estimation
@@ -179,14 +222,13 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 	}
 
 	usedTypes := UsedTypeOptions(regions, annotationTypes)
-	legendHeight := 0
-	var legend bytes.Buffer
-	if len(usedTypes) > 0 {
-		legendHeight = legendRowHeight/2 + len(usedTypes)*legendRowHeight
-		for i, t := range usedTypes {
-			fmt.Fprintf(&legend, `<g transform="translate(%d, %d)"><rect width="16" height="16" fill="%s"/><text x="24" y="13" font-family="sans-serif" font-size="15" fill="#111111">%s</text></g>`,
-				bakeSidePadding, i*legendRowHeight, html.EscapeString(t.Color), html.EscapeString(t.Label))
-		}
+	legend, legendHeight := legendMarkup(usedTypes, imgW, bakeSidePadding)
+	// The same gap that separates the image from the divider ("top of legend") also separates the
+	// legend from whatever follows ("bottom of legend") - symmetric breathing room around the
+	// whole legend block, not just above it.
+	legendBottomPad := 0
+	if legendHeight > 0 {
+		legendBottomPad = bakeDividerGap
 	}
 
 	noteLines := wrapText(target.Description.String, (imgW-2*bakeSidePadding)/bakeNoteCharWidth)
@@ -202,7 +244,8 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 
 	dividerY := imgH + bakeDividerGap
 	belowDividerY := dividerY + bakeDividerHeight + bakeDividerGap
-	totalHeight := belowDividerY + legendHeight + noteHeight
+	noteY := belowDividerY + legendHeight + legendBottomPad
+	totalHeight := noteY + noteHeight
 	if legendHeight == 0 && noteHeight == 0 {
 		// Nothing to caption - just the (grayscale) image itself, no divider floating with
 		// nothing underneath it.
@@ -222,7 +265,7 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 		`<image xlink:href="%s" x="0" y="0" width="100" height="100"/>%s</svg>`+
 		`%s<g transform="translate(0, %d)">%s</g><g transform="translate(0, %d)">%s</g></svg>`,
 		imgW, totalHeight, imgW, totalHeight, imgW, imgH, dataURI, shapes.String(),
-		divider, belowDividerY, legend.String(), belowDividerY+legendHeight, note.String())
+		divider, belowDividerY, legend, noteY, note.String())
 
 	rendered, err := vips.NewImageFromBuffer([]byte(svg))
 	if err != nil {

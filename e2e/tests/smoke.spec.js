@@ -209,7 +209,7 @@ test.describe("Studio golden path", () => {
     await shoot(page, "16b-project-finished.png");
   });
 
-  test("media grid shows uploaded photos and the lightbox opens", async () => {
+  test("media grid shows uploaded photos and the deep-zoom edit page works", async () => {
     await page.goto("/media");
     await shoot(page, "17-media-grid.png");
 
@@ -218,20 +218,24 @@ test.describe("Studio golden path", () => {
     await firstImage.click();
     await expect(page).toHaveURL(/\/media\/view\/[a-f0-9-]+$/);
 
-    // A true original's own lightbox is view-only (deep zoom, no annotation toolbar) - annotating
-    // it means starting an annotated version first (see internal/media/views.templ's
-    // annotatedVersionsCard/CreateAnnotatedVersion), which gets its own page to actually draw on.
-    await page.click('form[action*="/annotated-versions"] button[type="submit"]');
-    await expect(page).toHaveURL(/\/media\/view\/[a-f0-9-]+$/);
+    // media/view/<id> embeds a deep-zoom viewer directly on the page — no click-to-open modal
+    // needed (see internal/media/views.templ's mediaViewBody / static/js/media-viewer.js).
+    await expect(page.locator("#media-view-stage")).toBeVisible();
 
-    await page.click("#lightbox-trigger");
-    await expect(page.locator("#lightbox-overlay")).toBeVisible();
-    // Add-region mode is armed by default (see static/js/lightbox.js) - confirm the toolbar it
-    // shows/hides reflects that.
+    // A true original is view-only - annotating it means starting an annotated version first (see
+    // annotatedVersionsCard/CreateAnnotatedVersion), which now lands straight on its own edit page
+    // (/media/edit/{id}) to actually draw on, rather than opening a modal.
+    await page.click('form[action*="/annotated-versions"] button[type="submit"]');
+    await expect(page).toHaveURL(/\/media\/edit\/[a-f0-9-]+$/);
+
+    // Add-region mode is armed by default (see static/js/media-editor.js).
     await expect(page.locator("#pattern-layer-add-toggle")).toBeChecked();
     await shoot(page, "18-media-lightbox.png");
-    await page.click("#lightbox-close");
-    await expect(page.locator("#lightbox-overlay")).toBeHidden();
+
+    // The Save button persists the note + bakes the version, then returns to the view page.
+    await page.click("#media-edit-save");
+    await expect(page).toHaveURL(/\/media\/view\/[a-f0-9-]+$/);
+    await expect(page.locator("a.btn:has-text('Edit')")).toBeVisible();
   });
 
   test("Settings Users table lists accounts", async () => {

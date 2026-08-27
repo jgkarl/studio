@@ -122,20 +122,17 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 			}
 		</div>
 		if m.Kind == KindImage {
-			<button type="button" id="lightbox-trigger" class="lightbox-trigger" data-media-id={ m.ID } aria-label="Open image viewer">
-				if m.IsAnnotatedVersion() && !m.IsBaked() {
-					<p class="empty-state" style="margin:0;padding:3rem 1rem;">Not saved yet — open the editor, mark a region, then close it to save this version.</p>
-				} else {
-					<img src={ "/api/media/" + m.ID } alt=""/>
-				}
-			</button>
-			<p class="page-subtitle" style="text-align: center; margin-top: 0.5rem;">
-				if m.IsAnnotatedVersion() {
-					Click to open · zoom, annotate
-				} else {
-					Click to open · zoom
-				}
-			</p>
+			if m.IsAnnotatedVersion() && !m.IsBaked() {
+				<div class="empty-state" style="padding:3rem 1rem;text-align:center;">
+					<p style="margin:0 0 0.75rem;">Not saved yet — open the editor and mark a region to save this version.</p>
+					<a href={ templ.URL("/media/edit/" + m.ID) } class="btn btn-primary">
+						<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+						Open editor
+					</a>
+				</div>
+			} else {
+				<div class="pattern-layer-stage" id="media-view-stage" data-info-url={ "/api/iiif/" + m.ID + "/info.json" }></div>
+			}
 		}
 		if m.Kind == KindVideo {
 			<video controls class="media-view-video" src={ "/api/media/" + m.ID + "?variant=original" }></video>
@@ -148,9 +145,8 @@ templ mediaViewBody(m Media, uploadedByName string, reference *Reference, region
 		@annotatedVersionsCard(m, derivedVersions)
 	}
 	if m.Kind == KindImage {
-		@lightboxModal(m, regions, annotationTypes, source)
 		<script src="/static/openseadragon/openseadragon.min.js" defer></script>
-		<script src="/static/js/lightbox.js" defer></script>
+		<script src="/static/js/media-viewer.js" defer></script>
 	}
 }
 
@@ -242,7 +238,7 @@ templ patternLayerLegend(regions []AnnotationRegion, annotationTypes []Annotatio
 			<div class="pattern-layer-legend-swatches">
 				for _, t := range UsedTypeOptions(regions, annotationTypes) {
 					<div class="pattern-layer-legend-item">
-						<span class="pattern-layer-swatch" style={ "background-color:" + t.Color }></span>
+						@legendSwatch(t)
 						{ t.Label }
 					</div>
 				}
@@ -263,94 +259,133 @@ templ patternLayerLegend(regions []AnnotationRegion, annotationTypes []Annotatio
 	</div>
 }
 
+// liveLegendSwatchSize is legendSwatch's own physical render size (its viewBox matches it 1:1, unlike
+// the main pattern-layer-svg's 0-100-regardless-of-physical-size viewBox) - hatchTileSize's "2"
+// tuned for that much bigger overlay would resolve to a fraction of a screen pixel per stripe here
+// and anti-alias into a flat wash, so the swatch needs its own, coarser tile sized for how small it
+// actually renders.
+const liveLegendSwatchSize = 22
+
+// legendSwatch previews one annotation type's actual hatch pattern (not just its flat color, the
+// old plain CSS-background square) - a small standalone SVG under its own pattern id
+// (legend-pattern-{ID}) so it doesn't collide with the live pattern-layer-svg's own <defs> when
+// both are on the same page (the edit view).
+templ legendSwatch(t AnnotationTypeOption) {
+	<svg
+		class="pattern-layer-swatch"
+		viewBox={ "0 0 " + strconv.Itoa(liveLegendSwatchSize) + " " + strconv.Itoa(liveLegendSwatchSize) }
+		xmlns="http://www.w3.org/2000/svg"
+	>
+		<defs>
+			<pattern
+				id={ "legend-pattern-" + t.ID }
+				width="4"
+				height="4"
+				patternUnits="userSpaceOnUse"
+				patternTransform={ "rotate(" + strconv.Itoa(HatchAngle(t.Hatch)) + ")" }
+			>
+				<line x1="0" y1="1" x2="4" y2="1" stroke={ t.Color } stroke-width="1.6"></line>
+			</pattern>
+		</defs>
+		<rect width={ strconv.Itoa(liveLegendSwatchSize) } height={ strconv.Itoa(liveLegendSwatchSize) } rx="5" fill={ "url(#legend-pattern-" + t.ID + ")" } fill-opacity="0.85"></rect>
+		<rect x="1" y="1" width={ strconv.Itoa(liveLegendSwatchSize - 2) } height={ strconv.Itoa(liveLegendSwatchSize - 2) } rx="4" fill="none" stroke={ t.Color } stroke-width="1.5"></rect>
+	</svg>
+}
+
 func formatPct(n float64) string {
 	return strconv.FormatFloat(n, 'f', 3, 64)
 }
 
-// lightboxModal is the media module's one image viewer/editor: real OpenSeadragon deep zoom
-// (static/openseadragon/, vendored — the one deliberate exception to this app's usual
-// "no vendored libraries" rule, see static/js/lightbox.js's header comment) against the real IIIF
-// Image API (internal/iiif) as the viewing surface - a clean canvas with no OpenSeadragon toolbar/
-// navigator, just the image and the pattern layer on top of it - combined with the pattern layer
-// (a percentage-coordinate SVG overlay of stored regions - rect or freehand-brush outlines, see
-// AnnotationRegion - added as an OpenSeadragon overlay so it tracks pan/zoom automatically), a
+// MediaEditPage is the pattern-layer annotation editor for one annotated version - its own plain
+// page/URL (/media/edit/{id}) rather than a modal opened from the view page (see
+// static/js/media-editor.js's header comment for why). Real OpenSeadragon deep zoom (static/
+// openseadragon/, vendored — the one deliberate exception to this app's usual "no vendored
+// libraries" rule) tiles the true original's IIIF endpoint (internal/iiif), forced to grayscale to
+// match what BakeAnnotatedVersion actually composites - a clean canvas with no OpenSeadragon
+// toolbar/navigator, just the image and the pattern layer on top of it. The pattern layer (a
+// percentage-coordinate SVG overlay of stored regions - rect or freehand-brush outlines, see
+// AnnotationRegion) is added as an OpenSeadragon overlay so it tracks pan/zoom automatically. A
 // rectangle/brush draw tool (armed by default) with a type dropdown ("the reason" for a marked
-// area), a legend directly under the image (whether or not there's anything marked yet), and a
-// whole-image note (Media.Description) as a single inline row with its own save button - persisted
-// via POST /media/{id}/description, unlike the region shapes (already auto-saved per-draw). No
-// raster editing, no undo stack - regions are rows (internal/media/annotations.go), never baked
-// into a new image (that only happens server-side, on demand, for downloads/exports - see
-// internal/media/rasterize.go, and mediaViewActions above for the only download buttons - none
-// live in this modal). This used to be two disconnected modals (a flat-image editor with no real
-// zoom, and a separate read-only deep-zoom viewer with no editing) - one viewing surface now
-// carries every feature.
-templ lightboxModal(m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media) {
-	<div id="lightbox-overlay" class="lightbox-overlay" hidden>
-		<div class="lightbox-modal">
-			<button type="button" id="lightbox-close" class="lightbox-close" aria-label="Close">
-				<img src="/static/icons/close.svg" width="18" height="18" alt="" class="icon"/>
-			</button>
-			<div class="lightbox-image-wrap">
-				<div
-					class="pattern-layer-stage"
-					id="pattern-layer-wrap"
-					data-media-id={ m.ID }
-					data-bake-if-annotated={ strconv.FormatBool(m.IsAnnotatedVersion()) }
-					data-info-url={ "/api/iiif/" + tileSourceID(m, source) + "/info.json" }
-				>
-					<div id="osd-viewer" class="osd-viewer"></div>
-					<svg id="pattern-layer-svg" class="osd-annotation-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-						<defs>
-							for _, t := range UsedTypeOptions(regions, annotationTypes) {
-								@hatchPatternDef(t)
-							}
-						</defs>
-						for _, r := range regions {
-							@regionShape(r, OptionByID(annotationTypes, r.AnnotationTypeID))
-						}
-					</svg>
-				</div>
-			</div>
-			if m.IsAnnotatedVersion() {
-				@patternLayerLegend(regions, annotationTypes)
-				<div class="lightbox-controls">
-					if len(annotationTypes) == 0 {
-						<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
-					} else {
-						<div class="lightbox-control-row pattern-layer-toolbar">
-							<label class="checkbox-field">
-								<input type="checkbox" id="pattern-layer-add-toggle" checked/>
-								+ Add region
-							</label>
-							<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
-								<button type="button" id="pattern-layer-tool-rect" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
-									<img src="/static/icons/rectangle.svg" width="16" height="16" alt="" class="icon"/>
-								</button>
-								<button type="button" id="pattern-layer-tool-freehand" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
-									<img src="/static/icons/brush.svg" width="16" height="16" alt="" class="icon"/>
-								</button>
-							</div>
-							<label class="pattern-layer-select-field">
-								Type
-								<select id="pattern-layer-type" class="input">
-									for _, t := range annotationTypes {
-										<option value={ t.ID }>{ t.Label }</option>
-									}
-								</select>
-							</label>
-						</div>
+// area) sits below a legend that's always directly under the image (whether or not anything's
+// marked yet). Regions persist immediately as they're drawn (unchanged); a single "Save" button
+// is what saves the whole-image note (Media.Description) and re-bakes this version's own file in
+// one explicit action, replacing the old implicit bake-on-modal-close plus a separate tiny
+// note-save button.
+templ MediaEditPage(c web.Chrome, m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media) {
+	@web.AppLayout("Edit — "+mediaViewTitle(m, nil), c, mediaEditBody(m, regions, annotationTypes, source))
+}
+
+templ mediaEditBody(m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media) {
+	@web.PageHeader("Edit "+mediaViewTitle(m, nil), "Mark regions, add a note, then Save.", mediaEditActions(m))
+	@web.Card() {
+		<div
+			class="pattern-layer-stage"
+			id="pattern-layer-wrap"
+			data-media-id={ m.ID }
+			data-info-url={ "/api/iiif/" + tileSourceID(m, source) + "/info.json" }
+		>
+			<div id="osd-viewer" class="osd-viewer"></div>
+			<svg id="pattern-layer-svg" class="osd-annotation-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+				<defs>
+					for _, t := range UsedTypeOptions(regions, annotationTypes) {
+						@hatchPatternDef(t)
 					}
-					<form id="lightbox-description-form" class="lightbox-note-row" data-media-id={ m.ID }>
-						<label for="lightbox-description">Note</label>
-						<input type="text" id="lightbox-description" name="description" class="input" placeholder="Add a note…" value={ m.Description.String }/>
-						<button type="submit" class="btn btn-secondary" title="Save note" aria-label="Save note">
-							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+				</defs>
+				for _, r := range regions {
+					@regionShape(r, OptionByID(annotationTypes, r.AnnotationTypeID))
+				}
+			</svg>
+		</div>
+		@patternLayerLegend(regions, annotationTypes)
+		<div class="lightbox-controls">
+			if len(annotationTypes) == 0 {
+				<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
+			} else {
+				<div class="lightbox-control-row pattern-layer-toolbar">
+					<label class="checkbox-field">
+						<input type="checkbox" id="pattern-layer-add-toggle" checked/>
+						+ Add region
+					</label>
+					<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
+						<button type="button" id="pattern-layer-tool-rect" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
+							<img src="/static/icons/rectangle.svg" width="16" height="16" alt="" class="icon"/>
 						</button>
-					</form>
+						<button type="button" id="pattern-layer-tool-freehand" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
+							<img src="/static/icons/brush.svg" width="16" height="16" alt="" class="icon"/>
+						</button>
+					</div>
+					<label class="pattern-layer-select-field">
+						Type
+						<select id="pattern-layer-type" class="input">
+							for _, t := range annotationTypes {
+								<option value={ t.ID }>{ t.Label }</option>
+							}
+						</select>
+					</label>
 				</div>
 			}
+			<div class="lightbox-note-row">
+				<label for="media-edit-note">Note</label>
+				<input type="text" id="media-edit-note" class="input" placeholder="Add a note…" value={ m.Description.String }/>
+			</div>
+			<div class="media-edit-save-row">
+				<button type="button" id="media-edit-save" class="btn btn-primary">
+					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					Save
+				</button>
+				<span id="media-edit-save-status" class="page-subtitle" aria-live="polite"></span>
+			</div>
 		</div>
-	</div>
+	}
+	<script src="/static/openseadragon/openseadragon.min.js" defer></script>
+	<script src="/static/js/media-editor.js" defer></script>
+}
+
+templ mediaEditActions(m Media) {
+	<a class="btn btn-ghost" href={ templ.URL("/media/view/" + m.ID) }>
+		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon" style="transform: rotate(180deg);"/>
+		Back to view
+	</a>
 }
 
 // tileSourceID is whose IIIF endpoint the deep-zoom stage tiles against: an annotated version
@@ -364,28 +399,43 @@ func tileSourceID(m Media, source *Media) string {
 	return m.ID
 }
 
-// mediaViewActions is the only place download links appear (the lightbox editor itself has none).
-// A true original just downloads itself. An annotated version downloads its own baked file by
-// default (the composited PNG - see BakeAnnotatedVersion), with "Download original" alongside it
-// for the un-annotated source. Multiple annotated versions can exist per original now, so there's
-// no single "the annotated variant" of an original to default to any more - that's what each
-// version's own page is for.
+// mediaViewActions is the only place download links appear. A true original just downloads
+// itself. An annotated version downloads its own baked file by default (the composited PNG - see
+// BakeAnnotatedVersion), as a split button whose dropdown carries "Original" for the un-annotated
+// source - one button instead of two side by side, since there's exactly one secondary download
+// choice here, not a general-purpose menu. Editing (drawing/adjusting regions) is its own page
+// (/media/edit/{id}, see MediaEditPage) for any annotated version, baked or still a draft - a
+// draft has nothing to download yet, but still needs its Edit entry point.
 templ mediaViewActions(m Media, source *Media) {
-	if m.IsAnnotatedVersion() && m.IsBaked() {
+	if !m.IsAnnotatedVersion() {
 		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
 			<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
 			Download
 		</a>
-		if source != nil {
-			<a class="btn btn-ghost" href={ templ.URL("/api/media/" + source.ID + "?variant=original") }>
+	} else if m.IsBaked() {
+		<span class="split-btn">
+			<a class="btn btn-secondary split-btn-main" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
 				<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-				Download original
+				Download
 			</a>
-		}
-	} else if !m.IsAnnotatedVersion() {
-		<a class="btn btn-secondary" href={ templ.URL("/api/media/" + m.ID + "?variant=original") }>
-			<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-			Download
+			if source != nil {
+				<details class="split-btn-toggle">
+					<summary class="btn btn-secondary split-btn-caret" aria-label="More download options" title="More download options">
+						<img src="/static/icons/chevron-right.svg" width="12" height="12" alt="" class="icon" style="transform: rotate(90deg);"/>
+					</summary>
+					<div class="split-btn-menu">
+						<a class="split-btn-menu-item" href={ templ.URL("/api/media/" + source.ID + "?variant=original") }>
+							Original
+						</a>
+					</div>
+				</details>
+			}
+		</span>
+	}
+	if m.IsAnnotatedVersion() {
+		<a class="btn btn-secondary" href={ templ.URL("/media/edit/" + m.ID) }>
+			<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+			Edit
 		</a>
 	}
 	<a class="btn btn-ghost" href="/media">
