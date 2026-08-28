@@ -117,6 +117,9 @@ safe in production). `SeedDemoData` additionally seeds fictional demo content, b
   Quirks: `condition` and `Order` are reserved words needing double-quoting; foreign keys must be
   declared inline in `CREATE TABLE` (no `ALTER TABLE ... ADD CONSTRAINT`); dropping/changing a
   column requires the create-new-table/copy/drop/rename dance (SQLite can't do it directly).
+  **Whenever a migration adds, drops, or changes a table or column, update `docs/schema.md`
+  (simplified DDL + Mermaid ER diagram) in the same change** — it must always reflect the schema
+  that results from applying every migration in order.
 - **Media files**: local disk via the `StorageAdapter` interface (`internal/media/storage.go`),
   root at `MEDIA_STORAGE_DIR` — `LocalDiskAdapter` is the only implementation so far; a future
   S3-compatible backend means implementing the interface, nothing else.
@@ -191,6 +194,7 @@ without installing anything" use, not the deploy path.
 - `README.md` — project overview and quick start.
 - `docs/tech-stack.md` — the same material as this file's Tech Stack/Architecture sections, in
   more narrative form.
+- `docs/schema.md` — simplified DDL for the current schema plus a Mermaid ER diagram.
 - `docs/setup.md` — full local-dev walkthrough (Docker and native), env var reference, exactly
   what first boot seeds.
 - `docs/deploy.md` — deployment reasoning (why Ubuntu 24.04 specifically), backups.
