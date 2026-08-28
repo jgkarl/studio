@@ -2070,13 +2070,14 @@ html[data-theme="dark"] .kanban-card {
 
 /* --- Module landing grid pages (Clients/Assets/Treatments/Assessments/Reports search+filter
    lists, all built on the shared [data-el-root]/EntityList* components) — every row reads as its
-   own card: two-tone striping by position, a hover highlight, no border dividers. Scoped under
-   [data-el-root] so plain .entity-list-row usages elsewhere (dashboard/detail sub-lists) are
-   unaffected by default - .entity-list-cards (no search/filter JS involved, just a plain
-   <ul class="entity-list entity-list-cards">) opts a nested "linked records" list (a Project's
-   Assessments/Treatments/Reports/Media, an Asset's per-project sub-lists, ...) into the exact same
-   look, so a card-within-a-card reads the same as a top-level search result instead of the older
-   flat divider-line rows. */
+   own plain white card: a shadow-only hover lift, no odd/even striping, no border dividers.
+   Scoped under [data-el-root] so plain .entity-list-row usages elsewhere (dashboard/detail
+   sub-lists) are unaffected by default - .entity-list-cards (no search/filter JS involved, just a
+   plain <ul class="entity-list entity-list-cards">) opts a nested "linked records" list (a
+   Project's Assessments/Treatments/Reports/Media, an Asset's per-project sub-lists, ...) into a
+   variant of the same look (it keeps an odd/even stripe - see below - since it sits inside an
+   already-white .card and needs the contrast), so a card-within-a-card still reads as its own row
+   instead of the older flat divider-line style. */
 [data-el-root] .entity-list,
 .entity-list-cards {
   display: flex;
@@ -2092,12 +2093,10 @@ html[data-theme="dark"] .kanban-card {
   transition: box-shadow 150ms ease, background-color 150ms ease;
 }
 
-[data-el-root] [data-el-row]:nth-child(odd) > .entity-list-row {
+/* Every row is plain --surface (no odd/even stripe) - hover is shadow-only elevation, no
+   background-color change either, so the row's color never shifts, just lifts. */
+[data-el-root] .entity-list-row {
   background: var(--surface);
-}
-
-[data-el-root] [data-el-row]:nth-child(even) > .entity-list-row {
-  background: var(--stripe-even);
 }
 
 /* Odd rows use --bg (not --surface, the top-level rule's choice above) - a nested list already
@@ -2112,7 +2111,11 @@ html[data-theme="dark"] .kanban-card {
   background: var(--stripe-even);
 }
 
-[data-el-root] .entity-list-row:hover,
+[data-el-root] .entity-list-row:hover {
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+}
+
 .entity-list-cards > .entity-list-row:hover {
   background: var(--green-bg);
   box-shadow: var(--shadow-sm);
