@@ -141,7 +141,11 @@ CREATE TABLE Treatment (
 );
 
 -- Structured, exportable report. `content` is a legacy freeform TipTap JSON doc kept for old
--- rows only; new reports use the structured summary/conditionFindings/... fields + layout flags.
+-- rows only. conditionFindings/treatmentPerformed/materialsUsed/showCondition/showTreatment/
+-- showMaterials are legacy too - kept so old report data isn't lost, but no longer shown or
+-- edited in the UI; `description` (general notes/misc) replaced them as of 0019. `deletedAt`
+-- doubles as the "Removed" tag: a removed report stays in the gridview search, just hidden by
+-- default unless the Removed filter chip is used.
 CREATE TABLE Report (
     id                    TEXT PRIMARY KEY,
     projectId             TEXT NOT NULL REFERENCES Project(id),
@@ -150,22 +154,39 @@ CREATE TABLE Report (
     content               TEXT NOT NULL,     -- legacy, unused by new reports
     status                TEXT NOT NULL DEFAULT 'draft',
     authorId              TEXT REFERENCES User(id),
+    description           TEXT,              -- general notes/misc (0019)
     summary               TEXT,
-    conditionFindings     TEXT,
-    treatmentPerformed    TEXT,
-    materialsUsed         TEXT,
+    conditionFindings     TEXT,              -- legacy, unused by new reports
+    treatmentPerformed    TEXT,              -- legacy, unused by new reports
+    materialsUsed         TEXT,              -- legacy, unused by new reports
     recommendations       TEXT,
     coverMediaId          TEXT REFERENCES Media(id),
     layoutStyle           TEXT NOT NULL DEFAULT 'standard',
+    galleryColumns        INTEGER NOT NULL DEFAULT 2,   -- 1 or 2 (0019)
     showCover             INTEGER NOT NULL DEFAULT 1,   -- section toggle
+    showDescription       INTEGER NOT NULL DEFAULT 1,   -- section toggle (0019)
     showSummary           INTEGER NOT NULL DEFAULT 1,   -- section toggle
-    showCondition         INTEGER NOT NULL DEFAULT 1,   -- section toggle
-    showTreatment         INTEGER NOT NULL DEFAULT 1,   -- section toggle
-    showMaterials         INTEGER NOT NULL DEFAULT 1,   -- section toggle
+    showCondition         INTEGER NOT NULL DEFAULT 1,   -- section toggle, legacy
+    showTreatment         INTEGER NOT NULL DEFAULT 1,   -- section toggle, legacy
+    showMaterials         INTEGER NOT NULL DEFAULT 1,   -- section toggle, legacy
     showRecommendations   INTEGER NOT NULL DEFAULT 1,   -- section toggle
     createdAt             DATETIME NOT NULL,
     updatedAt             DATETIME NOT NULL,
     deletedAt             DATETIME
+);
+
+-- Per-report image gallery customization (drag-drop order, per-image "stretch to column width")
+-- for a MediaReference the report's gallery displays. Lives in its own table rather than as
+-- columns on MediaReference because the same reference can appear in several reports' galleries
+-- at once. A row only exists once a conservator has customized that item for that report; absent
+-- a row, the gallery falls back to default timestamp order and non-stretched display.
+CREATE TABLE ReportGalleryItem (
+    id                 TEXT PRIMARY KEY,
+    reportId           TEXT NOT NULL REFERENCES Report(id),
+    mediaReferenceId   TEXT NOT NULL REFERENCES MediaReference(id),   -- UNIQUE(reportId, mediaReferenceId)
+    sortOrder          INTEGER NOT NULL DEFAULT 0,
+    stretch            INTEGER NOT NULL DEFAULT 0,
+    createdAt          DATETIME NOT NULL
 );
 
 -- Legacy "Activity Notebook" — retired (Treatment is now the sole way to record conservation
@@ -373,22 +394,33 @@ erDiagram
         string content "legacy TipTap JSON"
         string status
         string authorId FK
+        string description "general notes/misc"
         string summary
-        string conditionFindings
-        string treatmentPerformed
-        string materialsUsed
+        string conditionFindings "legacy"
+        string treatmentPerformed "legacy"
+        string materialsUsed "legacy"
         string recommendations
         string coverMediaId FK
         string layoutStyle
+        int galleryColumns "1 or 2"
         int showCover
+        int showDescription
         int showSummary
-        int showCondition
-        int showTreatment
-        int showMaterials
+        int showCondition "legacy"
+        int showTreatment "legacy"
+        int showMaterials "legacy"
         int showRecommendations
         datetime createdAt
         datetime updatedAt
-        datetime deletedAt "soft delete"
+        datetime deletedAt "soft delete / removed tag"
+    }
+    ReportGalleryItem {
+        string id PK
+        string reportId FK
+        string mediaReferenceId FK "UK with reportId"
+        int sortOrder
+        int stretch
+        datetime createdAt
     }
     Activity {
         string id PK
@@ -460,6 +492,8 @@ erDiagram
     Treatment    }o--o| User              : "performed by"
     Report       }o--o| User              : "authored by"
     Report       }o--o| Media             : "cover image"
+    Report       ||--o{ ReportGalleryItem : "gallery customization"
+    MediaReference ||--o{ ReportGalleryItem : "gallery customization"
     Activity     }o--o| User              : "logged by"
     Media        ||--o{ MediaReference    : "attached via"
     Media        ||--o{ MediaAnnotationRegion : "annotated by"
