@@ -19,6 +19,7 @@
     name:
       - libvips42
       - ca-certificates
+      - logrotate
     state: present
 
 - name: Create system group
@@ -72,6 +73,14 @@
     enabled: true
     state: started
     daemon_reload: true
+
+- name: Template the logrotate config for the on-disk log file
+  ansible.builtin.template:
+    src: studio-logrotate.conf.j2
+    dest: /etc/logrotate.d/studio
+    owner: root
+    group: root
+    mode: "0644"
 
 - name: Set up Caddy as the reverse proxy
   when: studio_domain | length > 0

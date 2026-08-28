@@ -22,17 +22,34 @@
 - name: Reset Studio's content data (dangerous - confirm=RESET-DATA required)
   hosts: studio
   become: true
-  # This playbook doesn't invoke the studio_app role (it must not run its install/provisioning
-  # tasks), so role defaults like studio_home/studio_system_user wouldn't normally load - pull
-  # them in explicitly instead. Same reasoning as update.yml's use of include_role.
-  vars_files:
-    - roles/studio_app/defaults/main.yml
   vars:
     studio_reset_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
     studio_db_path: "{{ studio_home }}/data/studio.db"
     studio_media_dir: "{{ studio_home }}/data/media-storage"
 
   pre_tasks:
+    # This playbook doesn't provision/release anything, so it never invokes the studio_app role
+    # the normal way - but it still needs the role's defaults (studio_home, studio_system_user).
+    # include_role (unlike a raw `vars_files:` include of the same file) loads them as genuine
+    # role defaults - the lowest variable precedence tier - so group_vars/vault values still
+    # override them correctly. Do NOT switch this to vars_files: that ranks *above* group_vars and
+    # will silently blank out studio_bootstrap_admin_email and friends back to the role's blank
+    # placeholder defaults - this exact bug shipped once already.
+    # All five of the untagged-by-nature safety/setup tasks below are explicitly tagged `always`.
+    # Without it, `--tags database`/`--tags media` (both documented above as supported ways to
+    # scope this playbook) would silently skip them - including the confirm=RESET-DATA refusal
+    # gate itself - since Ansible applies --tags filtering to pre_tasks/post_tasks same as tasks,
+    # and only `always`-tagged tasks are exempt. This shipped once already: a scoped run would
+    # have skipped the confirmation check, left the service running during the wipe, and skipped
+    # the backup-directory setup and the post-wipe restart.
+    - name: Load studio_app role defaults (studio_home, studio_system_user, etc.)
+      ansible.builtin.include_role:
+        name: studio_app
+        tasks_from: noop
+        public: true   # without this, include_role keeps its defaults scoped to itself only -
+                        # invisible to every task after it in this play, unlike roles:/import_role.
+      tags: [always]
+
     - name: Refuse to run without explicit confirmation
       ansible.builtin.fail:
         msg: >-
@@ -40,6 +57,7 @@
           -e confirm=RESET-DATA to proceed - see this file's header comment for scoping to just
           --tags database or --tags media.
       when: (confirm | default('')) != 'RESET-DATA'
+      tags: [always]
 
     - name: Refuse to run without a bootstrap admin email to preserve
       ansible.builtin.fail:
@@ -51,6 +69,7 @@
       ansible.builtin.systemd:
         name: studio
         state: stopped
+      tags: [always]
 
     - name: Ensure the backup directory exists
       ansible.builtin.file:
@@ -59,6 +78,7 @@
         owner: "{{ studio_system_user }}"
         group: "{{ studio_system_user }}"
         mode: "0750"
+      tags: [always]
 
   tasks:
     - name: Database
@@ -99,10 +119,16 @@
         # bootstrap admin was never created because BOOTSTRAP_ADMIN_* was blank at deploy time) -
         # checked here, before the destructive script runs, rather than discovered afterwards by
         # nobody being able to log in.
+        # Deliberately runs as root (become: true at play level), not become_user:
+        # studio_system_user - this host has no setfacl/getfacl installed, so Ansible can't bridge
+        # its own root-owned temp module file down to an unprivileged become_user (fails with
+        # "chmod: invalid mode: 'A+user:...:allow'" - an ACL chmod syntax this host's coreutils
+        # doesn't support). Root can read/write the database file regardless of its owner, so
+        # there's no functional need to become studio_system_user here - see the ownership-restore
+        # task after the write below, which is the part that actually matters.
         - name: Confirm the bootstrap admin account actually exists before wiping other Users
           ansible.builtin.command: >-
             sqlite3 {{ studio_db_path }} "SELECT COUNT(*) FROM User WHERE email = '{{ studio_bootstrap_admin_email }}'"
-          become_user: "{{ studio_system_user }}"
           register: studio_bootstrap_admin_check
           when: studio_reset_db_stat.stat.exists
 
@@ -125,10 +151,20 @@
             mode: "0600"
           when: studio_reset_db_stat.stat.exists
 
+        # Also runs as root - see the comment on "Confirm the bootstrap admin account..." above.
+        # sqlite3's WAL-mode write here can touch/recreate studio.db-wal and studio.db-shm, so the
+        # ownership-restore task right after this one is what actually keeps the app (which runs
+        # as studio_system_user via systemd) able to write to them post-restart - it's not
+        # optional cleanup.
         - name: Run the cleanup script against the database
           ansible.builtin.command: sqlite3 {{ studio_db_path }} -init {{ studio_home }}/reset-data.sql .quit
-          become_user: "{{ studio_system_user }}"
           register: studio_reset_sql_out
+          when: studio_reset_db_stat.stat.exists
+
+        - name: Restore database file ownership (sqlite3 above ran as root, not studio_system_user)
+          ansible.builtin.shell: chown {{ studio_system_user }}:{{ studio_system_user }} {{ studio_db_path }}*
+          args:
+            executable: /bin/bash
           when: studio_reset_db_stat.stat.exists
 
         - name: Show the cleanup script's own summary output
@@ -180,3 +216,4 @@
       ansible.builtin.systemd:
         name: studio
         state: started
+      tags: [always]

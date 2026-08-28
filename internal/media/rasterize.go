@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html"
-	"log"
+	"log/slog"
 	"math"
 	"path/filepath"
 	"strings"
@@ -297,13 +297,13 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 	if existing, err := s.Storage.Get(target.StorageKey); err == nil && len(existing) > 0 {
 		backupKey := fmt.Sprintf("%s-old-%d", strings.TrimSuffix(target.StorageKey, filepath.Ext(target.StorageKey)), time.Now().UnixNano()) + filepath.Ext(target.StorageKey)
 		if err := s.Storage.Put(backupKey, existing); err != nil {
-			log.Printf("media: backing up previous bake of %s: %v", target.ID, err)
+			slog.ErrorContext(ctx, "backing up previous bake", "err", err, "media_id", target.ID, "category", "media", "event", "bake_backup_failed")
 		}
 	}
 	if err := s.Storage.Put(target.StorageKey, baked); err != nil {
 		return fmt.Errorf("storing baked image: %w", err)
 	}
-	s.storeImageVariants(target.ID, baked)
+	s.storeImageVariants(ctx, target.ID, baked)
 
 	sum := sha256.Sum256(baked)
 	_, err = studiodb.Execute(ctx, s.Pool,

@@ -6,8 +6,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"studio/internal/assessments"
@@ -18,7 +19,9 @@ import (
 	"studio/internal/dashboard"
 	"studio/internal/db"
 	"studio/internal/export"
+	"studio/internal/httplog"
 	"studio/internal/iiif"
+	"studio/internal/logging"
 	"studio/internal/mail"
 	"studio/internal/media"
 	"studio/internal/reporter"
@@ -35,25 +38,32 @@ import (
 
 func main() {
 	cfg := config.Load()
+	slog.SetDefault(logging.New(cfg))
+
+	const category = "startup"
 
 	pool, err := db.Open(cfg.DBPath)
 	if err != nil {
-		log.Fatalf("db: %v", err)
+		slog.Error("opening database", "err", err, "category", category, "event", "db_open_failed")
+		os.Exit(1)
 	}
 	defer pool.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := pool.PingContext(ctx); err != nil {
-		log.Fatalf("db ping: %v", err)
+		slog.Error("pinging database", "err", err, "category", category, "event", "db_ping_failed")
+		os.Exit(1)
 	}
 	if err := db.Migrate(ctx, pool, migrations.Files); err != nil {
-		log.Fatalf("migrate: %v", err)
+		slog.Error("running migrations", "err", err, "category", category, "event", "migrate_failed")
+		os.Exit(1)
 	}
-	log.Println("database ready, migrations applied")
+	slog.Info("database ready, migrations applied", "category", category, "event", "db_ready")
 
 	if err := seed.BootstrapAdmin(ctx, pool, cfg.BootstrapAdminName, cfg.BootstrapAdminEmail, cfg.BootstrapAdminPassword); err != nil {
-		log.Fatalf("bootstrapping admin: %v", err)
+		slog.Error("bootstrapping admin", "err", err, "category", category, "event", "bootstrap_admin_failed")
+		os.Exit(1)
 	}
 
 	media.InitImageProcessing()
@@ -61,7 +71,8 @@ func main() {
 
 	storage, err := media.NewLocalDiskAdapter(cfg.MediaStorageDir)
 	if err != nil {
-		log.Fatalf("media storage: %v", err)
+		slog.Error("initializing media storage", "err", err, "category", category, "event", "media_storage_init_failed")
+		os.Exit(1)
 	}
 	mediaSvc := &media.Service{Pool: pool, Storage: storage}
 
@@ -71,7 +82,8 @@ func main() {
 	// production boot only ever gets the one BootstrapAdmin account above.
 	if cfg.SeedExampleData {
 		if err := seed.SeedDemoData(ctx, pool, mediaSvc); err != nil {
-			log.Fatalf("seeding demo data: %v", err)
+			slog.Error("seeding demo data", "err", err, "category", category, "event", "seed_demo_failed")
+			os.Exit(1)
 		}
 	}
 
@@ -110,8 +122,10 @@ func main() {
 	iiif.Mount(mux, &iiif.Service{Media: mediaSvc}, authSvc)
 
 	addr := ":" + cfg.Port
-	log.Printf("listening on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("server: %v", err)
+	slog.Info("listening", "addr", addr, "log_level", cfg.LogLevel, "log_format", cfg.LogFormat,
+		"category", category, "event", "listening")
+	if err := http.ListenAndServe(addr, httplog.Middleware(mux)); err != nil {
+		slog.Error("server", "err", err, "category", category, "event", "server_failed")
+		os.Exit(1)
 	}
 }

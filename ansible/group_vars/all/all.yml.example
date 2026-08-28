@@ -26,6 +26,16 @@ studio_port: 3000
 # "v1.2.3") to control exactly what update.yml deploys instead.
 studio_release_version: "latest"
 
+# debug/info/warn/error (default info, see roles/studio_app/defaults/main.yml) and text/json
+# (default text) - override here, or pass -e studio_log_level=debug on a one-off
+# update.yml/deploy.yml run, while troubleshooting a live issue. studio_log_rotate_size/_count
+# control the logrotate config for the JSON copy under {{ studio_home }}/data/log/studio.log
+# (default: rotate at 10M, keep 5).
+# studio_log_level: "info"
+# studio_log_format: "text"
+# studio_log_rotate_size: "10M"
+# studio_log_rotate_count: 5
+
 # owner/repo on GitHub that release.yml publishes to.
 studio_github_repo: "jgkarl/studio"
 

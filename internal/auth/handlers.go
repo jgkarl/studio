@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -37,7 +37,7 @@ func Mount(mux *http.ServeMux, svc *Service) {
 func writeHTML(w http.ResponseWriter, r *http.Request, page templ.Component) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := page.Render(r.Context(), w); err != nil {
-		log.Printf("render error: %v", err)
+		slog.ErrorContext(r.Context(), "rendering page", "err", err, "category", "auth", "event", "render_failed")
 	}
 }
 
@@ -149,7 +149,7 @@ func (s *Service) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.sendVerificationEmail(r, userID, name, email); err != nil {
-		log.Printf("sending verification email: %v", err)
+		slog.ErrorContext(r.Context(), "sending verification email", "err", err, "user_id", userID, "category", "auth", "event", "verification_email_failed")
 	}
 
 	http.Redirect(w, r, "/register/check-email", http.StatusSeeOther)
@@ -213,7 +213,7 @@ func (s *Service) handleResendVerification(w http.ResponseWriter, r *http.Reques
 	// leaking which emails have accounts.
 	if user != nil && user.Provider.String == "email" && !user.EmailVerifiedAt.Valid {
 		if err := s.sendVerificationEmail(r, user.ID, user.Name, user.Email); err != nil {
-			log.Printf("resending verification email: %v", err)
+			slog.ErrorContext(r.Context(), "resending verification email", "err", err, "user_id", user.ID, "category", "auth", "event", "verification_email_resend_failed")
 		}
 	}
 	http.Redirect(w, r, "/register/check-email", http.StatusSeeOther)
@@ -241,11 +241,11 @@ func (s *Service) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	if user != nil && user.Provider.String == "email" {
 		token, err := CreateVerificationToken(r.Context(), s.Pool, user.ID, TokenPasswordReset)
 		if err != nil {
-			log.Printf("creating reset token: %v", err)
+			slog.ErrorContext(r.Context(), "creating password reset token", "err", err, "user_id", user.ID, "category", "auth", "event", "reset_token_create_failed")
 		} else {
 			link := s.Origin(r) + "/reset-password?token=" + url.QueryEscape(token)
 			if err := s.Mailer.Send(applyName(mail.ResetPasswordMessage(user.Name, link), user.Email)); err != nil {
-				log.Printf("sending reset email: %v", err)
+				slog.ErrorContext(r.Context(), "sending reset email", "err", err, "user_id", user.ID, "category", "auth", "event", "reset_email_failed")
 			}
 		}
 	}

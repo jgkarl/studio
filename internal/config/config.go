@@ -27,6 +27,20 @@ type Config struct {
 	SMTPUser string
 	SMTPPass string
 	SMTPFrom string
+
+	// LogLevel is one of "debug"/"info"/"warn"/"error" (case-insensitive), defaulting to "info" -
+	// see internal/logging. Every request still gets its one access-log line regardless of level
+	// (at info, or warn/error for a 4xx/5xx response) - "debug" only adds extra low-level detail
+	// individual packages may choose to log at that level.
+	LogLevel string
+	// LogFormat is "text" (human-readable key=value, easy to read directly in `journalctl -f`) or
+	// "json" (machine-parseable, pipe through `jq`) - defaults to "text". Only affects the console
+	// (stdout/journalctl) stream - the on-disk file under LogDir, if any, is always JSON.
+	LogFormat string
+	// LogDir is where a rotation-friendly JSON log file (LogDir/studio.log) is written, in
+	// addition to stdout - blank disables file logging entirely (console-only). See
+	// internal/logging and docs/manage.md for the logrotate setup that keeps it capped at 10MB.
+	LogDir string
 }
 
 func Load() *Config {
@@ -48,6 +62,10 @@ func Load() *Config {
 		SMTPUser: os.Getenv("SMTP_USER"),
 		SMTPPass: os.Getenv("SMTP_PASS"),
 		SMTPFrom: getenv("SMTP_FROM", "studio@localhost"),
+
+		LogLevel:  getenv("LOG_LEVEL", "info"),
+		LogFormat: getenv("LOG_FORMAT", "text"),
+		LogDir:    getenv("LOG_DIR", "./data/log"),
 	}
 }
 

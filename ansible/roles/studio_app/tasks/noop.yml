@@ -1,0 +1,10 @@
+---
+# Intentionally empty. Exists purely so a playbook that isn't provisioning/releasing anything
+# (reset-data.yml) can still pull in this role's defaults/main.yml (studio_home,
+# studio_system_user, etc.) at their correct - lowest - precedence via
+# `include_role: {name: studio_app, tasks_from: noop}`, so group_vars/vault values still override
+# them as expected. A raw `vars_files:` include of defaults/main.yml does NOT do this correctly:
+# vars_files ranks above group_vars, so it would silently clobber real values (e.g.
+# studio_bootstrap_admin_email) back to the blank role-default placeholder instead of leaving them
+# alone - that exact bug shipped once already, see git blame.
+[]

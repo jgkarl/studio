@@ -108,6 +108,31 @@ safe in production). `SeedDemoData` additionally seeds fictional demo content, b
 `SEED_EXAMPLE_DATA=true` — dev/Docker convenience only, never set in production (see
 `ansible/roles/studio_app/defaults/main.yml`).
 
+**Logging** (`internal/logging`, `internal/httplog`): `log/slog` throughout, no third-party
+logging library. `cmd/server/main.go` builds the one process-wide logger from `LOG_LEVEL`
+(debug/info/warn/error, default info), `LOG_FORMAT` (text/json, default text, console stream
+only), and `LOG_DIR` (default `./data/log`, blank disables) and installs it via `slog.SetDefault`
+— every other package just calls `slog.Info`/`slog.ErrorContext`/etc. directly, no logger threaded
+through structs. Every call site is expected to include `category` (module: `"auth"`, `"media"`,
+`"http"`, ...) and `event` (a short slug for what happened: `"http_request"`,
+`"verification_email_failed"`, ...) as attributes alongside slog's own `time`/`lvl` (renamed from
+slog's default `level`)/`msg` — a convention, not something the type system enforces.
+`httplog.Middleware` wraps the whole top-level mux and logs one line per request
+(method/path/status/duration/client IP, query string redacted for known-sensitive params like the
+email-verification/password-reset `?token=`); `httplog.ContextHandler` stamps a `request_id` onto
+that line and onto every other log line emitted anywhere during the same request (as long as
+`ctx`/`r.Context()` is passed through, which it already is everywhere) — that's what makes `grep
+request_id=<id>` (or `jq` under JSON) pull one request's full story out of the log. Console output
+(stdout, captured by journalctl under systemd) uses `LOG_FORMAT`; `LOG_DIR/studio.log`, if enabled,
+is always JSON regardless, since it exists for later `jq`/grep analysis rather than a human tailing
+it live — `internal/logging/rotate.go` reopens that file on `SIGHUP` so
+`ansible/roles/studio_app/templates/studio-logrotate.conf.j2`'s postrotate hook
+(`systemctl kill -s SIGHUP studio`) works with logrotate's normal rename-based rotation (10MB
+default, see `studio_log_rotate_size`/`_count` in `ansible/group_vars/all/all.yml.example`)
+instead of needing `copytruncate`. Bumping `LOG_LEVEL=debug` on a live host doesn't require a
+redeploy of code, just the env (`ansible/roles/studio_app/templates/studio.env.j2`) — see
+`studio_log_level`/`studio_log_format` in `ansible/group_vars/all/all.yml.example`.
+
 ## Data
 
 - **SQLite**, one file at `DB_PATH` (default `./data/studio.db`), plus `-wal`/`-shm` sidecars —

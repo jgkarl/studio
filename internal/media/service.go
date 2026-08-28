@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"log"
+	"log/slog"
 
 	"github.com/davidbyttow/govips/v2/vips"
 
@@ -20,16 +20,16 @@ type Service struct {
 // storeImageVariants stores a "web" thumbnail conversion (max 1600x1600, EXIF auto-rotated,
 // JPEG q80) alongside the original — non-fatal on failure (an undecodable/corrupt image still
 // keeps its original servable as-is).
-func (s *Service) storeImageVariants(mediaID string, buf []byte) (width, height int) {
+func (s *Service) storeImageVariants(ctx context.Context, mediaID string, buf []byte) (width, height int) {
 	img, err := vips.NewImageFromBuffer(buf)
 	if err != nil {
-		log.Printf("media: decoding image for variant generation: %v", err)
+		slog.ErrorContext(ctx, "decoding image for variant generation", "err", err, "media_id", mediaID, "category", "media", "event", "image_decode_failed")
 		return 0, 0
 	}
 	defer img.Close()
 
 	if err := img.AutoRotate(); err != nil {
-		log.Printf("media: auto-rotating image: %v", err)
+		slog.WarnContext(ctx, "auto-rotating image", "err", err, "media_id", mediaID, "category", "media", "event", "image_autorotate_failed")
 	}
 
 	width, height = img.Width(), img.Height()
@@ -42,7 +42,7 @@ func (s *Service) storeImageVariants(mediaID string, buf []byte) (width, height 
 			scale = hs
 		}
 		if err := img.Resize(scale, vips.KernelAuto); err != nil {
-			log.Printf("media: resizing web variant: %v", err)
+			slog.ErrorContext(ctx, "resizing web variant", "err", err, "media_id", mediaID, "category", "media", "event", "image_resize_failed")
 			return width, height
 		}
 	}
@@ -51,11 +51,11 @@ func (s *Service) storeImageVariants(mediaID string, buf []byte) (width, height 
 	params.Quality = 80
 	webBytes, _, err := img.ExportJpeg(params)
 	if err != nil {
-		log.Printf("media: exporting web variant: %v", err)
+		slog.ErrorContext(ctx, "exporting web variant", "err", err, "media_id", mediaID, "category", "media", "event", "image_export_failed")
 		return width, height
 	}
 	if err := s.Storage.Put(mediaID+"/web.jpg", webBytes); err != nil {
-		log.Printf("media: storing web variant: %v", err)
+		slog.ErrorContext(ctx, "storing web variant", "err", err, "media_id", mediaID, "category", "media", "event", "web_variant_store_failed")
 	}
 	return width, height
 }
@@ -83,7 +83,7 @@ func (s *Service) UploadMedia(ctx context.Context, data []byte, mimeType, upload
 
 	var width, height int
 	if kind == KindImage {
-		width, height = s.storeImageVariants(id, data)
+		width, height = s.storeImageVariants(ctx, id, data)
 	}
 
 	if _, err := studiodb.Execute(ctx, s.Pool, "UPDATE Media SET storageKey = ?, width = ?, height = ? WHERE id = ?",

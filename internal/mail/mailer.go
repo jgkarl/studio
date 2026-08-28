@@ -7,7 +7,7 @@ package mail
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/smtp"
 	"strings"
 )
@@ -140,12 +140,13 @@ func buildMIME(from string, msg Message) []byte {
 }
 
 func sendViaConsole(msg Message) {
-	log.Printf(`
+	slog.Info(fmt.Sprintf(`
 ===== Email (SMTP_HOST not set — printing instead of sending) =====
 To: %s
 Subject: %s
 ---
 %s
 =====================================================================`,
-		msg.To, msg.Subject, msg.Text)
+		msg.To, msg.Subject, msg.Text),
+		"to", msg.To, "subject", msg.Subject, "category", "mail", "event", "console_email")
 }

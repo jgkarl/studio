@@ -1,0 +1,25 @@
+# Managed by Ansible (ansible/roles/studio_app/templates/studio-logrotate.conf.j2) - edit
+# group_vars/all.yml (studio_log_rotate_size et al.) and re-run the playbook instead of editing
+# this file directly, it'll just get overwritten.
+#
+# `size {{ studio_log_rotate_size }}` means logrotate only rotates once the file exceeds that size
+# - checked whenever logrotate itself runs (Ubuntu's default is once daily, via
+# logrotate.timer/cron.daily), not continuously, so under sustained heavy logging the file can
+# grow somewhat past this before the next check catches it.
+#
+# No copytruncate: that avoids the small window where a write between logrotate's copy and
+# truncate steps would be silently lost, but means the app must be told to reopen its log file
+# after rotation - the postrotate hook below does that with a SIGHUP (see
+# internal/logging/rotate.go's watchForRotation), not a full service restart.
+{{ studio_home }}/data/log/studio.log {
+    size {{ studio_log_rotate_size }}
+    rotate {{ studio_log_rotate_count }}
+    missingok
+    notifempty
+    compress
+    delaycompress
+    su {{ studio_system_user }} {{ studio_system_user }}
+    postrotate
+        systemctl kill -s SIGHUP studio.service >/dev/null 2>&1 || true
+    endscript
+}
