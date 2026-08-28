@@ -117,7 +117,7 @@ func formInput(r *http.Request) Input {
 }
 
 func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	if err := r.ParseForm(); err != nil {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
@@ -134,6 +134,15 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Optional cover image (web.FileInput("cover", ...) on the New Asset form) - "cover" role
+	// (not "photo") is what List's thumbnail query prefers over an incidental Assessment photo.
+	if cover := media.FilesFromForm(r, "cover"); len(cover) > 0 {
+		if _, err := svc.Media.UploadAndAttachWithCaption(ctx, cover[0], user.ID, media.RefAsset, id, "cover", r.FormValue("coverCaption")); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Registering an Asset leads straight into creating its first Project — Assessments,
@@ -271,7 +280,7 @@ func (svc *Service) handleAddMedia(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 	id := r.PathValue("id")
-	if _, err := svc.Media.UploadAllAndAttach(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefAsset, id, "photo"); err != nil {
+	if _, err := svc.Media.UploadAllAndAttachWithCaption(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefAsset, id, "photo", r.FormValue("photosCaption")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

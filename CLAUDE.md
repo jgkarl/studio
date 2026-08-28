@@ -93,8 +93,14 @@ constructs each module's `Service`, calls every module's `Mount(mux, svc)` in se
 failure); `internal/iiif` is a from-scratch IIIF Image API v3 implementation (region/size/rotation/
 quality/format transforms via govips, not run through the official validator) backing both the
 deep-zoom viewer/editor (`static/js/lightbox.js` + vendored OpenSeadragon) and the pattern-layer
-grayscale base image. `internal/media/rasterize.go` flattens a media item's drawn annotation
-regions + legend into a downloadable PNG via libvips' SVG rasterizer.
+grayscale base image (`quality=gray`, real pixel conversion, not a CSS filter). Annotating a true
+original starts an "annotated version" — its own real `Media` row (`EditedFromID` + `DerivedLabel`,
+`internal/media/rasterize.go`'s `BakeAnnotatedVersion`) baked from the original plus its region
+legend/note on editor-close, not just an ephemeral download; a version can be re-baked repeatedly
+(its previous file kept as a timestamped backup, never silently discarded), and a fresh version can
+always be branched from the original instead. `RenderAnnotatedImage` (same file) is the older,
+purely on-demand flatten still used by report exports for media with regions attached the
+pre-versioning way.
 
 **Seeding** (`internal/seed`, runs from `cmd/server/main.go` on every boot): `BootstrapAdmin`
 creates the one admin account from `BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD` if set (idempotent,

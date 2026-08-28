@@ -14,12 +14,16 @@ templ ListPage(c web.Chrome, rows []ListRow) {
 }
 
 templ listBody(rows []ListRow) {
-	@web.PageHeader("Reports", "Conservation write-ups.", newReportLink())
+	@web.PageHeader("Reports", "Conservation write-ups.", web.NewActionLink("/reports/new", "New report"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, asset, author…")
 			@web.EntityListFilterSelect("status", "All statuses", []web.FilterOption{{Value: "draft", Label: "Draft"}, {Value: "final", Label: "Final"}})
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "asset", Label: "Asset"},
+				{Value: "client", Label: "Client"},
+				{Value: "status", Label: "Status"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No reports yet.</p>
@@ -32,6 +36,7 @@ templ listBody(rows []ListRow) {
 					data-el-status={ row.Status }
 					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
 					data-el-group-client={ row.ClientName }
+					data-el-group-status={ statusLabel(row.Status) }
 				>
 					<a href={ templ.URL("/reports/" + row.ID) } class="entity-list-row">
 						<div>
@@ -54,7 +59,7 @@ templ listBody(rows []ListRow) {
 								<span class="badge badge-amber tag-chip" data-el-tag-filter="status" data-el-tag-value={ row.Status } role="button" tabindex="0">Draft</span>
 							}
 						</div>
-						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+						<span class="material-symbols-outlined icon entity-list-chevron" style="font-size:16px" aria-hidden="true">chevron_right</span>
 					</a>
 				</li>
 			}
@@ -70,19 +75,21 @@ func assetLabel(title sql.NullString, referenceCode string) string {
 	return referenceCode
 }
 
+// statusLabel is the "Group by Status" group header text for a report row - mirrors the
+// Final/Draft badge label the row itself already shows, rather than the raw "final"/"draft" code.
+func statusLabel(status string) string {
+	if status == "final" {
+		return "Final"
+	}
+	return "Draft"
+}
+
 func reportSearchHaystack(row ListRow) string {
 	author := ""
 	if row.AuthorName.Valid {
 		author = row.AuthorName.String
 	}
 	return row.Title + " " + assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + author
-}
-
-templ newReportLink() {
-	<a class="btn btn-primary" href="/reports/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New report
-	</a>
 }
 
 templ NewPage(c web.Chrome, projects []ProjectOption, preselectedProjectID string) {
@@ -108,7 +115,7 @@ templ newBody(projects []ProjectOption, preselectedProjectID string) {
 					<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
 				}
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Create report
 				</button>
 			</form>
@@ -137,7 +144,7 @@ templ AddModalBody(projectID string, projects []ProjectOption) {
 			<input class="input" name="title" required placeholder="e.g. Conservation Report — 2026-014"/>
 		}
 		<button type="submit" class="btn btn-primary">
-			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			@web.Icon("check_circle", 14)
 			Create report
 		</button>
 	</form>
@@ -163,10 +170,10 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 	@web.PageHeader(report.Title, "", templ.NopComponent)
 	<div class="row-actions" style="margin-bottom: 1rem;">
 		@web.ExportLinks("report", report.ID)
-		<form method="post" action={ templ.URL("/reports/" + report.ID + "/unlink") } data-confirm={ "Unlink \"" + report.Title + "\"? It stays in the database but won't show here anymore." }>
-			<button type="submit" class="btn btn-ghost">
-				<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
-				Unlink
+		<form method="post" action={ templ.URL("/reports/" + report.ID + "/unlink") } data-confirm={ "Remove \"" + report.Title + "\"? It stays in the database but won't show here anymore." }>
+			<button type="submit" class="btn btn-ghost" aria-label="Remove" title="Remove">
+				@web.Icon("close", 14)
+				<span class="btn-label">Remove</span>
 			</button>
 		</form>
 		if report.Status == "final" {
@@ -174,7 +181,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 			<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
 				<input type="hidden" name="status" value="draft"/>
 				<button type="submit" class="btn btn-secondary">
-					<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("edit", 14)
 					Revert draft
 				</button>
 			</form>
@@ -183,7 +190,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 			<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
 				<input type="hidden" name="status" value="final"/>
 				<button type="submit" class="btn btn-secondary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("check_circle", 14)
 					Mark final
 				</button>
 			</form>
@@ -210,7 +217,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 					}
 					if report.Status != "final" {
 						<button type="submit" class="btn btn-primary">
-							<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+							@web.Icon("check_circle", 14)
 							Save sections
 						</button>
 					}
@@ -223,7 +230,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 					<form method="post" action={ templ.URL("/reports/" + report.ID + "/attachments") } enctype="multipart/form-data" class="row-actions form-section">
 						@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 						<button type="submit" class="btn btn-secondary">
-							<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+							@web.Icon("add", 14)
 							Upload
 						</button>
 					</form>
@@ -234,26 +241,24 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 				if len(projectAssessments) == 0 {
 					<p class="empty-state">No assessments recorded for this project.</p>
 				} else {
-					<div class="table-wrap">
-						<table class="table">
-							<thead>
-								<tr>
-									<th>Date</th>
-									<th>Condition</th>
-									<th>Description</th>
-								</tr>
-							</thead>
-							<tbody>
-								for _, a := range projectAssessments {
-									<tr>
-										<td>{ a.RecordedAt.Format("2006-01-02") }</td>
-										<td><a href={ templ.URL("/assessments/" + a.ID) }>{ a.Condition }</a></td>
-										<td>{ a.Description }</td>
-									</tr>
-								}
-							</tbody>
-						</table>
-					</div>
+					<ul class="entity-list entity-list-cards">
+						for _, a := range projectAssessments {
+							<li class="entity-list-row">
+								<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">
+									{ a.Condition }
+									if a.Description != "" {
+										<div class="page-subtitle">{ a.Description }</div>
+									}
+								</a>
+								<div class="row-actions">
+									<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
+									<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
+										@web.Icon("chevron_right", 14)
+									</a>
+								</div>
+							</li>
+						}
+					</ul>
 				}
 			}
 			@web.Card() {
@@ -261,26 +266,20 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 				if len(projectTreatments) == 0 {
 					<p class="empty-state">No treatments logged for this project.</p>
 				} else {
-					<div class="table-wrap">
-						<table class="table">
-							<thead>
-								<tr>
-									<th>Date</th>
-									<th>Method</th>
-									<th>Title</th>
-								</tr>
-							</thead>
-							<tbody>
-								for _, t := range projectTreatments {
-									<tr>
-										<td>{ t.PerformedAt.Format("2006-01-02") }</td>
-										<td>{ t.Method }</td>
-										<td><a href={ templ.URL("/treatments/" + t.ID) }>{ t.Title }</a></td>
-									</tr>
-								}
-							</tbody>
-						</table>
-					</div>
+					<ul class="entity-list entity-list-cards">
+						for _, t := range projectTreatments {
+							<li class="entity-list-row">
+								<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
+								<div class="row-actions">
+									<span class="badge">{ t.Method }</span>
+									<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+									<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
+										@web.Icon("chevron_right", 14)
+									</a>
+								</div>
+							</li>
+						}
+					</ul>
 				}
 			}
 			@web.Card() {
@@ -299,7 +298,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 								<input class="input" type="text" name="caption" placeholder="Description…" value={ item.Caption.String } readonly?={ report.Status == "final" }/>
 								if report.Status != "final" {
 									<button type="submit" class="btn btn-ghost" title="Save">
-										<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+										@web.Icon("check_circle", 14)
 									</button>
 								}
 							</form>
@@ -319,19 +318,19 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 			@web.Card() {
 				<h2 class="dashboard-heading">Customize layout</h2>
 				<form method="post" action={ templ.URL("/reports/" + report.ID + "/layout") } class="form-grid">
-					@web.Field("Layout style", "") {
+					@web.Field("Layout style", "Standard + gallery adds every connected image (assessments, treatments, this report's own attachments) to the export, not just what's uploaded here.") {
 						<select class="input" name="layoutStyle">
-							for _, style := range []string{"standard", "compact", "gallery"} {
+							for _, style := range []string{"standard", "gallery"} {
 								<option value={ style } selected?={ style == report.LayoutStyle }>{ layoutStyleLabel(style) }</option>
 							}
 						</select>
 					}
-					if len(attachments) > 0 {
-						@web.Field("Cover image", "") {
+					if len(gallery) > 0 {
+						@web.Field("Cover image", "Pulled from this asset's whole image gallery, not just this report's own attachments.") {
 							<select class="input" name="coverMediaId">
 								<option value="">None</option>
-								for _, ref := range attachments {
-									<option value={ ref.MediaID } selected?={ report.CoverMediaID.Valid && report.CoverMediaID.String == ref.MediaID }>{ ref.MediaID }</option>
+								for _, item := range gallery {
+									<option value={ item.MediaID } selected?={ report.CoverMediaID.Valid && report.CoverMediaID.String == item.MediaID }>{ galleryOptionLabel(item) }</option>
 								}
 							</select>
 						}
@@ -363,7 +362,7 @@ templ detailBody(report Report, attachments []media.ReferenceWithMedia,
 						</label>
 					</div>
 					<button type="submit" class="btn btn-secondary">
-						<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+						@web.Icon("check_circle", 14)
 						Save layout
 					</button>
 				</form>
@@ -390,11 +389,19 @@ templ infoFieldList(label, href string, fields []InfoField) {
 
 func layoutStyleLabel(style string) string {
 	switch style {
-	case "compact":
-		return "Compact"
 	case "gallery":
-		return "Gallery"
+		return "Standard + gallery"
 	default:
 		return "Standard"
 	}
+}
+
+// galleryOptionLabel is one <option>'s text in the "Cover image" picker - the item's own caption
+// when it has one (matching what the Image gallery section itself shows as its editable caption),
+// falling back to its timestamp so every image is still distinguishable without one.
+func galleryOptionLabel(item GalleryItem) string {
+	if item.Caption.Valid && item.Caption.String != "" {
+		return item.Caption.String
+	}
+	return item.CreatedAt.Format("2006-01-02 15:04")
 }

@@ -1,5 +1,17 @@
 package web
 
+import "strconv"
+
+// Icon renders one Material Symbols (Outlined) glyph at the given pixel size - the Google Fonts
+// CDN link in Layout/AuthLayout/AppLayout's <head> is what actually loads the font (see
+// static/css/app.css's .material-symbols-outlined). Sized via font-size and colored via
+// currentColor, so a button's own text color already themes the icon correctly on any
+// background/theme - callers never need a separate "inverted" variant the way the old hand-drawn
+// static/icons/*.svg set did.
+templ Icon(name string, size int) {
+	<span class="material-symbols-outlined icon" style={ "font-size:" + strconv.Itoa(size) + "px" } aria-hidden="true">{ name }</span>
+}
+
 // Card and Field are the two truly reusable structural wrappers (spacing/borders are easy to get
 // inconsistent by hand). Buttons/inputs/badges are plain HTML with the .btn/.input/.badge
 // utility classes from static/css/app.css directly in each page's markup — simple templates, no
@@ -22,14 +34,24 @@ templ Field(label string, hint string) {
 
 // FileInput replaces a raw <input type="file"> with a styled "Choose files…" trigger — the
 // native input stays functional (multi-select, camera capture on mobile) but visually hidden;
-// clicking the label opens its file picker natively, no JS required.
+// clicking the label opens its file picker natively, no JS required. An optional "Name / caption"
+// text field sits alongside it, submitted as name+"Caption" - the handler on the other end threads
+// it through to media.Service's *WithCaption upload methods (applied to every file in the batch,
+// a multi-file <input> having no way to solicit one caption per file), so a name can be given
+// right here at upload time instead of only ever after, editing each item separately once
+// uploaded. Every module's upload flow (New asset's cover photo, a Project's initial photos, an
+// Asset/Project/Report's "Add media" modal, ...) uses this one component, so browse-name-save
+// works the same way everywhere.
 templ FileInput(name, label, hint string) {
 	@Field(label, hint) {
-		<input type="file" id={ name + "-input" } name={ name } multiple accept="image/*,video/*" capture="environment" class="sr-only"/>
-		<label for={ name + "-input" } class="btn btn-secondary">
-			<img src="/static/icons/upload.svg" width="14" height="14" alt="" class="icon"/>
-			Choose files…
-		</label>
+		<div class="file-input-row">
+			<input type="file" id={ name + "-input" } name={ name } multiple accept="image/*,video/*" capture="environment" class="sr-only"/>
+			<label for={ name + "-input" } class="btn btn-secondary">
+				@Icon("upload", 14)
+				Choose files…
+			</label>
+			<input type="text" class="input" name={ name + "Caption" } placeholder="Name / caption (optional)"/>
+		</div>
 	}
 }
 
@@ -44,12 +66,12 @@ templ Alert(tone string) {
 // /api/export/{type}/{id} route.
 templ ExportLinks(exportType, id string) {
 	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=html") }>
-		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-		Export HTML
+		@Icon("download", 14)
+		HTML
 	</a>
 	<a class="btn btn-ghost" href={ templ.URL("/api/export/" + exportType + "/" + id + "?format=pdf") }>
-		<img src="/static/icons/download.svg" width="14" height="14" alt="" class="icon"/>
-		Export PDF
+		@Icon("download", 14)
+		PDF
 	</a>
 }
 
@@ -68,7 +90,7 @@ templ OpenBadge(completed bool) {
 // match the modalID passed to that Modal. label defaults to "+ Add" when empty.
 templ ModalTrigger(modalID, label string) {
 	<button type="button" class="btn btn-secondary" data-modal-open={ modalID }>
-		<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
+		@Icon("add", 14)
 		if label != "" {
 			{ label }
 		} else {
@@ -84,7 +106,7 @@ templ Modal(modalID, title string) {
 	<div id={ modalID } class="modal-overlay" hidden>
 		<div class="modal-panel">
 			<button type="button" class="modal-close" data-modal-close aria-label="Close">
-				<img src="/static/icons/close.svg" width="16" height="16" alt=""/>
+				@Icon("close", 16)
 			</button>
 			if title != "" {
 				<h2 class="modal-panel-title">{ title }</h2>
@@ -106,16 +128,20 @@ type FilterOption struct {
 // contract.
 templ EntityListSearchInput(placeholder string) {
 	<span class="search-wrap">
-		<img src="/static/icons/search.svg" width="16" height="16" alt="" class="icon"/>
+		@Icon("search", 16)
 		<input type="text" data-el-search placeholder={ placeholder }/>
 	</span>
 }
 
 // EntityListFilterSelect renders one filter <select data-el-filter="key">. Each option's Value
 // must match the corresponding row's data-el-<key-hyphenated> attribute exactly (e.g. key
-// "assetType" matches data-el-asset-type).
+// "assetType" matches data-el-asset-type). The funnel icon is purely visual (matching
+// EntityListSearchInput's own leading icon) - it's what "All types"/"All conditions" reads as a
+// filter rather than a plain picklist at a glance, especially once the label itself has less room
+// on a narrow screen.
 templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
 	<label class="filter-chip">
+		@Icon("filter_alt", 14)
 		<select class="filter-chip-select" data-el-filter={ key }>
 			<option value="">{ allLabel }</option>
 			for _, opt := range options {
@@ -129,6 +155,7 @@ templ EntityListFilterSelect(key, allLabel string, options []FilterOption) {
 // must match the corresponding row's data-el-group-<value-hyphenated> attribute exactly.
 templ EntityListGroupBySelect(options []FilterOption) {
 	<label class="filter-chip">
+		@Icon("filter_alt", 14)
 		<select class="filter-chip-select" data-el-groupby>
 			<option value="">No grouping</option>
 			for _, opt := range options {
@@ -174,18 +201,37 @@ func selectedLabelFor(options []ClassifierOption, valueKey, selected string) str
 	return ""
 }
 
-// PageHeader is the top-of-page title/subtitle/actions row every in-app module list/detail page
-// uses. actions is a slot for buttons/links — pass templ.NopComponent when there are none.
+// PageHeader is the top-of-page title/subtitle/actions block every in-app module list/detail page
+// uses. actions is a slot for buttons/links — pass templ.NopComponent when there are none. Title
+// and actions always share their own row (.page-header-row, flex-wrap:nowrap, vertically
+// centered) at every breakpoint, down to a smaller h1 on a narrow screen rather than ever wrapping
+// the primary action underneath; subtitle (when present) is its own row below that pair, not
+// stacked inside the same flex item as the title, so centering the title/actions row against just
+// the title's own height (not title+subtitle combined) actually lines them up.
 templ PageHeader(title, subtitle string, actions templ.Component) {
 	<div class="page-header">
-		<div>
+		<div class="page-header-row">
 			<h1>{ title }</h1>
-			if subtitle != "" {
-				<p class="page-subtitle">{ subtitle }</p>
-			}
+			<div class="actions">
+				@actions
+			</div>
 		</div>
-		<div class="actions">
-			@actions
-		</div>
+		if subtitle != "" {
+			<p class="page-subtitle">{ subtitle }</p>
+		}
 	</div>
+}
+
+// NewActionLink is the "+ New" primary button every module list page's PageHeader actions slot
+// uses (New client/asset/treatment/.../New intake on the dashboard) - one shared component instead
+// of six near-identical copies. label carries the full "New client"/"New asset"/... wording only
+// for aria-label/title (a screen reader or tooltip still gets the specific noun); the visible text
+// is always the plain "New" - the model name is redundant next to a page titled "Clients" - and
+// collapses to icon-only under .btn-label's narrow-screen rule (static/css/app.css) so the button
+// never forces PageHeader's title+action row to wrap on a small screen.
+templ NewActionLink(href, label string) {
+	<a class="btn btn-primary" href={ templ.URL(href) } aria-label={ label } title={ label }>
+		@Icon("add", 16)
+		<span class="btn-label">New</span>
+	</a>
 }

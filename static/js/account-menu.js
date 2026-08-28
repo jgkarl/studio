@@ -1,5 +1,6 @@
-// Desktop account-menu dropdown — a single click-to-open panel (locale/theme toggle, Settings,
-// sign out) behind the navbar's user chip. Same hidden-panel/backdrop-click/Escape pattern as
+// Desktop account-menu dropdown — a single click-to-open panel (just sign out; locale/theme/
+// Settings are their own icon buttons in .navbar-controls) behind the navbar's user chip. Same
+// hidden-panel/backdrop-click/Escape pattern as
 // static/js/modal.js/lightbox.js, sized for exactly one panel. The mobile drawer already shows
 // these controls inline and doesn't use this — only relevant at the >=1024px breakpoint where the
 // account-menu-trigger button is visible at all (see .navbar-controls in app.css).

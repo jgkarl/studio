@@ -35,11 +35,17 @@ func List(ctx context.Context, q studiodb.Querier) ([]ListRow, error) {
 	return studiodb.Query(ctx, q, `
 		SELECT a.id, a.title, a.referenceCode, at.code, at.title, c.name, cs."condition",
 		       (SELECT COUNT(*) FROM Project p WHERE p.assetId = a.id AND p.deletedAt IS NULL) AS projectCount,
-		       (SELECT mr.mediaId FROM MediaReference mr
-		          JOIN Assessment ast ON ast.id = mr.referencingId AND mr.referencingType = 'Assessment'
-		          JOIN Media m ON m.id = mr.mediaId AND m.kind = 'image'
-		          WHERE ast.assetId = a.id
-		          ORDER BY mr.createdAt DESC, mr.sortOrder ASC LIMIT 1) AS thumbnailMediaId
+		       COALESCE(
+		         (SELECT mr.mediaId FROM MediaReference mr
+		            JOIN Media m ON m.id = mr.mediaId AND m.kind = 'image'
+		            WHERE mr.referencingType = 'Asset' AND mr.referencingId = a.id AND mr.role = 'cover'
+		            ORDER BY mr.createdAt DESC LIMIT 1),
+		         (SELECT mr.mediaId FROM MediaReference mr
+		            JOIN Assessment ast ON ast.id = mr.referencingId AND mr.referencingType = 'Assessment'
+		            JOIN Media m ON m.id = mr.mediaId AND m.kind = 'image'
+		            WHERE ast.assetId = a.id
+		            ORDER BY mr.createdAt DESC, mr.sortOrder ASC LIMIT 1)
+		       ) AS thumbnailMediaId
 		FROM Asset a
 		JOIN Classifier at ON at.id = a.assetTypeId
 		JOIN Client c ON c.id = a.clientId

@@ -19,13 +19,17 @@ templ ListPage(c web.Chrome, rows []ListRow, assetTypes []settings.Classifier, c
 }
 
 templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []settings.Classifier, locale i18n.Locale) {
-	@web.PageHeader("Assets", "The physical objects being conserved.", newAssetLink())
+	@web.PageHeader("Assets", "The physical objects being conserved.", web.NewActionLink("/assets/new", "New asset"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, artist, reference code…")
 			@web.EntityListFilterSelect("assetType", "All types", settings.ClassifierFilterOptions(assetTypes, locale))
 			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "client", Label: "Client"},
+				{Value: "assetType", Label: "Type"},
+				{Value: "condition", Label: "Condition"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No assets yet.</p>
@@ -38,6 +42,8 @@ templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []se
 					data-el-asset-type={ row.AssetTypeCode }
 					data-el-condition={ row.CurrentStateCondition.String }
 					data-el-group-client={ row.ClientName }
+					data-el-group-asset-type={ row.AssetTypeTitle }
+					data-el-group-condition={ row.CurrentStateCondition.String }
 				>
 					<a href={ templ.URL("/assets/" + row.ID) } class="entity-list-row">
 						@assetThumb(row)
@@ -49,15 +55,16 @@ templ listBody(rows []ListRow, assetTypes []settings.Classifier, conditions []se
 									{ row.ReferenceCode }
 								}
 							</span>
-							<div class="page-subtitle">{ row.ReferenceCode } · { row.AssetTypeTitle } · owner: { row.ClientName }</div>
+							<div class="page-subtitle">{ row.ReferenceCode } · owner: { row.ClientName }</div>
 						</div>
 						<div class="row-actions">
+							<span class="badge tag-chip" data-el-tag-filter="assetType" data-el-tag-value={ row.AssetTypeCode } role="button" tabindex="0">{ row.AssetTypeTitle }</span>
 							if row.CurrentStateCondition.Valid {
 								<span class="badge badge-amber tag-chip" data-el-tag-filter="condition" data-el-tag-value={ row.CurrentStateCondition.String } role="button" tabindex="0">{ row.CurrentStateCondition.String }</span>
 							}
 							<span class="page-subtitle">{ strconv.Itoa(row.ProjectCount) } workflow(s)</span>
 						</div>
-						<img src="/static/icons/chevron-right.svg" width="16" height="16" alt="" class="icon entity-list-chevron"/>
+						<span class="material-symbols-outlined icon entity-list-chevron" style="font-size:16px" aria-hidden="true">chevron_right</span>
 					</a>
 				</li>
 			}
@@ -82,13 +89,6 @@ func assetSearchHaystack(row ListRow) string {
 	return title + " " + row.ReferenceCode + " " + row.AssetTypeTitle + " " + row.ClientName
 }
 
-templ newAssetLink() {
-	<a class="btn btn-primary" href="/assets/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New asset
-	</a>
-}
-
 templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string) {
 	@web.AppLayout("New asset", c, newBody(allClients, assetTypes, preselectedClientID, c.Locale))
 }
@@ -96,7 +96,7 @@ templ NewPage(c web.Chrome, allClients []clients.Client, assetTypes []settings.C
 templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, preselectedClientID string, locale i18n.Locale) {
 	@web.PageHeader("New asset", "", templ.NopComponent)
 	@web.Card() {
-		<form method="post" action="/assets" class="form-grid">
+		<form method="post" action="/assets" enctype="multipart/form-data" class="form-grid">
 			<div class="form-row-2">
 				@web.Field("Client", "") {
 					<select class="input" name="clientId" required>
@@ -164,6 +164,7 @@ templ newBody(allClients []clients.Client, assetTypes []settings.Classifier, pre
 			@web.Field("Location in studio", "") {
 				<input class="input" name="locationInStudio" placeholder="e.g. Shelf B3, Wet Room"/>
 			}
+			@web.FileInput("cover", "Cover image", "Optional — the first photo shown for this asset. On a phone this opens your camera directly.")
 			<p class="hint">Next you'll start this asset's first project — that's where its intake condition gets recorded.</p>
 			<button type="submit" class="btn btn-primary">Create asset</button>
 		</form>
@@ -188,7 +189,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 	treatmentMethods []settings.Classifier, stageLabels map[string]string, assetMedia []media.ReferenceWithMedia, locale i18n.Locale) {
 	@web.PageHeader(asset.DisplayName(), asset.ReferenceCode+" · "+assetTypeTitle(assetType, locale), assetActions(asset))
 	if client != nil {
-		<p class="page-subtitle" style="margin-top:-0.75rem;margin-bottom:1rem;">
+		<p class="subtitle-card">
 			Owner: <a href={ templ.URL("/clients/" + client.ID) }>{ client.Name }</a>
 		</p>
 	}
@@ -213,26 +214,70 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 			<p class="detail-paragraph"><strong>Provenance:</strong> { asset.Provenance.String }</p>
 		}
 	}
-	<div class="card-header-row">
-		<h2 class="dashboard-heading">Projects</h2>
-		<div class="row-actions">
-			if len(assessmentProjects) > 0 {
-				@web.ModalTrigger("modal-assessment", "Assessment")
-			}
-			if len(treatmentProjects) > 0 {
-				@web.ModalTrigger("modal-treatment", "Treatment")
-			}
-			if len(reportProjects) > 0 {
-				@web.ModalTrigger("modal-report", "Report")
-			}
-			@web.ModalTrigger("modal-project", "Project")
+	<div class="detail-section">
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Projects</h2>
+			<div class="row-actions">
+				if len(assessmentProjects) > 0 {
+					@web.ModalTrigger("modal-assessment", "Assessment")
+				}
+				if len(treatmentProjects) > 0 {
+					@web.ModalTrigger("modal-treatment", "Treatment")
+				}
+				if len(reportProjects) > 0 {
+					@web.ModalTrigger("modal-report", "Report")
+				}
+				@web.ModalTrigger("modal-project", "Project")
+			</div>
 		</div>
+		if len(projectCards) == 0 {
+			<p class="empty-state">No projects yet.</p>
+		}
+		for _, pc := range projectCards {
+			@assetProjectCard(pc, conditions, treatmentMethodLabels, stageLabels, locale)
+		}
 	</div>
-	if len(projectCards) == 0 {
-		<p class="empty-state">No projects yet.</p>
-	}
-	for _, pc := range projectCards {
-		@assetProjectCard(pc, conditions, treatmentMethodLabels, stageLabels, locale)
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Media</h2>
+			@web.ModalTrigger("modal-media", "Add")
+		</div>
+		if len(assetMedia) == 0 {
+			<p class="empty-state">No media yet.</p>
+		}
+		<ul class="entity-list entity-list-cards">
+			for _, ref := range assetMedia {
+				<li class="entity-list-row">
+					<a href={ mediaViewHref(ref) } class="entity-list-name">
+						<img class="entity-thumb" src={ "/api/media/" + ref.MediaID } alt="" style="width:2.5rem;height:2.5rem;display:inline-block;vertical-align:middle;margin-right:0.5rem;border-radius:4px;"/>
+						if ref.Role.Valid {
+							{ ref.Role.String }
+						} else {
+							{ string(ref.Media.Kind) }
+						}
+					</a>
+					<div class="row-actions">
+						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
+							@web.Icon("chevron_right", 14)
+						</a>
+						<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Remove this media item? It stays in the database but won't show here anymore.">
+							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+								@web.Icon("close", 14)
+							</button>
+						</form>
+					</div>
+				</li>
+			}
+		</ul>
+		@web.Modal("modal-media", "Add: Media") {
+			<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media") } enctype="multipart/form-data" class="form-grid">
+				@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
+				<button type="submit" class="btn btn-primary">
+					@web.Icon("check_circle", 14)
+					Upload
+				</button>
+			</form>
+		}
 	}
 	if len(assessmentProjects) > 0 {
 		@web.Modal("modal-assessment", "Add: Assessment") {
@@ -256,52 +301,10 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 				<input class="input" name="title" required/>
 			}
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Create
 			</button>
 		</form>
-	}
-	@web.Card() {
-		<div class="card-header-row">
-			<h2 class="dashboard-heading">Media</h2>
-			@web.ModalTrigger("modal-media", "Add")
-		</div>
-		if len(assetMedia) == 0 {
-			<p class="empty-state">No media yet.</p>
-		}
-		<ul class="entity-list">
-			for _, ref := range assetMedia {
-				<li class="entity-list-row">
-					<a href={ mediaViewHref(ref) } class="entity-list-name">
-						<img class="entity-thumb" src={ "/api/media/" + ref.MediaID } alt="" style="width:2.5rem;height:2.5rem;display:inline-block;vertical-align:middle;margin-right:0.5rem;border-radius:4px;"/>
-						if ref.Role.Valid {
-							{ ref.Role.String }
-						} else {
-							{ string(ref.Media.Kind) }
-						}
-					</a>
-					<div class="row-actions">
-						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
-						</a>
-						<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Unlink this media item? It stays in the database but won't show here anymore.">
-							<button type="submit" class="row-action-icon" title="Unlink">
-								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
-							</button>
-						</form>
-					</div>
-				</li>
-			}
-		</ul>
-		@web.Modal("modal-media", "Add: Media") {
-			<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media") } enctype="multipart/form-data" class="form-grid">
-				@web.FileInput("photos", "Photos / video", "On a phone this opens your camera directly.")
-				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
-					Upload
-				</button>
-			</form>
-		}
 	}
 	<script src="/static/js/modal.js" defer></script>
 }
@@ -325,18 +328,18 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 			<div class="row-actions">
 				@web.OpenBadge(pc.Project.Stage == "completed")
 				<a href={ templ.URL("/projects/" + pc.Project.ID + "/edit") } class="row-action-icon" title="Edit">
-					<img src="/static/icons/edit.svg" width="14" height="14" alt=""/>
+					@web.Icon("edit", 14)
 				</a>
-				<form method="post" action={ templ.URL("/projects/" + pc.Project.ID + "/unlink") } data-confirm={ "Unlink \"" + pc.Project.Title + "\"? It stays in the database but won't show here anymore." }>
-					<button type="submit" class="row-action-icon" title="Unlink">
-						<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+				<form method="post" action={ templ.URL("/projects/" + pc.Project.ID + "/unlink") } data-confirm={ "Remove \"" + pc.Project.Title + "\"? It stays in the database but won't show here anymore." }>
+					<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+						@web.Icon("close", 14)
 					</button>
 				</form>
 			</div>
 		</div>
 		<div class="page-subtitle">{ stageLabel(stageLabels, pc.Project.Stage) }</div>
 		@assetProjectCardSection("Assessments", "No assessments recorded yet.", len(pc.Assessments))
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, a := range pc.Assessments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
@@ -344,14 +347,14 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 						<span class="page-subtitle">{ a.Description }</span>
 						<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
 						<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 					</div>
 				</li>
 			}
 		</ul>
 		@assetProjectCardSection("Treatments", "No treatments logged yet.", len(pc.Treatments))
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, t := range pc.Treatments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
@@ -359,14 +362,14 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 						<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
 						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
 						<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
 						<a href={ templ.URL("/treatments/" + t.ID + "/edit") } class="row-action-icon" title="Edit">
-							<img src="/static/icons/edit.svg" width="14" height="14" alt=""/>
+							@web.Icon("edit", 14)
 						</a>
-						<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Unlink \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
-							<button type="submit" class="row-action-icon" title="Unlink">
-								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+						<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Remove \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
+							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+								@web.Icon("close", 14)
 							</button>
 						</form>
 					</div>
@@ -374,18 +377,18 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 			}
 		</ul>
 		@assetProjectCardSection("Reports", "No reports yet for this object.", len(pc.Reports))
-		<ul class="entity-list">
+		<ul class="entity-list entity-list-cards">
 			for _, rep := range pc.Reports {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
 					<div class="row-actions">
 						<span class="badge">{ rep.Status }</span>
 						<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
-							<img src="/static/icons/chevron-right.svg" width="14" height="14" alt=""/>
+							@web.Icon("chevron_right", 14)
 						</a>
-						<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Unlink \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
-							<button type="submit" class="row-action-icon" title="Unlink">
-								<img src="/static/icons/close.svg" width="14" height="14" alt=""/>
+						<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Remove \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
+							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+								@web.Icon("close", 14)
 							</button>
 						</form>
 					</div>
@@ -471,11 +474,11 @@ templ editBody(asset Asset) {
 			}
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/assets/" + asset.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>
@@ -484,13 +487,13 @@ templ editBody(asset Asset) {
 }
 
 templ assetActions(asset Asset) {
-	<a class="btn btn-secondary" href={ templ.URL("/assets/" + asset.ID + "/edit") }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
-		Edit
+	<a class="btn btn-secondary" href={ templ.URL("/assets/" + asset.ID + "/edit") } aria-label="Edit" title="Edit">
+		@web.Icon("edit", 14)
+		<span class="btn-label">Edit</span>
 	</a>
-	<a class="btn btn-secondary" href={ templ.URL("/projects/new?assetId=" + asset.ID) }>
-		<img src="/static/icons/history.svg" width="14" height="14" alt="" class="icon"/>
-		Start project
+	<a class="btn btn-secondary" href={ templ.URL("/projects/new?assetId=" + asset.ID) } aria-label="Start project" title="Start project">
+		@web.Icon("history", 14)
+		<span class="btn-label">Start</span>
 	</a>
 	@web.ExportLinks("asset", asset.ID)
 }

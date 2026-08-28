@@ -85,8 +85,17 @@ needs it.
 - `internal/media/rasterize.go`'s `RenderAnnotatedImage` flattens a media item's drawn regions and
   their legend into the image itself: it builds a standalone SVG (the image as a `data:` URI plus
   the same region/legend markup the editor renders) and rasterizes it to PNG via
-  `libvips`'s librsvg-backed SVG loader — no separate SVG library. Backs the "Download annotated"
-  button and report HTML/PDF exports.
+  `libvips`'s librsvg-backed SVG loader — no separate SVG library. Backs report HTML/PDF exports
+  for media that still has regions attached to it directly (pre-dates annotated versions, below).
+- An "annotated version" (started from a true original via "+ New annotated version") is its own
+  real `Media` row (`EditedFromID` pointing back to the original, `DerivedLabel` "annotated"/
+  "annotated 2"/...) rather than something generated on the fly - `BakeAnnotatedVersion` (same
+  file) renders the *current* region set onto a grayscale conversion of the original at full
+  resolution, with a black divider + the region legend + the whole-image note appended below (the
+  canvas widens only in height, never distorting the photo itself), and persists that PNG as the
+  version's own file plus its own web thumbnail. Runs once per editor session, on close
+  (`static/js/lightbox.js`); a version's previous file is kept alongside as a timestamped backup
+  rather than overwritten silently.
 - This is why local `go build` needs `libvips-dev` installed to compile against
   (`apt install libvips-dev` — works cleanly on plain Ubuntu 24.04, see `docs/deploy.md`), and
   why the Docker/release builds run inside a container: reproducible regardless of what's

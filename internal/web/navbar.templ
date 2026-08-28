@@ -11,27 +11,23 @@ type navItem struct {
 	href, label, icon string
 }
 
-// navItems is the page-nav row shared by the desktop inline nav and the mobile drawer's own nav
-// list. Settings is deliberately not part of it — on desktop it lives in the account-menu dropdown
-// only (see accountMenuTrigger/accountMenuPanel below); the drawer renders it as its own link
-// separately, right where this list used to append it, so drawer behavior is unchanged.
 // navItems is the top-level navbar: Clients, Assets, Projects, Reports (a shortcut into the
-// Project-scoped Reports list), and Media. Dashboard stays reachable via the logo/brand link
-// only; Assessments/Treatments/damage-mappings live inside a Project's own detail page (see
-// internal/workflows' DetailPage) rather than as top-level tabs, since every one of those is now
-// created under a Project, not browsed independently first.
+// Project-scoped Reports list), and Media, shared by the desktop inline nav and the mobile
+// drawer's own nav list. Dashboard stays reachable via the logo/brand link only; Assessments/
+// Treatments/damage-mappings live inside a Project's own detail page (see internal/workflows'
+// DetailPage) rather than as top-level tabs, since every one of those is now created under a
+// Project, not browsed independently first. Settings is deliberately not part of it - it renders
+// as its own icon button in .navbar-controls, alongside the language/theme toggles (see
+// Navbar below), not as a nav tab; the drawer renders it as its own link in the same spot the
+// desktop's icon button occupies.
 func navItems(c Chrome) []navItem {
 	return []navItem{
-		{"/clients", c.Dict.Nav.Clients, "people"},
+		{"/clients", c.Dict.Nav.Clients, "group"},
 		{"/assets", c.Dict.Nav.Assets, "folder"},
 		{"/projects", c.Dict.Nav.Projects, "history"},
 		{"/reports", c.Dict.Nav.Reports, "description"},
 		{"/media", c.Dict.Nav.Media, "image"},
 	}
-}
-
-func iconSrc(name string) string {
-	return "/static/icons/" + name + ".svg"
 }
 
 // initials renders up to the first two words of a name as uppercase letters, for the small
@@ -62,7 +58,7 @@ templ Navbar(c Chrome) {
 			for _, item := range navItems(c) {
 				<a href={ templ.URL(item.href) } class={ "navbar-link", templ.KV("navbar-link-active", item.href == c.Active) }>
 					if item.icon != "" {
-						<img src={ iconSrc(item.icon) } width="16" height="16" alt="" class="icon"/>
+						@Icon(item.icon, 16)
 					}
 					{ item.label }
 				</a>
@@ -77,6 +73,11 @@ templ Navbar(c Chrome) {
 					@themeGlyph(c)
 				</button>
 			</form>
+			if c.ShowSettings {
+				<a href="/settings" class="navbar-icon-btn" title={ c.Dict.Nav.Settings } aria-label={ c.Dict.Nav.Settings }>
+					@Icon("settings", 20)
+				</a>
+			}
 			<button type="button" class="account-menu-trigger" data-account-menu-open aria-haspopup="true" aria-label="Account menu">
 				<span class="avatar-chip avatar-chip-sm avatar-chip-user">{ initials(c.UserName) }</span>
 				<span class="navbar-user-text">
@@ -86,19 +87,16 @@ templ Navbar(c Chrome) {
 				</span>
 			</button>
 			<div id="account-menu" class="account-menu-panel" hidden>
-				if c.ShowSettings {
-					<a href="/settings" class="account-menu-item account-menu-link">{ c.Dict.Nav.Settings }</a>
-				}
 				<form method="post" action="/logout">
 					<button type="submit" class="account-menu-item">
-						<img src={ iconSrc("logout") } width="14" height="14" alt="" class="icon"/>
+						@Icon("logout", 14)
 						{ c.Dict.Common.SignOut }
 					</button>
 				</form>
 			</div>
 		</div>
 		<label for="nav-toggle" class="nav-toggle-btn" aria-label="Menu">
-			<img src={ iconSrc("menu") } width="22" height="22" alt="" class="icon"/>
+			@Icon("menu", 22)
 		</label>
 	</header>
 	<label for="nav-toggle" class="nav-drawer-backdrop" aria-hidden="true"></label>
@@ -106,20 +104,21 @@ templ Navbar(c Chrome) {
 		<div class="nav-drawer-header">
 			<span class="nav-drawer-title">{ c.Dict.Common.Menu }</span>
 			<label for="nav-toggle" class="nav-drawer-close" aria-label="Close menu">
-				<img src={ iconSrc("close") } width="20" height="20" alt="" class="icon"/>
+				@Icon("close", 20)
 			</label>
 		</div>
 		<nav class="nav-drawer-links">
 			for _, item := range navItems(c) {
 				<a href={ templ.URL(item.href) } class={ "nav-drawer-link", templ.KV("nav-drawer-link-active", item.href == c.Active) }>
 					if item.icon != "" {
-						<img src={ iconSrc(item.icon) } width="18" height="18" alt="" class="icon"/>
+						@Icon(item.icon, 18)
 					}
 					{ item.label }
 				</a>
 			}
 			if c.ShowSettings {
 				<a href="/settings" class={ "nav-drawer-link", templ.KV("nav-drawer-link-active", c.Active == "/settings") }>
+					@Icon("settings", 18)
 					{ c.Dict.Nav.Settings }
 				</a>
 			}
@@ -134,7 +133,7 @@ templ Navbar(c Chrome) {
 				</span>
 				<form method="post" action="/logout">
 					<button type="submit" class="btn btn-ghost" title={ c.Dict.Common.SignOut } aria-label={ c.Dict.Common.SignOut }>
-						<img src={ iconSrc("logout") } width="18" height="18" alt="" class="icon"/>
+						@Icon("logout", 18)
 					</button>
 				</form>
 			</div>
@@ -153,7 +152,7 @@ templ Navbar(c Chrome) {
 }
 
 templ logoMark() {
-	<img src={ iconSrc("logo") } width="30" height="30" alt="" class="icon" style="flex-shrink:0;"/>
+	<img src="/static/icons/logo.svg" width="30" height="30" alt="" class="icon" style="flex-shrink:0;"/>
 }
 
 templ themeGlyph(c Chrome) {
@@ -196,6 +195,9 @@ templ AppLayout(title string, c Chrome, body templ.Component) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ title } · Studio</title>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+			<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"/>
 			<link rel="stylesheet" href="/static/css/app.css"/>
 		</head>
 		<body>

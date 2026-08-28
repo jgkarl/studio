@@ -97,9 +97,13 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 	}
 
 	// Optional "initial assessment" sub-block: keeps the old one-step asset-intake feel now that
-	// Assessments require a Project — if the conservator filled in a condition description here,
-	// record it as this Project's first Assessment right away.
-	if description := strings.TrimSpace(r.FormValue("assessmentDescription")); description != "" {
+	// Assessments require a Project — if the conservator filled in a condition description and/or
+	// attached photos here, record it as this Project's first Assessment right away. Photos alone
+	// (no description text) still count - they used to silently vanish here because the upload was
+	// nested inside the description-only check below.
+	description := strings.TrimSpace(r.FormValue("assessmentDescription"))
+	photos := media.FilesFromForm(r, "photos")
+	if description != "" || len(photos) > 0 {
 		condition := r.FormValue("assessmentCondition")
 		if condition == "" {
 			condition = "other"
@@ -111,7 +115,7 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssessment, assessmentID, "photo"); err != nil {
+		if _, err := svc.Media.UploadAllAndAttachWithCaption(ctx, photos, user.ID, media.RefAssessment, assessmentID, "photo", r.FormValue("photosCaption")); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -336,7 +340,7 @@ func (svc *Service) handleAddMedia(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 	id := r.PathValue("id")
-	if _, err := svc.Media.UploadAllAndAttach(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefProject, id, "photo"); err != nil {
+	if _, err := svc.Media.UploadAllAndAttachWithCaption(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefProject, id, "photo", r.FormValue("photosCaption")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

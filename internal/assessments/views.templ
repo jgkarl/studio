@@ -14,12 +14,16 @@ templ ListPage(c web.Chrome, rows []ListRow, conditions []settings.Classifier) {
 }
 
 templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Locale) {
-	@web.PageHeader("Assessments", "Condition-status records, per object.", newAssessmentLink())
+	@web.PageHeader("Assessments", "Condition-status records, per object.", web.NewActionLink("/assessments/new", "New assessment"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by asset, client…")
 			@web.EntityListFilterSelect("condition", "All conditions", settings.ClassifierFilterOptions(conditions, locale))
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "asset", Label: "Asset"},
+				{Value: "client", Label: "Client"},
+				{Value: "condition", Label: "Condition"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No assessments recorded yet.</p>
@@ -32,6 +36,7 @@ templ listBody(rows []ListRow, conditions []settings.Classifier, locale i18n.Loc
 					data-el-condition={ row.Condition }
 					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
 					data-el-group-client={ row.ClientName }
+					data-el-group-condition={ row.Condition }
 				>
 					<a href={ templ.URL("/assessments/" + row.ID) } class="entity-list-row">
 						<div>
@@ -61,13 +66,6 @@ func assessmentSearchHaystack(row ListRow) string {
 	return assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + row.Description
 }
 
-templ newAssessmentLink() {
-	<a class="btn btn-primary" href="/assessments/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New assessment
-	</a>
-}
-
 func projectOptionLabel(p ProjectOption) string {
 	return p.Title + " — " + assetLabel(p.AssetTitle, p.AssetRef) + " — " + p.ClientName
 }
@@ -94,7 +92,7 @@ templ newBody(projects []ProjectOption, conditions []settings.Classifier, presel
 				@assessmentFields("", "", conditions, locale)
 				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save assessment
 				</button>
 			</form>
@@ -151,18 +149,18 @@ func conditionTitle(conditions []settings.Classifier, code string, locale i18n.L
 }
 
 templ detailActions(assessment DetailRow) {
-	<a class="btn btn-ghost" href={ templ.URL("/projects/" + assessment.ProjectID) }>
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
-		View project
+	<a class="btn btn-ghost" href={ templ.URL("/projects/" + assessment.ProjectID) } aria-label="View project" title="View project">
+		@web.Icon("history", 14)
+		<span class="btn-label">View</span>
 	</a>
-	<a class="btn btn-secondary" href={ templ.URL("/assessments/" + assessment.ID + "/edit") }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
-		Edit
+	<a class="btn btn-secondary" href={ templ.URL("/assessments/" + assessment.ID + "/edit") } aria-label="Edit" title="Edit">
+		@web.Icon("edit", 14)
+		<span class="btn-label">Edit</span>
 	</a>
-	<form method="post" action={ templ.URL("/assessments/" + assessment.ID + "/unlink") } data-confirm="Unlink this assessment? It stays in the database but won't show here anymore.">
-		<button type="submit" class="btn btn-ghost">
-			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
-			Unlink
+	<form method="post" action={ templ.URL("/assessments/" + assessment.ID + "/unlink") } data-confirm="Remove this assessment? It stays in the database but won't show here anymore.">
+		<button type="submit" class="btn btn-ghost" aria-label="Remove" title="Remove">
+			@web.Icon("close", 14)
+			<span class="btn-label">Remove</span>
 		</button>
 	</form>
 }
@@ -178,11 +176,11 @@ templ editBody(assessment Assessment, conditions []settings.Classifier, locale i
 			@assessmentFields(assessment.Condition, assessment.Description, conditions, locale)
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/assessments/" + assessment.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>
@@ -222,7 +220,7 @@ templ AddModalBody(projectID string, projects []ProjectOption, conditions []sett
 		@assessmentFields("", "", conditions, locale)
 		@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 		<button type="submit" class="btn btn-primary">
-			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			@web.Icon("check_circle", 14)
 			Save assessment
 		</button>
 	</form>

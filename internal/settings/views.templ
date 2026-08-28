@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"database/sql"
+	"encoding/json"
 	"strconv"
 
 	"studio/internal/auth"
@@ -14,11 +16,59 @@ import (
 templ tabNav(active string, showUsers bool) {
 	<div class="tab-nav">
 		<a href="/settings" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "classifiers") }>Classifiers</a>
+		<a href="/settings/statistics" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "statistics") }>Statistics</a>
 		<a href="/settings/features" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "features") }>Features</a>
 		if showUsers {
 			<a href="/settings/users" class={ "tab-nav-link", templ.KV("tab-nav-link-active", active == "users") }>Users</a>
 		}
 	</div>
+}
+
+// StatisticsPage is the Settings -> Statistics tab: read-only counters over the two classifier
+// families it's genuinely useful to see usage totals for - Asset Types (how many Assets of each)
+// and Annotation Types (how many pattern-layer regions have been drawn with each, and how many
+// distinct Assets carry at least one) - see LoadAssetTypeStats/LoadAnnotationTypeStats.
+templ StatisticsPage(c web.Chrome, assetTypes []AssetTypeStat, annotationTypes []AnnotationTypeStat, isAdmin bool, locale i18n.Locale) {
+	@web.AppLayout("Settings", c, statisticsBody(assetTypes, annotationTypes, isAdmin, locale))
+}
+
+templ statisticsBody(assetTypes []AssetTypeStat, annotationTypes []AnnotationTypeStat, isAdmin bool, locale i18n.Locale) {
+	@web.PageHeader("Settings", "Usage counters across the app.", templ.NopComponent)
+	@tabNav("statistics", isAdmin)
+	@web.Card() {
+		<h2 class="dashboard-heading">Asset types</h2>
+		if len(assetTypes) == 0 {
+			<p class="empty-state">No asset types configured yet.</p>
+		} else {
+			<ul class="stat-list">
+				for _, s := range assetTypes {
+					<li class="stat-list-row">
+						<span>{ ClassifierLabel(s.Classifier, locale) }</span>
+						<span class="badge">{ strconv.Itoa(s.AssetCount) } asset(s)</span>
+					</li>
+				}
+			</ul>
+		}
+	}
+	@web.Card() {
+		<h2 class="dashboard-heading">Annotation types</h2>
+		<p class="page-subtitle">Region count is every drawn region of that type; asset count is how many distinct assets carry at least one.</p>
+		if len(annotationTypes) == 0 {
+			<p class="empty-state">No annotation types configured yet.</p>
+		} else {
+			<ul class="stat-list">
+				for _, s := range annotationTypes {
+					<li class="stat-list-row">
+						<span>{ ClassifierLabel(s.Classifier, locale) }</span>
+						<span class="row-actions">
+							<span class="badge">{ strconv.Itoa(s.RegionCount) } region(s)</span>
+							<span class="badge">{ strconv.Itoa(s.AssetCount) } asset(s)</span>
+						</span>
+					</li>
+				}
+			</ul>
+		}
+	}
 }
 
 templ ClassifiersPage(c web.Chrome, groups []ClassifierGroup, isAdmin bool) {
@@ -53,7 +103,7 @@ templ featuresBody(limits []FeatureLimitValue, reportableGroups []ReportableGrou
 				}
 			}
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Save limits
 			</button>
 		</form>
@@ -76,7 +126,7 @@ templ featuresBody(limits []FeatureLimitValue, reportableGroups []ReportableGrou
 				</div>
 			}
 			<button type="submit" class="btn btn-primary">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Save reportable fields
 			</button>
 		</form>
@@ -128,7 +178,7 @@ templ usersBody(users []auth.User) {
 										}
 									</select>
 									<button type="submit" class="btn btn-secondary">
-										<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+										@web.Icon("check_circle", 14)
 										Save
 									</button>
 								</form>
@@ -149,27 +199,91 @@ templ classifierGroupCard(group ClassifierGroup, locale i18n.Locale) {
 		}
 		<div class="tag-pills">
 			for _, row := range group.Rows {
-				<span class="tag-pill">
-					{ ClassifierLabel(row, locale) }
-					<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
-						<button type="submit" class="tag-pill-remove" aria-label="Remove">
-							<img src="/static/icons/close.svg" width="10" height="10" alt="" class="icon"/>
-						</button>
-					</form>
-				</span>
+				@classifierPill(group.Type, row, locale)
 			}
 		</div>
-		<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type)) } class="inline-edit-form">
-			@web.Field("Title (English)", "") {
-				<input class="input" name="title" required placeholder="New option name"/>
+		<form method="post" action={ templ.URL("/settings/classifiers/" + string(group.Type)) } class="inline-edit-form inline-edit-form-row">
+			<input class="input" name="title" required placeholder="Title (English)"/>
+			<input class="input" name="titleEt" placeholder="Title (Estonian)"/>
+			<input class="input classifier-sequence-input" type="number" name="sequence" placeholder="Order"/>
+			if group.Type == ClassifierAnnotationType {
+				@annotationSwatchFields(annotationSwatch{Hatch: "hatch-diagonal", Color: "#dc2626"})
 			}
-			@web.Field("Title (Estonian)", "") {
-				<input class="input" name="titleEt" placeholder="Eestikeelne nimi"/>
-			}
-			<button type="submit" class="btn btn-secondary">
-				<img src="/static/icons/add.svg" width="14" height="14" alt="" class="icon"/>
-				Add
+			<button type="submit" class="btn btn-secondary" aria-label="Add" title="Add">
+				@web.Icon("add", 14)
+				<span class="btn-label">Add</span>
 			</button>
 		</form>
 	}
+}
+
+// annotationSwatch is the {"hatch","color"} shape a Classifier.Data JSON holds for the
+// annotation_type group - internal/media/annotations.go's AnnotationTypeData decodes the exact
+// same shape server-side when rendering the pattern layer; duplicated here (rather than imported)
+// since internal/media already imports internal/settings, and settings importing media back would
+// be circular.
+type annotationSwatch struct {
+	Hatch string `json:"hatch"`
+	Color string `json:"color"`
+}
+
+var hatchOptions = []struct{ Value, Label string }{
+	{"hatch-horizontal", "Horizontal"},
+	{"hatch-vertical", "Vertical"},
+	{"hatch-diagonal", "Diagonal"},
+	{"hatch-antidiagonal", "Antidiagonal"},
+}
+
+func decodeAnnotationSwatch(data sql.NullString) annotationSwatch {
+	out := annotationSwatch{Hatch: "hatch-diagonal", Color: "#dc2626"}
+	if data.Valid && data.String != "" {
+		_ = json.Unmarshal([]byte(data.String), &out)
+	}
+	return out
+}
+
+// classifierPill is one classifier row's pill - its label (plus, for annotation_type, a color/hatch
+// swatch preview), and (behind a <details> disclosure, no JS needed) an inline edit form for
+// Title EN/ET + Sequence, with the color/hatch pair added on for annotation_type only. Sequence is
+// what every <select> built from GetClassifiers/GetAllClassifiers orders by, so this is how an
+// admin reorders any picklist in the app, not just annotation types.
+templ classifierPill(classifierType ClassifierType, row Classifier, locale i18n.Locale) {
+	{{ isAnnotation := classifierType == ClassifierAnnotationType }}
+	{{ swatch := decodeAnnotationSwatch(row.Data) }}
+	<span class={ "tag-pill", templ.KV("annotation-type-pill", isAnnotation) }>
+		if isAnnotation {
+			<span class="pattern-layer-swatch" style={ "background-color:" + swatch.Color }></span>
+		}
+		{ ClassifierLabel(row, locale) }
+		<details class="annotation-type-edit">
+			<summary aria-label="Edit">
+				@web.Icon("edit", 10)
+			</summary>
+			<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/update") } class="annotation-type-edit-form">
+				<input class="input classifier-edit-title" name="title" value={ row.Title } placeholder="Title (English)"/>
+				<input class="input classifier-edit-title" name="titleEt" value={ row.TitleEt.String } placeholder="Title (Estonian)"/>
+				<input class="input classifier-sequence-input" type="number" name="sequence" value={ strconv.Itoa(row.Sequence) } placeholder="Order"/>
+				if isAnnotation {
+					@annotationSwatchFields(swatch)
+				}
+				<button type="submit" class="btn btn-secondary" aria-label="Save" title="Save">
+					@web.Icon("check_circle", 14)
+				</button>
+			</form>
+		</details>
+		<form method="post" action={ templ.URL("/settings/classifiers/" + string(classifierType) + "/" + row.ID + "/delete") } data-confirm={ "Remove \"" + row.Title + "\"?" }>
+			<button type="submit" class="tag-pill-remove" aria-label="Remove">
+				@web.Icon("close", 10)
+			</button>
+		</form>
+	</span>
+}
+
+templ annotationSwatchFields(swatch annotationSwatch) {
+	<input type="color" name="color" value={ swatch.Color } aria-label="Color" title="Color"/>
+	<select name="hatch" class="input" aria-label="Pattern" title="Pattern">
+		for _, opt := range hatchOptions {
+			<option value={ opt.Value } selected?={ opt.Value == swatch.Hatch }>{ opt.Label }</option>
+		}
+	</select>
 }

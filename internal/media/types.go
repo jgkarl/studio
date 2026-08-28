@@ -1,7 +1,9 @@
 // Package media is the Media module: local-disk file storage, upload with a web-sized thumbnail
-// variant (govips), a lightbox viewer (rotate + brightness/contrast CSS filters, no server round
-// trip), and the media grid (every Media row, annotated with which Asset/Project/Client it
-// belongs to via the polymorphic MediaReference table).
+// variant (govips), an OpenSeadragon deep-zoom lightbox viewer/editor for drawing pattern-layer
+// annotations (see annotations.go), annotated versions as their own real, persisted Media rows
+// baked from the original (see rasterize.go's BakeAnnotatedVersion and Media.EditedFromID/
+// DerivedLabel), and the media grid (every Media row, annotated with which Asset/Project/Client
+// it belongs to via the polymorphic MediaReference table).
 package media
 
 import (
@@ -58,8 +60,25 @@ type Media struct {
 	Checksum        string
 	UploadedByID    string
 	EditedFromID    sql.NullString
-	Description     sql.NullString
-	CreatedAt       time.Time
+	// DerivedLabel is set only on an annotated version (EditedFromID also set) - "annotated",
+	// "annotated 2", ... computed once at creation by NextDerivedLabel. NULL on a true original.
+	DerivedLabel sql.NullString
+	Description  sql.NullString
+	CreatedAt    time.Time
+}
+
+// IsAnnotatedVersion reports whether this Media is a baked annotated version of another (rather
+// than a true original upload) - the two render meaningfully different chrome (see
+// internal/media/views.templ).
+func (m Media) IsAnnotatedVersion() bool {
+	return m.EditedFromID.Valid
+}
+
+// IsBaked reports whether an annotated version has actually been through BakeAnnotatedVersion at
+// least once - a freshly created draft (see CreateAnnotatedVersion) has no real file on disk yet,
+// only a placeholder row so region drawing has something to attach to.
+func (m Media) IsBaked() bool {
+	return m.SizeBytes > 0
 }
 
 // ReferencingType — the polymorphic MediaReference.referencingType values.

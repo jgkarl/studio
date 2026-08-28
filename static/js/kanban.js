@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Whole-card click navigates to the project — skipped when the click landed on the title
     // link itself (that already navigates via its own href) so we don't double-navigate.
     card.addEventListener("click", (e) => {
-      if (!card.dataset.href || e.target.closest("a")) return;
+      if (!card.dataset.href || e.target.closest("a") || e.target.closest("[data-el-tag-filter]")) return;
       window.location.href = card.dataset.href;
     });
   });
@@ -77,15 +77,43 @@ document.addEventListener("DOMContentLoaded", () => {
     if (header) header.textContent = columnBody.querySelectorAll(".kanban-card").length;
   }
 
-  // Search: cards live one per column (not one flat list), so this stays board-specific rather
-  // than reusing static/js/entity-list-filter.js, which assumes a single flat <ul>/<li> list.
+  // Search + filter: cards live one per column (not one flat list), so this stays board-specific
+  // rather than reusing static/js/entity-list-filter.js, which assumes a single flat <ul>/<li>
+  // list - but follows the same data-el-filter/data-el-<key> and data-el-tag-filter/
+  // data-el-tag-value conventions that script uses, for consistency across the app's list pages.
   const search = document.getElementById("kanban-search");
-  if (search) {
-    search.addEventListener("input", () => {
+  const filters = Array.from(document.querySelectorAll("[data-el-filter]"));
+
+  function matches(card) {
+    if (search && search.value.trim()) {
       const q = search.value.trim().toLowerCase();
-      board.querySelectorAll(".kanban-card").forEach((card) => {
-        card.hidden = q !== "" && !(card.dataset.search || "").toLowerCase().includes(q);
-      });
+      if (!(card.dataset.search || "").toLowerCase().includes(q)) return false;
+    }
+    for (const sel of filters) {
+      if (!sel.value) continue;
+      const key = "el" + sel.dataset.elFilter.charAt(0).toUpperCase() + sel.dataset.elFilter.slice(1);
+      if (card.dataset[key] !== sel.value) return false;
+    }
+    return true;
+  }
+
+  function render() {
+    board.querySelectorAll(".kanban-card").forEach((card) => {
+      card.hidden = !matches(card);
     });
   }
+
+  if (search) search.addEventListener("input", render);
+  filters.forEach((sel) => sel.addEventListener("change", render));
+
+  board.addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-el-tag-filter]");
+    if (!chip) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const sel = filters.find((s) => s.dataset.elFilter === chip.dataset.elTagFilter);
+    if (!sel) return;
+    sel.value = sel.value === chip.dataset.elTagValue ? "" : chip.dataset.elTagValue;
+    render();
+  });
 });

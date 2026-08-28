@@ -27,6 +27,7 @@ type AlbumItem struct {
 	ProjectID       sql.NullString
 	ProjectTitle    sql.NullString
 	ClientName      sql.NullString
+	DerivedLabel    sql.NullString
 }
 
 type mediaWithUploader struct {
@@ -34,6 +35,7 @@ type mediaWithUploader struct {
 	Kind                         Kind
 	Width, Height, Duration      sql.NullInt64
 	CreatedAt                    time.Time
+	DerivedLabel                 sql.NullString
 }
 
 type refRow struct {
@@ -50,12 +52,19 @@ type refRow struct {
 func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumItem, error) {
 	scanMediaU := func(rows *sql.Rows) (mediaWithUploader, error) {
 		var m mediaWithUploader
-		err := rows.Scan(&m.ID, &m.Kind, &m.MimeType, &m.Width, &m.Height, &m.Duration, &m.CreatedAt, &m.UploadedByName)
+		err := rows.Scan(&m.ID, &m.Kind, &m.MimeType, &m.Width, &m.Height, &m.Duration, &m.CreatedAt, &m.UploadedByName, &m.DerivedLabel)
 		return m, err
 	}
+	// editedFromId IS NULL OR sizeBytes > 0 excludes an annotated-version draft that hasn't been
+	// through BakeAnnotatedVersion yet (CreateAnnotatedVersion inserts it immediately so region
+	// drawing has something to attach to, but it has no real file on disk until the editor
+	// closes) - nothing to show a thumbnail of, so it doesn't belong in "every image uploaded"
+	// yet.
 	mediaRows, err := studiodb.Query(ctx, q, `
-		SELECT m.id, m.kind, m.mimeType, m.width, m.height, m.durationSeconds, m.createdAt, u.name
-		FROM Media m JOIN User u ON u.id = m.uploadedByUserId ORDER BY m.createdAt DESC`, scanMediaU)
+		SELECT m.id, m.kind, m.mimeType, m.width, m.height, m.durationSeconds, m.createdAt, u.name, m.derivedLabel
+		FROM Media m JOIN User u ON u.id = m.uploadedByUserId
+		WHERE m.editedFromId IS NULL OR m.sizeBytes > 0
+		ORDER BY m.createdAt DESC`, scanMediaU)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +313,7 @@ func GetAllMediaWithContext(ctx context.Context, q studiodb.Querier) ([]AlbumIte
 			ID: m.ID, Kind: m.Kind, MimeType: m.MimeType, Width: m.Width, Height: m.Height,
 			DurationSeconds: m.Duration, CreatedAt: m.CreatedAt, UploadedByName: m.UploadedByName,
 			Role: ref.Role, AssetID: assetID, AssetTitle: assetTitle, ProjectID: projectID,
-			ProjectTitle: projectTitle, ClientName: clientName,
+			ProjectTitle: projectTitle, ClientName: clientName, DerivedLabel: m.DerivedLabel,
 		}
 	}
 	return items, nil

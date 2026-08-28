@@ -9,6 +9,27 @@
 @font-face { font-family: 'Roboto'; src: url('/static/fonts/Roboto-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Roboto'; src: url('/static/fonts/Roboto-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
 
+/* Material Symbols (Outlined), loaded via Google Fonts CDN (internal/web/layout.templ's/ui.templ's
+   <head>) - replaces the old one-off hand-drawn static/icons/*.svg set app-wide (logo.svg stays,
+   it's the brand mark, not a UI icon) so every icon comes from one consistent, actively-maintained
+   glyph set instead of a growing pile of bespoke SVGs. Rendered as inline <span> glyphs (see
+   web.Icon) sized via font-size and colored via currentColor - a button's own text color already
+   themes its icon correctly in both light and dark, on any background, with no separate "inverted"
+   variant or dark-mode filter hack needed. */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
 :root {
   --font-body: 'Roboto', system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-heading: 'Raleway', 'Roboto', system-ui, sans-serif;
@@ -38,6 +59,7 @@
   --blue-text: #014682;
   --neutral-bg: var(--gray-100);
   --neutral-text: var(--text);
+  --stripe-even: #E8F0F9;
 
   --header-bg: linear-gradient(96.04deg, var(--yellow-100) -17.14%, var(--blue-100) 94.45%);
   --shadow-sm: 0px 10px 80px rgba(0,0,0,0.02275), 0px 5.0625px 34.875px rgba(0,0,0,0.035), 0px 2px 13px rgba(0,0,0,0.04725), 0px 0.4375px 4.625px rgba(0,0,0,0.07);
@@ -56,6 +78,7 @@ html[data-theme="dark"] {
   --accent: var(--green-500);
   --accent-text: #ffffff;
   --neutral-bg: var(--gray-700);
+  --stripe-even: #313B46;
   --header-bg: linear-gradient(96.04deg, var(--yellow-900) -17.14%, var(--blue-900) 94.45%);
   --shadow: none;
   --shadow-sm: none;
@@ -96,23 +119,80 @@ h1, h2, h3 {
   font-weight: 600;
 }
 
+/* Mobile-first: smaller page title on a narrow screen (real estate is scarce, and it needs to
+   share its row with the primary action - see .page-header/.btn-label below), back up to the
+   original size from the sm breakpoint up. */
 h1 {
-  font-size: 1.75rem;
+  font-size: 1.375rem;
   font-weight: 500;
 }
 
+@media (min-width: 640px) {
+  h1 {
+    font-size: 1.75rem;
+  }
+}
+
+/* flex-wrap: nowrap (not the app's usual mobile-first wrap) is deliberate here - the title and
+   its primary action (New client/asset/... - see web.NewActionLink) always stay on one row, at
+   every breakpoint, down to the smaller h1 above and .btn-label collapsing to icon-only below. */
 .page-header {
+  margin-bottom: 1.5rem;
+}
+
+/* Title + actions is its own row, kept separate from .page-subtitle below - a two-line title
+   block would otherwise get compared for vertical centering against the actions row as one
+   combined height, throwing the buttons off-center from the title text they actually sit next
+   to. */
+/* Mobile-first: wraps (actions drop to their own row under the title) below sm - .btn-label's
+   icon-only collapse keeps most action rows short enough to fit, but a detail page with several
+   always-visible-text buttons (e.g. Asset's Edit/Start/HTML/PDF) can still be too wide for a long
+   title to share a strict single row with on a narrow phone; wrapping is a safe fallback rather
+   than squeezing the title down to a sliver. nowrap (title/actions pinned to one row, vertically
+   centered) from sm up, where there's room for both. */
+.page-header-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: 0.5rem 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .page-header-row {
+    flex-wrap: nowrap;
+  }
+}
+
+.page-header-row h1 {
+  min-width: 0;
+}
+
+.page-header .actions {
+  flex-shrink: 0;
 }
 
 .page-subtitle {
   margin: 0.25rem 0 0;
   font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* A small breadcrumb-like chip for "this record's real-world context" lines directly under a
+   PageHeader - Asset's owner, Project's asset/owner, an annotated Media version's source - a
+   plain text line the same weight as .page-subtitle read as part of the header itself; a bordered
+   pill reads as its own distinct, secondary piece of info instead. */
+.subtitle-card {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0 0 1rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
 }
 
@@ -138,6 +218,18 @@ html[data-theme="dark"] .card {
   margin-top: 1rem;
 }
 
+/* A bare header-row + content block sitting directly on the page background between two .card
+   elements (e.g. Asset detail's "Projects" section, a list of its own per-project cards rather
+   than one enclosing card) - .card + .card's margin-top can't reach across it, so it carries its
+   own top margin, and hands the same margin on to whatever .card follows it. */
+.detail-section {
+  margin-top: 1rem;
+}
+
+.detail-section + .card {
+  margin-top: 1rem;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -155,7 +247,12 @@ html[data-theme="dark"] .card {
 
 .btn-primary {
   background: var(--accent);
+  border-color: transparent;
   color: var(--accent-text);
+}
+
+.btn-primary:hover {
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary {
@@ -198,6 +295,18 @@ html[data-theme="dark"] .card {
   pointer-events: none;
 }
 
+/* web.NewActionLink's label: icon-only below sm (a round/square icon button - simpler and never
+   competes with the page title for room on a narrow .page-header row), icon + text from sm up. */
+@media (max-width: 639px) {
+  .btn-label {
+    display: none;
+  }
+
+  .btn:has(.btn-label) {
+    padding: 0.625rem;
+  }
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -224,6 +333,20 @@ html[data-theme="dark"] .card {
   margin-bottom: 0.25rem;
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+/* web.FileInput: the "Choose files…" trigger and its optional name/caption field side by side,
+   wrapping to their own rows on a narrow screen rather than squeezing the caption input away. */
+.file-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-input-row .input {
+  flex: 1;
+  min-width: 10rem;
 }
 
 .field .hint {
@@ -387,8 +510,60 @@ html[data-theme="dark"] select.input, html[data-theme="dark"] select {
 .inline-edit-form {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.75rem;
+}
+
+.inline-edit-form-row {
+  align-items: center;
+}
+
+.inline-edit-form-row input[type="text"],
+.inline-edit-form-row input:not([type]),
+.classifier-edit-title {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+}
+
+.classifier-sequence-input {
+  flex: 0 0 5rem;
+  width: 5rem;
+  min-width: 5rem;
+}
+
+.inline-edit-form-row input[type="color"],
+.annotation-type-edit-form input[type="color"] {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.125rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.inline-edit-form-row select {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+@media (max-width: 639px) {
+  .inline-edit-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .inline-edit-form-row .classifier-edit-title,
+  .inline-edit-form-row .classifier-sequence-input,
+  .inline-edit-form-row input[type="text"],
+  .inline-edit-form-row input:not([type]) {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  .inline-edit-form-row .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .checkbox-field {
@@ -405,14 +580,7 @@ html[data-theme="dark"] select.input, html[data-theme="dark"] select {
 .icon {
   display: inline-block;
   vertical-align: middle;
-}
-
-html[data-theme="dark"] .icon {
-  filter: invert(0.9);
-}
-
-.icon-invert {
-  filter: invert(1) !important;
+  color: currentColor;
 }
 
 /* Visually hides an element while keeping it in the accessibility tree and clickable via an
@@ -555,8 +723,13 @@ html[data-theme="dark"] .nav-toggle-btn {
 .navbar-pill-btn {
   background: transparent;
   border: 1px solid rgba(36, 42, 48, 0.25);
-  border-radius: 9999px;
-  padding: 8px 12px;
+  border-radius: 4px;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -565,18 +738,22 @@ html[data-theme="dark"] .nav-toggle-btn {
   letter-spacing: 0.02em;
 }
 
+/* 40px is Material Design's minimum comfortable touch target for a dense icon button (the navbar
+   row has several side by side, so the full 48px spec target would crowd it) - matches
+   .pattern-layer-tool-btn/.split-btn-caret's own icon-button size for the same reason. */
 .navbar-icon-btn {
   background: transparent;
   border: 1px solid rgba(36, 42, 48, 0.25);
   border-radius: 4px;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 15px;
   color: var(--text);
+  text-decoration: none;
 }
 
 .navbar-pill-btn:hover,
@@ -1072,6 +1249,35 @@ html[data-theme="dark"] .stat-card {
   flex-shrink: 0;
 }
 
+/* Below sm, search and every filter/group-by chip each take their own full-width row instead of
+   wrapping into uneven, cramped widths - easier to read and tap on a phone. Must come *after* the
+   .list-toolbar/.search-wrap/.filter-chip base rules above: equal-specificity CSS ties break on
+   source order regardless of which @media condition is active, so placed any earlier this whole
+   block would lose every one of these overrides (width, min-width, flex, height) right back to
+   the unconditional base rules - which is exactly what silently happened before this comment. */
+@media (max-width: 639px) {
+  .list-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-wrap,
+  .filter-chip {
+    width: 100%;
+    min-width: 0;
+    /* .search-wrap's own flex: 1 sizes it along .list-toolbar's *main* axis - width in the
+       desktop row layout above, but height once flex-direction flips to column here, collapsing
+       it down toward its content's min-height instead of the explicit 40px height both rules
+       set. flex: none stops that axis takeover, so height:40px applies as intended. */
+    flex: none;
+  }
+
+  .filter-chip-select {
+    flex: 1;
+    width: 100%;
+  }
+}
+
 /* --- Detail pages (Client/Asset/etc.) ------------------------------------------------------ */
 
 .tag-pills {
@@ -1082,6 +1288,7 @@ html[data-theme="dark"] .stat-card {
 }
 
 .tag-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -1114,6 +1321,46 @@ html[data-theme="dark"] .stat-card {
 
 .tag-pill-remove:hover {
   opacity: 1;
+}
+
+.annotation-type-edit summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.7;
+  list-style: none;
+}
+
+.annotation-type-edit summary::-webkit-details-marker {
+  display: none;
+}
+
+.annotation-type-edit summary:hover {
+  opacity: 1;
+}
+
+.annotation-type-edit[open] summary {
+  opacity: 1;
+}
+
+.annotation-type-edit-form {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }
 
 /* --- Forms ----------------------------------------------------------------------------------- */
@@ -1202,6 +1449,29 @@ html[data-theme="dark"] .stat-card {
   margin: 0.75rem 0 0;
   font-size: 0.875rem;
   color: var(--text-muted);
+}
+
+/* --- Statistics tab counters (Settings -> Statistics) --------------------------------------- */
+
+.stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stat-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.625rem 0;
+  border-top: 1px solid var(--border-light);
+  font-size: 0.875rem;
+}
+
+.stat-list-row:first-child {
+  border-top: none;
 }
 
 /* --- Album ------------------------------------------------------------------------------- */
@@ -1308,79 +1578,7 @@ html[data-theme="dark"] .stat-card {
   text-overflow: ellipsis;
 }
 
-/* --- Media view image + lightbox + video --------------------------------------------------- */
-
-.lightbox-trigger {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: zoom-in;
-}
-
-.lightbox-trigger img {
-  display: block;
-  max-height: 60vh;
-  width: 100%;
-  object-fit: contain;
-  border-radius: 0.5rem;
-  background: #1c1917;
-}
-
-.lightbox-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.85);
-}
-
-.lightbox-overlay:not([hidden]) {
-  display: flex;
-}
-
-.lightbox-modal {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 80vw;
-  max-width: 80vw;
-  height: 80vh;
-  max-height: 80vh;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: var(--surface);
-  overflow-y: auto;
-}
-
-.lightbox-close {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 10;
-  padding: 0.4rem;
-  border: 0;
-  border-radius: 999px;
-  background: var(--bg);
-  cursor: pointer;
-}
-
-.lightbox-close:hover {
-  background: var(--neutral-bg);
-}
-
-.lightbox-image-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-}
+/* --- Media view image + video ---------------------------------------------------------------- */
 
 .lightbox-controls {
   display: flex;
@@ -1393,14 +1591,6 @@ html[data-theme="dark"] .stat-card {
   flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
-}
-
-.lightbox-slider-field {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 .media-view-video {
@@ -1444,32 +1634,29 @@ html[data-theme="dark"] .stat-card {
 }
 
 /* --- Pattern layer / deep-zoom viewer ----------------------------------------------------------
-   The media view's one image viewer/editor (static/js/lightbox.js): OpenSeadragon deep zoom
-   against the IIIF Image API is the viewing surface (.osd-viewer), with the stored annotation
-   regions (internal/media/annotations.go — rectangles or freehand-brush outlines) rendered into a
-   0-100 viewBox SVG that OpenSeadragon manages as one of its own overlays (viewer.addOverlay) so
-   it tracks pan/zoom/rotation automatically instead of needing hand-rolled viewport-transform
-   math — new regions are drawn directly on this same surface. A legend is always rendered
-   underneath, whether or not anything's marked yet. */
-
-/* Rotate is applied to this wrapper, one level above .pattern-layer-stage - never to the stage
-   itself, since OpenSeadragon measures that element's own box for its canvas/tile layout, and a
-   transform on the element being measured skews its bounding-rect-based size math. Keeping the
-   transform one level up leaves OpenSeadragon measuring an always-unrotated box, and just visually
-   spins the whole already-correctly-sized result. */
-.pattern-layer-rotate-wrap {
-  width: 100%;
-  transition: transform 0.2s ease;
-}
+   Shared by the plain view page (static/js/media-viewer.js, read-only, no overlay/toolbar) and the
+   edit page (static/js/media-editor.js): OpenSeadragon deep zoom against the IIIF Image API is the
+   viewing surface (.osd-viewer), with, on the edit page only, the stored annotation regions
+   (internal/media/annotations.go — rectangles or freehand-brush outlines) rendered into a 0-100
+   viewBox SVG that OpenSeadragon manages as one of its own overlays (viewer.addOverlay) so it
+   tracks pan/zoom automatically instead of needing hand-rolled viewport-transform math — new
+   regions are drawn directly on this same surface. A legend is always rendered underneath the
+   editor's image, whether or not anything's marked yet. */
 
 .pattern-layer-stage {
   position: relative;
   width: 100%;
+  min-width: 300px;
   height: 55vh;
   min-height: 20rem;
   border-radius: 0.5rem;
   overflow: hidden;
   background: var(--bg);
+  /* Hands every touch gesture over this stage to JS (OpenSeadragon's own pan/pinch-zoom,
+     static/js/media-editor.js's touch region-drawing) instead of the browser's default touch
+     handling - without it, mobile Safari/Chrome can intercept a drag as a page-scroll/pull-to-
+     refresh gesture (or add its own tap-recognition delay) before either ever sees it. */
+  touch-action: none;
 }
 
 .osd-viewer {
@@ -1499,6 +1686,37 @@ html[data-theme="dark"] .stat-card {
   align-items: center;
 }
 
+.pattern-layer-tool-group {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+/* Icon-toggle buttons picking rect vs. freehand-brush - same is-active/accent-highlight
+   convention as .album-kind-btn (internal/media/views.templ's albumBody kind filter). */
+.pattern-layer-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pattern-layer-tool-btn:hover {
+  background: var(--neutral-bg);
+}
+
+.pattern-layer-tool-btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
 .pattern-layer-select-field {
   display: flex;
   align-items: center;
@@ -1511,11 +1729,98 @@ html[data-theme="dark"] .stat-card {
   width: auto;
 }
 
+/* Whole-image description note: label + field on one row — saved together with the region set by
+   the edit page's one general Save button (.media-edit-save-row), not its own inline button. */
+.lightbox-note-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lightbox-note-row label {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.lightbox-note-row input {
+  flex: 1;
+}
+
+.media-edit-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Download-with-a-secondary-option split button (media view's "Download" / "Original") - a plain
+   <details> disclosure for the caret side, no JS needed, same no-framework convention as Settings'
+   annotation-type-edit popout. */
+.split-btn {
+  position: relative;
+  display: inline-flex;
+}
+
+.split-btn-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.split-btn-toggle summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+}
+
+.split-btn-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Icon-only, so it gets a square touch target instead of .btn's own text padding (which would
+   leave it oddly wide for just one glyph) - same 40px sizing as the other icon buttons. */
+.split-btn-caret {
+  width: 2.5rem;
+  height: 100%;
+  min-height: 40px;
+  padding: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.split-btn-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.split-btn-menu-item {
+  display: block;
+  padding: 0.5rem 0.625rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.split-btn-menu-item:hover {
+  background: var(--neutral-bg);
+}
+
 .pattern-layer-swatch {
   display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 0.1875rem;
+  width: 1.375rem;
+  height: 1.375rem;
   flex: none;
 }
 
@@ -1523,10 +1828,14 @@ html[data-theme="dark"] .stat-card {
   margin-top: 0.25rem;
 }
 
+/* Two columns once there's room, one below that — content-driven via auto-fit/minmax rather than a
+   hard breakpoint, so it tracks the legend's actual (image-width-matched) container instead of the
+   viewport: at the image's 300px floor (.pattern-layer-stage's own min-width) two 130px columns
+   plus the gap don't fit, so it collapses to one; a wider image gets two. */
 .pattern-layer-legend-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.5rem 1rem;
   margin-bottom: 0.5rem;
 }
 
@@ -1565,8 +1874,8 @@ html[data-theme="dark"] .stat-card {
 
 /* Full-bleed 5-column board (Orders) - breaks out of .container's 1200px max-width to use the
    full viewport instead of horizontal-scrolling fixed-width columns. */
-/* Mobile-first: 1 column by default, 2 at sm (a phone in landscape or a small tablet), 3 at md
-   (tablet portrait — 5 stages wrap 3/2), 5 — one row — at lg and up, where there's finally room. */
+/* Mobile-first: a single column below lg (no cramped 2/3-column in-between state — 5 real stage
+   columns need real width), all 5 stage columns in one row at lg and up. */
 .kanban-board {
   display: grid;
   grid-template-columns: 1fr;
@@ -1580,18 +1889,6 @@ html[data-theme="dark"] .stat-card {
   margin-right: -50vw;
   padding-inline: 1.5rem;
   box-sizing: border-box;
-}
-
-@media (min-width: 640px) {
-  .kanban-board {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 768px) {
-  .kanban-board {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 @media (min-width: 1024px) {
@@ -1710,7 +2007,7 @@ html[data-theme="dark"] .kanban-card {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  padding: 0.4rem;
+  padding: 0.5rem;
   border: 0;
   border-radius: 999px;
   background: var(--bg);
@@ -1729,8 +2026,8 @@ html[data-theme="dark"] .kanban-card {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -1773,38 +2070,86 @@ html[data-theme="dark"] .kanban-card {
 
 /* --- Module landing grid pages (Clients/Assets/Treatments/Assessments/Reports search+filter
    lists, all built on the shared [data-el-root]/EntityList* components) — every row reads as its
-   own card: two-tone striping by position, a hover highlight, no border dividers. Scoped under
-   [data-el-root] so plain .entity-list-row usages elsewhere (dashboard/detail sub-lists) are
-   unaffected. */
-[data-el-root] .entity-list {
+   own plain white card: a shadow-only hover lift, no odd/even striping, no border dividers.
+   Scoped under [data-el-root] so plain .entity-list-row usages elsewhere (dashboard/detail
+   sub-lists) are unaffected by default - .entity-list-cards (no search/filter JS involved, just a
+   plain <ul class="entity-list entity-list-cards">) opts a nested "linked records" list (a
+   Project's Assessments/Treatments/Reports/Media, an Asset's per-project sub-lists, ...) into a
+   variant of the same look (it keeps an odd/even stripe - see below - since it sits inside an
+   already-white .card and needs the contrast), so a card-within-a-card still reads as its own row
+   instead of the older flat divider-line style. */
+[data-el-root] .entity-list,
+.entity-list-cards {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-[data-el-root] .entity-list-row {
+[data-el-root] .entity-list-row,
+.entity-list-cards > .entity-list-row {
   border-top: none;
   border-radius: 6px;
   padding: 0.875rem 1rem;
   transition: box-shadow 150ms ease, background-color 150ms ease;
 }
 
-[data-el-root] [data-el-row]:nth-child(odd) > .entity-list-row {
+/* Every row is plain --surface (no odd/even stripe) - hover is shadow-only elevation, no
+   background-color change either, so the row's color never shifts, just lifts. */
+[data-el-root] .entity-list-row {
   background: var(--surface);
 }
 
-[data-el-root] [data-el-row]:nth-child(even) > .entity-list-row {
-  background: var(--neutral-bg);
+/* Odd rows use --bg (not --surface, the top-level rule's choice above) - a nested list already
+   sits inside a --surface .card, so a --surface "odd" row would be invisible against it in both
+   themes; --bg (the page's own background, always distinct from --surface) keeps every row
+   visibly its own card even on a single- or odd-count list. */
+.entity-list-cards > .entity-list-row:nth-child(odd) {
+  background: var(--bg);
+}
+
+.entity-list-cards > .entity-list-row:nth-child(even) {
+  background: var(--stripe-even);
 }
 
 [data-el-root] .entity-list-row:hover {
-  background: var(--green-bg);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
 }
 
-html[data-theme="dark"] [data-el-root] .entity-list-row {
+.entity-list-cards > .entity-list-row:hover {
+  background: var(--green-bg);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+}
+
+html[data-theme="dark"] [data-el-root] .entity-list-row,
+html[data-theme="dark"] .entity-list-cards > .entity-list-row {
   border: 1px solid var(--border);
+}
+
+/* Below md, each row reads as a small card rather than a cramped single line: name/subtitle (plus
+   a thumb/avatar where the module has one) stay a header line, row-actions (the filter chips/
+   extra text) wraps onto its own line beneath with a light divider, and the chevron - redundant
+   once the whole card is the tap target and there's no single line left for it to trail - is
+   dropped. */
+@media (max-width: 767px) {
+  [data-el-root] .entity-list-row,
+  .entity-list-cards > .entity-list-row {
+    flex-wrap: wrap;
+    row-gap: 0.625rem;
+  }
+
+  [data-el-root] .entity-list-row > .row-actions,
+  .entity-list-cards > .entity-list-row > .row-actions {
+    flex-basis: 100%;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--border-light);
+  }
+
+  [data-el-root] .entity-list-chevron,
+  .entity-list-cards .entity-list-chevron {
+    display: none;
+  }
 }
 
 /* Tag-chip badges (condition/method/type/status) double as one-click filters for the same grid —
@@ -1917,10 +2262,4 @@ html[data-theme="dark"] [data-el-root] .entity-list-row {
 
 .account-menu-item:hover {
   background: var(--neutral-bg);
-}
-
-.account-menu-link {
-  border-top: 1px solid var(--border-light);
-  margin-top: 4px;
-  padding-top: 10px;
 }

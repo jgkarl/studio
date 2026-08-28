@@ -22,7 +22,7 @@ templ loginForm(errorCode, noticeCode string) {
 				<input class="input" type="password" name="password" required autocomplete="current-password"/>
 			}
 			<button type="submit" class="btn btn-primary btn-block">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Sign in
 			</button>
 		</form>
@@ -65,7 +65,7 @@ templ registerBody() {
 				<input class="input" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password"/>
 			}
 			<button type="submit" class="btn btn-primary btn-block">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Create account
 			</button>
 		</form>
@@ -102,7 +102,7 @@ templ forgotPasswordBody() {
 				<input class="input" type="email" name="email" required autocomplete="email"/>
 			}
 			<button type="submit" class="btn btn-primary btn-block">
-				<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+				@web.Icon("check_circle", 14)
 				Send link
 			</button>
 		</form>
@@ -131,7 +131,7 @@ templ resetPasswordBody(token, errorCode string) {
 					<input class="input" type="password" name="confirmPassword" required minlength="8" autocomplete="new-password"/>
 				}
 				<button type="submit" class="btn btn-primary btn-block">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Update password
 				</button>
 			</form>
@@ -166,7 +166,7 @@ templ verifyEmailBody(verifiedUser *User) {
 					<input class="input" type="email" name="email" required autocomplete="email"/>
 				}
 				<button type="submit" class="btn btn-secondary btn-block">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("check_circle", 14)
 					Resend email
 				</button>
 			</form>

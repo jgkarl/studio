@@ -94,7 +94,7 @@ func (svc *Service) handleCreate(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if _, err := svc.Media.UploadAllAndAttach(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssessment, id, "photo"); err != nil {
+	if _, err := svc.Media.UploadAllAndAttachWithCaption(ctx, media.FilesFromForm(r, "photos"), user.ID, media.RefAssessment, id, "photo", r.FormValue("photosCaption")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

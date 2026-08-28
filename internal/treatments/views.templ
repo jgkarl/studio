@@ -14,12 +14,16 @@ templ ListPage(c web.Chrome, rows []ListRow, methodLabels map[string]string, met
 }
 
 templ listBody(rows []ListRow, methodLabels map[string]string, methods []settings.Classifier) {
-	@web.PageHeader("Treatments", "Conservation work performed, per object.", newTreatmentLink())
+	@web.PageHeader("Treatments", "Conservation work performed, per object.", web.NewActionLink("/treatments/new", "New treatment"))
 	<div data-el-root>
 		<div class="list-toolbar">
 			@web.EntityListSearchInput("Search by title, asset, client…")
 			@web.EntityListFilterSelect("method", "All methods", classifierFilterOptionsFromLabels(methods, methodLabels))
-			@web.EntityListGroupBySelect([]web.FilterOption{{Value: "asset", Label: "Asset"}, {Value: "client", Label: "Client"}})
+			@web.EntityListGroupBySelect([]web.FilterOption{
+				{Value: "asset", Label: "Asset"},
+				{Value: "client", Label: "Client"},
+				{Value: "method", Label: "Method"},
+			})
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No treatments logged yet.</p>
@@ -32,6 +36,7 @@ templ listBody(rows []ListRow, methodLabels map[string]string, methods []setting
 					data-el-method={ row.Method }
 					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
 					data-el-group-client={ row.ClientName }
+					data-el-group-method={ methodLabel(methodLabels, row.Method) }
 				>
 					<a href={ templ.URL("/treatments/" + row.ID) } class="entity-list-row">
 						<div>
@@ -79,13 +84,6 @@ func treatmentSearchHaystack(row ListRow, methodLabels map[string]string) string
 	return row.Title + " " + assetLabel(row.AssetTitle, row.AssetReferenceCode) + " " + row.ClientName + " " + methodLabel(methodLabels, row.Method)
 }
 
-templ newTreatmentLink() {
-	<a class="btn btn-primary" href="/treatments/new">
-		<img src="/static/icons/add.svg" width="16" height="16" alt="" class="icon icon-invert"/>
-		New treatment
-	</a>
-}
-
 templ NewPage(c web.Chrome, projects []ProjectOption, methods []settings.Classifier, preselectedProjectID string) {
 	@web.AppLayout("New treatment", c, newBody(projects, methods, preselectedProjectID, c.Locale))
 }
@@ -111,7 +109,7 @@ templ newBody(projects []ProjectOption, methods []settings.Classifier, preselect
 				}
 				@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Log treatment
 				</button>
 			</form>
@@ -166,22 +164,22 @@ func methodLabel(labels map[string]string, code string) string {
 }
 
 templ detailActions(treatment DetailRow) {
-	<a class="btn btn-ghost" href={ templ.URL("/projects/" + treatment.ProjectID) }>
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
-		View project
+	<a class="btn btn-ghost" href={ templ.URL("/projects/" + treatment.ProjectID) } aria-label="View project" title="View project">
+		@web.Icon("history", 14)
+		<span class="btn-label">View</span>
 	</a>
-	<a class="btn btn-ghost" href={ templ.URL("/assets/" + treatment.AssetID) }>
-		<img src="/static/icons/chevron-right.svg" width="14" height="14" alt="" class="icon"/>
-		View asset
+	<a class="btn btn-ghost" href={ templ.URL("/assets/" + treatment.AssetID) } aria-label="View asset" title="View asset">
+		@web.Icon("folder", 14)
+		<span class="btn-label">View</span>
 	</a>
-	<a class="btn btn-secondary" href={ templ.URL("/treatments/" + treatment.ID + "/edit") }>
-		<img src="/static/icons/edit.svg" width="14" height="14" alt="" class="icon"/>
-		Edit
+	<a class="btn btn-secondary" href={ templ.URL("/treatments/" + treatment.ID + "/edit") } aria-label="Edit" title="Edit">
+		@web.Icon("edit", 14)
+		<span class="btn-label">Edit</span>
 	</a>
-	<form method="post" action={ templ.URL("/treatments/" + treatment.ID + "/unlink") } data-confirm={ "Unlink \"" + treatment.Title + "\"? It stays in the database but won't show here anymore." }>
-		<button type="submit" class="btn btn-ghost">
-			<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
-			Unlink
+	<form method="post" action={ templ.URL("/treatments/" + treatment.ID + "/unlink") } data-confirm={ "Remove \"" + treatment.Title + "\"? It stays in the database but won't show here anymore." }>
+		<button type="submit" class="btn btn-ghost" aria-label="Remove" title="Remove">
+			@web.Icon("close", 14)
+			<span class="btn-label">Remove</span>
 		</button>
 	</form>
 }
@@ -197,11 +195,11 @@ templ editBody(treatment Treatment, methods []settings.Classifier, locale i18n.L
 			@treatmentFields(treatment.Method, treatment.Title, treatment.Notes, methods, locale)
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
-					<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+					@web.Icon("check_circle", 14)
 					Save
 				</button>
 				<a class="btn btn-ghost" href={ templ.URL("/treatments/" + treatment.ID) }>
-					<img src="/static/icons/close.svg" width="14" height="14" alt="" class="icon"/>
+					@web.Icon("close", 14)
 					Cancel
 				</a>
 			</div>
@@ -245,7 +243,7 @@ templ AddModalBody(projectID string, projects []ProjectOption, methods []setting
 		@treatmentFields("", "", "", methods, locale)
 		@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
 		<button type="submit" class="btn btn-primary">
-			<img src="/static/icons/check-circle.svg" width="14" height="14" alt="" class="icon icon-invert"/>
+			@web.Icon("check_circle", 14)
 			Log treatment
 		</button>
 	</form>

@@ -93,6 +93,42 @@ func (s *Service) UploadMedia(ctx context.Context, data []byte, mimeType, upload
 	return GetByID(ctx, s.Pool, id)
 }
 
+// CreateAnnotatedVersion starts a new annotation session on an original image: inserts a draft
+// Media row (EditedFromID pointing at the original, DerivedLabel computed via NextDerivedLabel) so
+// the drag-to-draw editor has something to attach regions to via POST /media/{id}/annotations
+// immediately - it has no real file/thumbnail on disk yet (SizeBytes 0, Width/Height NULL; see
+// Media.IsBaked) until the first BakeAnnotatedVersion call, which happens when the editor closes
+// (static/js/lightbox.js). Every MediaReference the original has is copied onto the new draft too,
+// so the annotated version shows up in the same Asset/Project/etc. context the original does, not
+// just reachable by drilling in from the original's own page.
+func (s *Service) CreateAnnotatedVersion(ctx context.Context, original Media, uploadedByUserID string) (*Media, error) {
+	label, err := NextDerivedLabel(ctx, s.Pool, original.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	id := studiodb.NewID()
+	placeholderKey := id + "/original.png"
+	if _, err := studiodb.Execute(ctx, s.Pool,
+		`INSERT INTO Media (id, storageKey, kind, mimeType, sizeBytes, checksum, uploadedByUserId, editedFromId, derivedLabel)
+		 VALUES (?, ?, ?, 'image/png', 0, '', ?, ?, ?)`,
+		id, placeholderKey, KindImage, uploadedByUserID, original.ID, label); err != nil {
+		return nil, err
+	}
+
+	refs, err := studiodb.Query(ctx, s.Pool, "SELECT "+referenceColumns+" FROM MediaReference WHERE mediaId = ?", scanReference, original.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, ref := range refs {
+		if err := s.AttachMediaReference(ctx, id, ref.ReferencingType, ref.ReferencingID, ref.Role.String, ref.SortOrder); err != nil {
+			return nil, err
+		}
+	}
+
+	return GetByID(ctx, s.Pool, id)
+}
+
 func nullIfZero(n int) any {
 	if n == 0 {
 		return nil
@@ -101,9 +137,16 @@ func nullIfZero(n int) any {
 }
 
 func (s *Service) AttachMediaReference(ctx context.Context, mediaID string, refType ReferencingType, refID, role string, sortOrder int) error {
+	return s.AttachMediaReferenceWithCaption(ctx, mediaID, refType, refID, role, "", sortOrder)
+}
+
+// AttachMediaReferenceWithCaption is AttachMediaReference plus an upfront caption - lets an
+// upload set its own name/caption in the same step instead of always needing a separate
+// after-the-fact edit (see web.FileInput's optional caption field).
+func (s *Service) AttachMediaReferenceWithCaption(ctx context.Context, mediaID string, refType ReferencingType, refID, role, caption string, sortOrder int) error {
 	_, err := studiodb.Execute(ctx, s.Pool,
-		"INSERT INTO MediaReference (id, mediaId, referencingType, referencingId, role, sortOrder) VALUES (?, ?, ?, ?, ?, ?)",
-		studiodb.NewID(), mediaID, refType, refID, nullIfEmptyStr(role), sortOrder)
+		"INSERT INTO MediaReference (id, mediaId, referencingType, referencingId, role, caption, sortOrder) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		studiodb.NewID(), mediaID, refType, refID, nullIfEmptyStr(role), nullIfEmptyStr(caption), sortOrder)
 	return err
 }
 
@@ -132,6 +175,12 @@ type UploadedFile struct {
 // UploadAndAttach uploads one file (if non-empty) and immediately attaches it to a target
 // record.
 func (s *Service) UploadAndAttach(ctx context.Context, file *UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role string) (*Media, error) {
+	return s.UploadAndAttachWithCaption(ctx, file, uploadedByUserID, refType, refID, role, "")
+}
+
+// UploadAndAttachWithCaption is UploadAndAttach plus an upfront caption for the new reference -
+// see AttachMediaReferenceWithCaption.
+func (s *Service) UploadAndAttachWithCaption(ctx context.Context, file *UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role, caption string) (*Media, error) {
 	if file == nil || len(file.Data) == 0 {
 		return nil, nil
 	}
@@ -139,7 +188,7 @@ func (s *Service) UploadAndAttach(ctx context.Context, file *UploadedFile, uploa
 	if err != nil {
 		return nil, err
 	}
-	if err := s.AttachMediaReference(ctx, m.ID, refType, refID, role, 0); err != nil {
+	if err := s.AttachMediaReferenceWithCaption(ctx, m.ID, refType, refID, role, caption, 0); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -147,9 +196,16 @@ func (s *Service) UploadAndAttach(ctx context.Context, file *UploadedFile, uploa
 
 // UploadAllAndAttach is UploadAndAttach for every file in a multi-file <input>.
 func (s *Service) UploadAllAndAttach(ctx context.Context, files []*UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role string) ([]*Media, error) {
+	return s.UploadAllAndAttachWithCaption(ctx, files, uploadedByUserID, refType, refID, role, "")
+}
+
+// UploadAllAndAttachWithCaption is UploadAllAndAttach, giving every file in the batch the same
+// caption - the one web.FileInput's optional name/caption field collects for the whole picker,
+// not a separate per-file name (a multi-file <input> has no way to solicit one per file).
+func (s *Service) UploadAllAndAttachWithCaption(ctx context.Context, files []*UploadedFile, uploadedByUserID string, refType ReferencingType, refID, role, caption string) ([]*Media, error) {
 	var out []*Media
 	for _, f := range files {
-		m, err := s.UploadAndAttach(ctx, f, uploadedByUserID, refType, refID, role)
+		m, err := s.UploadAndAttachWithCaption(ctx, f, uploadedByUserID, refType, refID, role, caption)
 		if err != nil {
 			return nil, err
 		}
