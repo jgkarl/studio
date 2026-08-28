@@ -12,6 +12,39 @@ templ Icon(name string, size int) {
 	<span class="material-symbols-outlined icon" style={ "font-size:" + strconv.Itoa(size) + "px" } aria-hidden="true">{ name }</span>
 }
 
+// TableRowChips wraps a "simple table" row's always-visible info badges/chips (status, method,
+// date, ...) - see TableRowActions below for the row's interactive buttons, which get a different
+// (collapsible-on-mobile) treatment. Together these are what every "linked records" list - a
+// Project's Assessments/Treatments/Reports/Media, an Asset's per-project sub-lists, a Client's
+// Assets, ... - uses instead of the module search-result pages' own card-row look, which those
+// don't share (no [data-el-root] search/filter/striping machinery here, just <title-label>,
+// <chips>, <actions> on a plain divider-line row).
+templ TableRowChips() {
+	<span class="row-chips">
+		{ children... }
+	</span>
+}
+
+// TableRowActions renders a row's interactive actions (View/Edit/Remove/...) twice - once inline
+// (visible from sm up) and once inside a "⋮" kebab menu (visible below sm) - from the exact same
+// markup, so callers never write their action buttons more than once. CSS toggles which copy is
+// visible per breakpoint; no JS needed, same <details>/<summary> disclosure as .split-btn's own
+// "more options" caret. A row with only one action still works fine collapsed into a one-item
+// menu - simpler than special-casing "just show it inline always" for that case.
+templ TableRowActions() {
+	<span class="row-actions-inline">
+		{ children... }
+	</span>
+	<details class="row-actions-menu">
+		<summary class="row-action-icon" aria-label="More actions" title="More actions">
+			@Icon("more_vert", 18)
+		</summary>
+		<div class="row-actions-menu-panel">
+			{ children... }
+		</div>
+	</details>
+}
+
 // Card and Field are the two truly reusable structural wrappers (spacing/borders are easy to get
 // inconsistent by hand). Buttons/inputs/badges are plain HTML with the .btn/.input/.badge
 // utility classes from static/css/app.css directly in each page's markup — simple templates, no

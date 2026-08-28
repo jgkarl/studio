@@ -4,7 +4,6 @@ import (
 	"database/sql"
 
 	"studio/internal/assessments"
-	"studio/internal/media"
 	"studio/internal/treatments"
 	"studio/internal/web"
 )
@@ -24,6 +23,18 @@ templ listBody(rows []ListRow) {
 				{Value: "client", Label: "Client"},
 				{Value: "status", Label: "Status"},
 			})
+			<!-- Every row (removed or not) is always rendered - see ListIncludingRemoved - this chip
+			     just defaults to filtering removed ones back out client-side, same mechanism
+			     static/js/entity-list-filter.js already uses for every other filter here, just with
+			     "Active" (not "All") preselected as its own real option instead of the usual blank one. -->
+			<label class="filter-chip">
+				@web.Icon("filter_alt", 14)
+				<select class="filter-chip-select" data-el-filter="removed">
+					<option value="0" selected>Active</option>
+					<option value="">All</option>
+					<option value="1">Removed</option>
+				</select>
+			</label>
 		</div>
 		if len(rows) == 0 {
 			<p class="empty-state">No reports yet.</p>
@@ -34,6 +45,7 @@ templ listBody(rows []ListRow) {
 					data-el-row
 					data-el-search={ reportSearchHaystack(row) }
 					data-el-status={ row.Status }
+					data-el-removed={ removedFilterValue(row.Removed) }
 					data-el-group-asset={ assetLabel(row.AssetTitle, row.AssetReferenceCode) }
 					data-el-group-client={ row.ClientName }
 					data-el-group-status={ statusLabel(row.Status) }
@@ -53,6 +65,9 @@ templ listBody(rows []ListRow) {
 							</div>
 						</div>
 						<div class="row-actions">
+							if row.Removed {
+								<span class="badge badge-red">Removed</span>
+							}
 							if row.Status == "final" {
 								<span class="badge badge-green tag-chip" data-el-tag-filter="status" data-el-tag-value={ row.Status } role="button" tabindex="0">Final</span>
 							} else {
@@ -66,6 +81,13 @@ templ listBody(rows []ListRow) {
 		</ul>
 	</div>
 	<script src="/static/js/entity-list-filter.js" defer></script>
+}
+
+func removedFilterValue(removed bool) string {
+	if removed {
+		return "1"
+	}
+	return "0"
 }
 
 func assetLabel(title sql.NullString, referenceCode string) string {
@@ -158,217 +180,244 @@ func projectOptionLabel(p ProjectOption) string {
 	return p.Title + " — " + name + " — " + p.ClientName
 }
 
-templ DetailPage(c web.Chrome, report Report, attachments []media.ReferenceWithMedia,
+templ DetailPage(c web.Chrome, report Report,
 	projectAssessments []assessments.ListRow, projectTreatments []treatments.ListRow,
 	gallery []GalleryItem, infoPanel InfoPanel) {
-	@web.AppLayout(report.Title, c, detailBody(report, attachments, projectAssessments, projectTreatments, gallery, infoPanel))
+	@web.AppLayout(report.Title, c, detailBody(report, projectAssessments, projectTreatments, gallery, infoPanel))
 }
 
-templ detailBody(report Report, attachments []media.ReferenceWithMedia,
+// detailBody's block order is deliberate: Client/Asset/Project info leads (the real-world context
+// a reader needs before anything else), then the report's own three sections, then its reference
+// lists and gallery, then the layout customization card last.
+templ detailBody(report Report,
 	projectAssessments []assessments.ListRow, projectTreatments []treatments.ListRow,
 	gallery []GalleryItem, infoPanel InfoPanel) {
-	@web.PageHeader(report.Title, "", templ.NopComponent)
-	<div class="row-actions" style="margin-bottom: 1rem;">
-		@web.ExportLinks("report", report.ID)
-		<form method="post" action={ templ.URL("/reports/" + report.ID + "/unlink") } data-confirm={ "Remove \"" + report.Title + "\"? It stays in the database but won't show here anymore." }>
-			<button type="submit" class="btn btn-ghost" aria-label="Remove" title="Remove">
-				@web.Icon("close", 14)
-				<span class="btn-label">Remove</span>
-			</button>
-		</form>
-		if report.Status == "final" {
-			<span class="badge badge-green">Final</span>
-			<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
-				<input type="hidden" name="status" value="draft"/>
-				<button type="submit" class="btn btn-secondary">
-					@web.Icon("edit", 14)
-					Revert draft
-				</button>
-			</form>
-		} else {
-			<span class="badge badge-amber">Draft</span>
-			<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
-				<input type="hidden" name="status" value="final"/>
-				<button type="submit" class="btn btn-secondary">
-					@web.Icon("check_circle", 14)
-					Mark final
-				</button>
-			</form>
-		}
-	</div>
-	<div class="report-layout">
-		<div class="report-layout-main">
-			@web.Card() {
-				<form method="post" action={ templ.URL("/reports/" + report.ID + "/sections") } class="form-grid">
-					@web.Field("Summary", "") {
-						<textarea class="input" name="summary" rows="3" readonly?={ report.Status == "final" }>{ report.Summary.String }</textarea>
-					}
-					@web.Field("Condition findings", "") {
-						<textarea class="input" name="conditionFindings" rows="4" readonly?={ report.Status == "final" }>{ report.ConditionFindings.String }</textarea>
-					}
-					@web.Field("Treatment performed", "") {
-						<textarea class="input" name="treatmentPerformed" rows="4" readonly?={ report.Status == "final" }>{ report.TreatmentPerformed.String }</textarea>
-					}
-					@web.Field("Materials used", "") {
-						<textarea class="input" name="materialsUsed" rows="3" readonly?={ report.Status == "final" }>{ report.MaterialsUsed.String }</textarea>
-					}
-					@web.Field("Recommendations", "") {
-						<textarea class="input" name="recommendations" rows="3" readonly?={ report.Status == "final" }>{ report.Recommendations.String }</textarea>
-					}
-					if report.Status != "final" {
-						<button type="submit" class="btn btn-primary">
-							@web.Icon("check_circle", 14)
-							Save sections
+	<div class="page-header">
+		<div class="page-header-row">
+			<h1>
+				{ report.Title }
+				if report.Status == "final" {
+					<span class="badge badge-green">Final</span>
+				} else {
+					<span class="badge badge-amber">Draft</span>
+				}
+			</h1>
+			<div class="actions">
+				@web.ExportLinks("report", report.ID)
+				if report.Status == "final" {
+					<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
+						<input type="hidden" name="status" value="draft"/>
+						<button type="submit" class="btn btn-secondary" aria-label="Revert draft" title="Revert draft">
+							@web.Icon("edit", 14)
+							<span class="btn-label">Revert draft</span>
 						</button>
-					}
-				</form>
-			}
-			@web.Card() {
-				<h2 class="dashboard-heading">Attachments <span class="page-subtitle">(images/video)</span></h2>
-				@media.MediaGrid(attachments)
-				if report.Status != "final" {
-					<form method="post" action={ templ.URL("/reports/" + report.ID + "/attachments") } enctype="multipart/form-data" class="row-actions form-section">
-						@web.FileInput("photos", "Photos", "On a phone this opens your camera directly.")
-						<button type="submit" class="btn btn-secondary">
-							@web.Icon("add", 14)
-							Upload
+					</form>
+				} else {
+					<form method="post" action={ templ.URL("/reports/" + report.ID + "/status") }>
+						<input type="hidden" name="status" value="final"/>
+						<button type="submit" class="btn btn-secondary" aria-label="Mark final" title="Mark final">
+							@web.Icon("check_circle", 14)
+							<span class="btn-label">Mark final</span>
 						</button>
 					</form>
 				}
+				<form method="post" action={ templ.URL("/reports/" + report.ID + "/unlink") } data-confirm={ "Remove \"" + report.Title + "\"? It stays in the database but won't show here anymore." }>
+					<button type="submit" class="btn btn-ghost" aria-label="Remove" title="Remove">
+						@web.Icon("close", 14)
+						<span class="btn-label">Remove</span>
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+	@web.Card() {
+		<h2 class="dashboard-heading">Client / Asset / Project info</h2>
+		@infoFieldList("Client", "/clients/"+infoPanel.ClientID, infoPanel.Client)
+		@infoFieldList("Asset", "/assets/"+report.AssetID, infoPanel.Asset)
+		@infoFieldList("Project", "/projects/"+report.ProjectID, infoPanel.Project)
+		<p class="page-subtitle">Configurable in Settings → Features → Reportable fields.</p>
+		if report.CoverMediaID.Valid {
+			<hr class="section-divider"/>
+			<div class="cover-photo-preview">
+				<img class="entity-thumb" src={ "/api/media/" + report.CoverMediaID.String } alt=""/>
+				<span class="page-subtitle">Cover photo</span>
+			</div>
+		}
+	}
+	@web.Card() {
+		<form method="post" action={ templ.URL("/reports/" + report.ID + "/sections") } class="form-grid">
+			@web.Field("Description", "") {
+				<textarea class="input" name="description" rows="3" readonly?={ report.Status == "final" }>{ report.Description.String }</textarea>
 			}
-			@web.Card() {
-				<h2 class="dashboard-heading">Assessments</h2>
-				if len(projectAssessments) == 0 {
-					<p class="empty-state">No assessments recorded for this project.</p>
-				} else {
-					<ul class="entity-list entity-list-cards">
-						for _, a := range projectAssessments {
-							<li class="entity-list-row">
-								<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">
-									{ a.Condition }
-									if a.Description != "" {
-										<div class="page-subtitle">{ a.Description }</div>
-									}
+			@web.Field("Summary", "") {
+				<textarea class="input" name="summary" rows="3" readonly?={ report.Status == "final" }>{ report.Summary.String }</textarea>
+			}
+			@web.Field("Recommendations", "") {
+				<textarea class="input" name="recommendations" rows="3" readonly?={ report.Status == "final" }>{ report.Recommendations.String }</textarea>
+			}
+			if report.Status != "final" {
+				<button type="submit" class="btn btn-primary">
+					@web.Icon("check_circle", 14)
+					Save sections
+				</button>
+			}
+		</form>
+	}
+	@web.Card() {
+		<h2 class="dashboard-heading">Assessments</h2>
+		if len(projectAssessments) == 0 {
+			<p class="empty-state">No assessments recorded for this project.</p>
+		} else {
+			<ul class="entity-list">
+				for _, a := range projectAssessments {
+					<li class="entity-list-row">
+						<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">
+							{ a.Condition }
+							if a.Description != "" {
+								<div class="page-subtitle">{ a.Description }</div>
+							}
+						</a>
+						<div class="row-actions">
+							@web.TableRowChips() {
+								<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
+							}
+							@web.TableRowActions() {
+								<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
+									@web.Icon("chevron_right", 14)
 								</a>
-								<div class="row-actions">
-									<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
-									<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
-										@web.Icon("chevron_right", 14)
-									</a>
-								</div>
-							</li>
-						}
-					</ul>
-				}
-			}
-			@web.Card() {
-				<h2 class="dashboard-heading">Treatments</h2>
-				if len(projectTreatments) == 0 {
-					<p class="empty-state">No treatments logged for this project.</p>
-				} else {
-					<ul class="entity-list entity-list-cards">
-						for _, t := range projectTreatments {
-							<li class="entity-list-row">
-								<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
-								<div class="row-actions">
-									<span class="badge">{ t.Method }</span>
-									<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
-									<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
-										@web.Icon("chevron_right", 14)
-									</a>
-								</div>
-							</li>
-						}
-					</ul>
-				}
-			}
-			@web.Card() {
-				<h2 class="dashboard-heading">Image gallery <span class="page-subtitle">(ordered by timestamp)</span></h2>
-				if len(gallery) == 0 {
-					<p class="empty-state">No images yet for this project.</p>
-				}
-				<div class="gallery-grid">
-					for _, item := range gallery {
-						<div class="gallery-item">
-							<a href={ templ.URL("/media/view/" + item.MediaID) }>
-								<img class="entity-thumb" src={ "/api/media/" + item.MediaID } alt=""/>
-							</a>
-							<span class="page-subtitle">{ item.CreatedAt.Format("2006-01-02 15:04") }</span>
-							<form method="post" action={ templ.URL("/reports/" + report.ID + "/media/" + item.ID + "/caption") } class="row-actions">
-								<input class="input" type="text" name="caption" placeholder="Description…" value={ item.Caption.String } readonly?={ report.Status == "final" }/>
-								if report.Status != "final" {
-									<button type="submit" class="btn btn-ghost" title="Save">
-										@web.Icon("check_circle", 14)
-									</button>
-								}
-							</form>
+							}
 						</div>
-					}
+					</li>
+				}
+			</ul>
+		}
+	}
+	@web.Card() {
+		<h2 class="dashboard-heading">Treatments</h2>
+		if len(projectTreatments) == 0 {
+			<p class="empty-state">No treatments logged for this project.</p>
+		} else {
+			<ul class="entity-list">
+				for _, t := range projectTreatments {
+					<li class="entity-list-row">
+						<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
+						<div class="row-actions">
+							@web.TableRowChips() {
+								<span class="badge">{ t.Method }</span>
+								<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+							}
+							@web.TableRowActions() {
+								<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
+									@web.Icon("chevron_right", 14)
+								</a>
+							}
+						</div>
+					</li>
+				}
+			</ul>
+		}
+	}
+	@web.Card() {
+		<div class="card-header-row">
+			<h2 class="dashboard-heading">Image gallery</h2>
+			<form method="post" action={ templ.URL("/reports/" + report.ID + "/gallery/columns") } class="pattern-layer-select-field" data-autosubmit-on-change>
+				Columns
+				<select class="input" name="columns">
+					<option value="1" selected?={ report.GalleryColumns == 1 }>1</option>
+					<option value="2" selected?={ report.GalleryColumns != 1 }>2</option>
+				</select>
+			</form>
+		</div>
+		if report.Status != "final" {
+			<form method="post" action={ templ.URL("/reports/" + report.ID + "/attachments") } enctype="multipart/form-data" class="form-grid gallery-upload-form">
+				<div class="file-input-row">
+					<input type="file" id="gallery-upload-input" name="photos" multiple accept="image/*" class="sr-only"/>
+					<label for="gallery-upload-input" class="btn btn-secondary">
+						@web.Icon("upload", 14)
+						Choose images…
+					</label>
+					<input type="text" class="input" name="photosCaption" placeholder="Name / caption"/>
+					<button type="submit" class="btn btn-primary">
+						@web.Icon("add", 14)
+						Upload
+					</button>
+				</div>
+			</form>
+		}
+		if len(gallery) == 0 {
+			<p class="empty-state">No images yet for this project.</p>
+		}
+		<div
+			id="report-gallery-grid"
+			class={ "gallery-grid", templ.KV("gallery-grid-1col", report.GalleryColumns == 1) }
+			data-reorder-url={ "/reports/" + report.ID + "/gallery/reorder" }
+		>
+			for _, item := range gallery {
+				<div class="gallery-item" data-ref-id={ item.ID }>
+					<a href={ templ.URL("/media/view/" + item.MediaID) }>
+						<img class={ "gallery-photo", templ.KV("gallery-item-stretch", item.Stretch) } src={ "/api/media/" + item.MediaID } alt=""/>
+					</a>
+					<form method="post" action={ templ.URL("/reports/" + report.ID + "/media/" + item.ID + "/caption") } class="gallery-item-form">
+						<input class="input" type="text" name="caption" placeholder="Description…" value={ item.Caption.String } readonly?={ report.Status == "final" }/>
+						if report.Status != "final" {
+							<label class="checkbox-field" title="Stretch to column width">
+								<input type="checkbox" name="stretch" checked?={ item.Stretch }/>
+								Stretch
+							</label>
+							<button type="submit" class="btn btn-ghost" title="Save" aria-label="Save">
+								@web.Icon("check_circle", 14)
+							</button>
+						}
+					</form>
 				</div>
 			}
 		</div>
-		<div class="report-layout-sidebar">
-			@web.Card() {
-				<h2 class="dashboard-heading">Client / Asset / Project info</h2>
-				@infoFieldList("Client", "/clients/"+infoPanel.ClientID, infoPanel.Client)
-				@infoFieldList("Asset", "/assets/"+report.AssetID, infoPanel.Asset)
-				@infoFieldList("Project", "/projects/"+report.ProjectID, infoPanel.Project)
-				<p class="page-subtitle">Configurable in Settings → Features → Reportable fields.</p>
-			}
-			@web.Card() {
-				<h2 class="dashboard-heading">Customize layout</h2>
-				<form method="post" action={ templ.URL("/reports/" + report.ID + "/layout") } class="form-grid">
-					@web.Field("Layout style", "Standard + gallery adds every connected image (assessments, treatments, this report's own attachments) to the export, not just what's uploaded here.") {
-						<select class="input" name="layoutStyle">
-							for _, style := range []string{"standard", "gallery"} {
-								<option value={ style } selected?={ style == report.LayoutStyle }>{ layoutStyleLabel(style) }</option>
-							}
-						</select>
+		<script src="/static/js/report-gallery.js" defer></script>
+	}
+	@web.Card() {
+		<h2 class="dashboard-heading">Customize layout</h2>
+		<form method="post" action={ templ.URL("/reports/" + report.ID + "/layout") } class="form-grid">
+			@web.Field("Layout style", "Standard + gallery adds every connected image (assessments, treatments, this report's own uploads) to the export, not just what's uploaded here.") {
+				<select class="input" name="layoutStyle">
+					for _, style := range []string{"standard", "gallery"} {
+						<option value={ style } selected?={ style == report.LayoutStyle }>{ layoutStyleLabel(style) }</option>
 					}
-					if len(gallery) > 0 {
-						@web.Field("Cover image", "Pulled from this asset's whole image gallery, not just this report's own attachments.") {
-							<select class="input" name="coverMediaId">
-								<option value="">None</option>
-								for _, item := range gallery {
-									<option value={ item.MediaID } selected?={ report.CoverMediaID.Valid && report.CoverMediaID.String == item.MediaID }>{ galleryOptionLabel(item) }</option>
-								}
-							</select>
+				</select>
+			}
+			if len(gallery) > 0 {
+				@web.Field("Cover image", "Pulled from this asset's whole image gallery, not just this report's own uploads.") {
+					<select class="input" name="coverMediaId">
+						<option value="">None</option>
+						for _, item := range gallery {
+							<option value={ item.MediaID } selected?={ report.CoverMediaID.Valid && report.CoverMediaID.String == item.MediaID }>{ galleryOptionLabel(item) }</option>
 						}
-					}
-					<div class="checkbox-grid">
-						<label class="checkbox-field">
-							<input type="checkbox" name="showCover" checked?={ report.ShowCover }/>
-							Cover
-						</label>
-						<label class="checkbox-field">
-							<input type="checkbox" name="showSummary" checked?={ report.ShowSummary }/>
-							Summary
-						</label>
-						<label class="checkbox-field">
-							<input type="checkbox" name="showCondition" checked?={ report.ShowCondition }/>
-							Condition findings
-						</label>
-						<label class="checkbox-field">
-							<input type="checkbox" name="showTreatment" checked?={ report.ShowTreatment }/>
-							Treatment performed
-						</label>
-						<label class="checkbox-field">
-							<input type="checkbox" name="showMaterials" checked?={ report.ShowMaterials }/>
-							Materials used
-						</label>
-						<label class="checkbox-field">
-							<input type="checkbox" name="showRecommendations" checked?={ report.ShowRecommendations }/>
-							Recommendations
-						</label>
-					</div>
-					<button type="submit" class="btn btn-secondary">
-						@web.Icon("check_circle", 14)
-						Save layout
-					</button>
-				</form>
+					</select>
+				}
 			}
-		</div>
-	</div>
+			<div class="checkbox-grid">
+				<label class="checkbox-field">
+					<input type="checkbox" name="showCover" checked?={ report.ShowCover }/>
+					Cover
+				</label>
+				<label class="checkbox-field">
+					<input type="checkbox" name="showDescription" checked?={ report.ShowDescription }/>
+					Description
+				</label>
+				<label class="checkbox-field">
+					<input type="checkbox" name="showSummary" checked?={ report.ShowSummary }/>
+					Summary
+				</label>
+				<label class="checkbox-field">
+					<input type="checkbox" name="showRecommendations" checked?={ report.ShowRecommendations }/>
+					Recommendations
+				</label>
+			</div>
+			<button type="submit" class="btn btn-secondary">
+				@web.Icon("check_circle", 14)
+				Save layout
+			</button>
+		</form>
+	}
 }
 
 templ infoFieldList(label, href string, fields []InfoField) {

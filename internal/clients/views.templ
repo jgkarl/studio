@@ -193,17 +193,21 @@ templ detailBody(client Client, typeLabel string, assets []AssetSummary, clientT
 		if len(assets) == 0 {
 			<p class="empty-state">No assets yet.</p>
 		}
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, a := range assets {
 				<li class="entity-list-row">
-					<a href={ templ.URL("/assets/" + a.ID) }>
+					<a href={ templ.URL("/assets/" + a.ID) } class="entity-list-name">
 						if a.Title.Valid {
 							{ a.Title.String }
 						} else {
 							{ a.ReferenceCode }
 						}
 					</a>
-					<span class="page-subtitle">{ a.ReferenceCode }</span>
+					<div class="row-actions">
+						@web.TableRowChips() {
+							<span class="page-subtitle">{ a.ReferenceCode }</span>
+						}
+					</div>
 				</li>
 			}
 		</ul>

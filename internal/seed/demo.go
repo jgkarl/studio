@@ -240,17 +240,15 @@ func SeedDemoData(ctx context.Context, pool *sql.DB, mediaSvc *media.Service) er
 		return fmt.Errorf("seed demo data: creating report: %w", err)
 	}
 	if err := reporter.UpdateSections(ctx, pool, reportID, reporter.SectionsInput{
-		Summary:            "Routine winter conservation cycle: surface cleaning completed, condition improved from fair to good.",
-		ConditionFindings:  "Surface grime throughout at intake, plus small paint losses lower-left. Stable structurally.",
-		TreatmentPerformed: "Dry surface cleaning across the full painted surface; losses left for a later retouching campaign.",
-		MaterialsUsed:      "Dry cleaning sponge, soft natural-bristle brush.",
-		Recommendations:    "Schedule a retouching pass for the lower-left losses; recheck in 12 months.",
+		Summary:         "Routine winter conservation cycle: surface cleaning completed, condition improved from fair to good.",
+		Description:     "Surface grime throughout at intake, plus small paint losses lower-left. Stable structurally. Dry surface cleaning across the full painted surface; losses left for a later retouching campaign. Materials: dry cleaning sponge, soft natural-bristle brush.",
+		Recommendations: "Schedule a retouching pass for the lower-left losses; recheck in 12 months.",
 	}); err != nil {
 		return fmt.Errorf("seed demo data: updating report sections: %w", err)
 	}
 	if err := reporter.UpdateLayout(ctx, pool, reportID, reporter.LayoutInput{
 		LayoutStyle: "standard", CoverMediaID: beforePhoto.ID,
-		ShowCover: true, ShowSummary: true, ShowCondition: true, ShowTreatment: true, ShowMaterials: true, ShowRecommendations: true,
+		ShowCover: true, ShowDescription: true, ShowSummary: true, ShowRecommendations: true,
 	}); err != nil {
 		return fmt.Errorf("seed demo data: updating report layout: %w", err)
 	}

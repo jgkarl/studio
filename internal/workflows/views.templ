@@ -224,15 +224,19 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectAssessments) == 0 {
 			<p class="empty-state">No assessments recorded yet.</p>
 		}
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, a := range projectAssessments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
 					<div class="row-actions">
-						<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
-						<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
+						@web.TableRowChips() {
+							<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
+						}
+						@web.TableRowActions() {
+							<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+						}
 					</div>
 				</li>
 			}
@@ -249,16 +253,20 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectTreatments) == 0 {
 			<p class="empty-state">No treatments logged yet.</p>
 		}
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, t := range projectTreatments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
 					<div class="row-actions">
-						<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
-						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
-						<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
+						@web.TableRowChips() {
+							<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
+							<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+						}
+						@web.TableRowActions() {
+							<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+						}
 					</div>
 				</li>
 			}
@@ -275,19 +283,23 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectReports) == 0 {
 			<p class="empty-state">No reports yet for this project.</p>
 		}
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, rep := range projectReports {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
 					<div class="row-actions">
-						if rep.Status == "final" {
-							<span class="badge badge-green">Final</span>
-						} else {
-							<span class="badge badge-amber">Draft</span>
+						@web.TableRowChips() {
+							if rep.Status == "final" {
+								<span class="badge badge-green">Final</span>
+							} else {
+								<span class="badge badge-amber">Draft</span>
+							}
 						}
-						<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
+						@web.TableRowActions() {
+							<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+						}
 					</div>
 				</li>
 			}
@@ -305,7 +317,7 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 		if len(projectMedia) == 0 {
 			<p class="empty-state">No media yet.</p>
 		}
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, ref := range projectMedia {
 				<li class="entity-list-row">
 					<a href={ mediaViewHref(ref) } class="entity-list-name">
@@ -317,14 +329,16 @@ templ detailBody(project Project, asset *assets.Asset, client *clients.Client, s
 						}
 					</a>
 					<div class="row-actions">
-						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
-						<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Remove this media item? It stays in the database but won't show here anymore.">
-							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
-								@web.Icon("close", 14)
-							</button>
-						</form>
+						@web.TableRowActions() {
+							<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+							<form method="post" action={ templ.URL("/projects/" + project.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Remove this media item? It stays in the database but won't show here anymore.">
+								<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+									@web.Icon("close", 14)
+								</button>
+							</form>
+						}
 					</div>
 				</li>
 			}

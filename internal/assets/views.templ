@@ -245,7 +245,7 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 		if len(assetMedia) == 0 {
 			<p class="empty-state">No media yet.</p>
 		}
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, ref := range assetMedia {
 				<li class="entity-list-row">
 					<a href={ mediaViewHref(ref) } class="entity-list-name">
@@ -257,14 +257,16 @@ templ detailBody(asset Asset, client *clients.Client, assetType *settings.Classi
 						}
 					</a>
 					<div class="row-actions">
-						<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
-						<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Remove this media item? It stays in the database but won't show here anymore.">
-							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
-								@web.Icon("close", 14)
-							</button>
-						</form>
+						@web.TableRowActions() {
+							<a href={ mediaViewHref(ref) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+							<form method="post" action={ templ.URL("/assets/" + asset.ID + "/media/" + ref.ID + "/unlink") } data-confirm="Remove this media item? It stays in the database but won't show here anymore.">
+								<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+									@web.Icon("close", 14)
+								</button>
+							</form>
+						}
 					</div>
 				</li>
 			}
@@ -339,58 +341,70 @@ templ assetProjectCard(pc ProjectCard, conditions []settings.Classifier, treatme
 		</div>
 		<div class="page-subtitle">{ stageLabel(stageLabels, pc.Project.Stage) }</div>
 		@assetProjectCardSection("Assessments", "No assessments recorded yet.", len(pc.Assessments))
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, a := range pc.Assessments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/assessments/" + a.ID) } class="entity-list-name">{ conditionTitle(conditions, a.Condition, locale) }</a>
 					<div class="row-actions">
-						<span class="page-subtitle">{ a.Description }</span>
-						<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
-						<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
+						@web.TableRowChips() {
+							<span class="page-subtitle">{ a.Description }</span>
+							<span class="page-subtitle">{ a.RecordedAt.Format("2006-01-02") }</span>
+						}
+						@web.TableRowActions() {
+							<a href={ templ.URL("/assessments/" + a.ID) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+						}
 					</div>
 				</li>
 			}
 		</ul>
 		@assetProjectCardSection("Treatments", "No treatments logged yet.", len(pc.Treatments))
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, t := range pc.Treatments {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/treatments/" + t.ID) } class="entity-list-name">{ t.Title }</a>
 					<div class="row-actions">
-						<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
-						<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
-						<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
-						<a href={ templ.URL("/treatments/" + t.ID + "/edit") } class="row-action-icon" title="Edit">
-							@web.Icon("edit", 14)
-						</a>
-						<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Remove \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
-							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
-								@web.Icon("close", 14)
-							</button>
-						</form>
+						@web.TableRowChips() {
+							<span class="badge">{ treatmentMethodLabel(treatmentMethodLabels, t.Method) }</span>
+							<span class="page-subtitle">{ t.PerformedAt.Format("2006-01-02") }</span>
+						}
+						@web.TableRowActions() {
+							<a href={ templ.URL("/treatments/" + t.ID) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+							<a href={ templ.URL("/treatments/" + t.ID + "/edit") } class="row-action-icon" title="Edit">
+								@web.Icon("edit", 14)
+							</a>
+							<form method="post" action={ templ.URL("/treatments/" + t.ID + "/unlink") } data-confirm={ "Remove \"" + t.Title + "\"? It stays in the database but won't show here anymore." }>
+								<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+									@web.Icon("close", 14)
+								</button>
+							</form>
+						}
 					</div>
 				</li>
 			}
 		</ul>
 		@assetProjectCardSection("Reports", "No reports yet for this object.", len(pc.Reports))
-		<ul class="entity-list entity-list-cards">
+		<ul class="entity-list">
 			for _, rep := range pc.Reports {
 				<li class="entity-list-row">
 					<a href={ templ.URL("/reports/" + rep.ID) } class="entity-list-name">{ rep.Title }</a>
 					<div class="row-actions">
-						<span class="badge">{ rep.Status }</span>
-						<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
-							@web.Icon("chevron_right", 14)
-						</a>
-						<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Remove \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
-							<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
-								@web.Icon("close", 14)
-							</button>
-						</form>
+						@web.TableRowChips() {
+							<span class="badge">{ rep.Status }</span>
+						}
+						@web.TableRowActions() {
+							<a href={ templ.URL("/reports/" + rep.ID) } class="row-action-icon" title="View">
+								@web.Icon("chevron_right", 14)
+							</a>
+							<form method="post" action={ templ.URL("/reports/" + rep.ID + "/unlink") } data-confirm={ "Remove \"" + rep.Title + "\"? It stays in the database but won't show here anymore." }>
+								<button type="submit" class="row-action-icon" title="Remove" aria-label="Remove">
+									@web.Icon("close", 14)
+								</button>
+							</form>
+						}
 					</div>
 				</li>
 			}

@@ -1,0 +1,37 @@
+-- Managed by Ansible (ansible/templates/reset-data.sql.j2), run once by reset-data.yml and then
+-- deleted - not meant to be kept or re-run by hand. Wipes real content data, keeping the schema,
+-- Classifier reference data (every <select> in the app reads from it), AppSettings, and the one
+-- User row matching studio_bootstrap_admin_email. foreign_keys is off for the duration purely to
+-- avoid needing to hand-verify a perfect child-before-parent delete order; the deletes below are
+-- still written in that order anyway, and PRAGMA foreign_key_check afterwards (with foreign_keys
+-- back on) confirms nothing was left dangling regardless.
+.bail on
+.headers on
+
+PRAGMA foreign_keys=OFF;
+BEGIN;
+DELETE FROM MediaAnnotationRegion;
+DELETE FROM MediaReference;
+DELETE FROM Media;
+DELETE FROM Report;
+DELETE FROM Treatment;
+DELETE FROM Assessment;
+DELETE FROM Project;
+DELETE FROM Asset;
+DELETE FROM Client;
+DELETE FROM VerificationToken;
+DELETE FROM User WHERE email <> '{{ studio_bootstrap_admin_email }}';
+COMMIT;
+PRAGMA foreign_keys=ON;
+PRAGMA foreign_key_check;
+VACUUM;
+
+-- Sanity-check summary - shows up in the playbook's own "Show the cleanup script's own summary
+-- output" task.
+SELECT 'users_remaining' AS metric, COUNT(*) AS n FROM User
+UNION ALL SELECT 'clients_remaining', COUNT(*) FROM Client
+UNION ALL SELECT 'assets_remaining', COUNT(*) FROM Asset
+UNION ALL SELECT 'projects_remaining', COUNT(*) FROM Project
+UNION ALL SELECT 'media_remaining', COUNT(*) FROM Media
+UNION ALL SELECT 'classifiers_kept', COUNT(*) FROM Classifier
+UNION ALL SELECT 'app_settings_kept', COUNT(*) FROM AppSetting;

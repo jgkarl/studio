@@ -188,17 +188,25 @@ func BuildInfoPanel(ctx context.Context, q studiodb.Querier, assetID, projectID 
 	return panel, nil
 }
 
-// GalleryItem is one image/video in the Report's timestamp-ordered gallery, spanning every
-// Assessment/Treatment/Report/Project-direct upload the Project has — not just this Report's own
-// attachments.
+// GalleryItem is one image in a Report's gallery, spanning every Assessment/Treatment/Report/
+// Project-direct upload the Project has — not just this Report's own attachments (which is why
+// the old separate "Attachments" section was folded into this one: an upload there was already
+// showing up here too, just also duplicated in its own card). Video is deliberately excluded —
+// see BuildGallery.
 type GalleryItem struct {
 	media.ReferenceWithMedia
+	SortOrder int  // this report's own explicit position, once ReorderGallery has been used at least once - see BuildGallery
+	Stretch   bool // this report's own "fill the column width" choice for this image - see SetGalleryItemStretch
 }
 
-// BuildGallery collects every Media reference reachable from a Project (its own direct uploads,
-// plus every Assessment/Treatment/Report's own attachments), oldest first — the report's "image
-// gallery order by timestamp" requirement.
-func BuildGallery(ctx context.Context, mediaSvc *media.Service, q studiodb.Querier, projectID string) ([]GalleryItem, error) {
+// BuildGallery collects every image Media reference reachable from a Project (its own direct
+// uploads, plus every Assessment/Treatment/Report's own attachments) - video is excluded, the
+// gallery being image-only by design (see internal/reporter/views.templ's upload field). Ordered
+// by this report's own ReportGalleryItem.sortOrder once any item in the gallery has one (see
+// ReorderGallery - drag-drop always rewrites every item's position together, never a partial
+// patch, so a gallery is either fully on that explicit order or, before the first reorder, fully
+// on its default oldest-first timestamp order - never a confusing mix of the two).
+func BuildGallery(ctx context.Context, mediaSvc *media.Service, q studiodb.Querier, projectID, reportID string) ([]GalleryItem, error) {
 	var items []GalleryItem
 
 	addRefs := func(refType media.ReferencingType, refID string) error {
@@ -207,7 +215,10 @@ func BuildGallery(ctx context.Context, mediaSvc *media.Service, q studiodb.Queri
 			return err
 		}
 		for _, r := range refs {
-			items = append(items, GalleryItem{r})
+			if r.Media.Kind != media.KindImage {
+				continue
+			}
+			items = append(items, GalleryItem{ReferenceWithMedia: r})
 		}
 		return nil
 	}
@@ -250,5 +261,44 @@ func BuildGallery(ctx context.Context, mediaSvc *media.Service, q studiodb.Queri
 	}
 
 	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.Before(items[j].CreatedAt) })
+
+	overrides, err := studiodb.Query(ctx, q,
+		"SELECT mediaReferenceId, sortOrder, stretch FROM ReportGalleryItem WHERE reportId = ?",
+		func(rows *sql.Rows) (struct {
+			RefID     string
+			SortOrder int
+			Stretch   bool
+		}, error) {
+			var o struct {
+				RefID     string
+				SortOrder int
+				Stretch   bool
+			}
+			err := rows.Scan(&o.RefID, &o.SortOrder, &o.Stretch)
+			return o, err
+		}, reportID)
+	if err != nil {
+		return nil, err
+	}
+	if len(overrides) > 0 {
+		byRef := make(map[string]struct {
+			SortOrder int
+			Stretch   bool
+		}, len(overrides))
+		for _, o := range overrides {
+			byRef[o.RefID] = struct {
+				SortOrder int
+				Stretch   bool
+			}{o.SortOrder, o.Stretch}
+		}
+		for i := range items {
+			if o, ok := byRef[items[i].ID]; ok {
+				items[i].SortOrder = o.SortOrder
+				items[i].Stretch = o.Stretch
+			}
+		}
+		sort.SliceStable(items, func(i, j int) bool { return items[i].SortOrder < items[j].SortOrder })
+	}
+
 	return items, nil
 }

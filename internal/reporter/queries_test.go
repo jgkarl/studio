@@ -81,7 +81,7 @@ func TestUpdateSections(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	if err := reporter.UpdateSections(ctx, pool, id, reporter.SectionsInput{
-		Summary: "New summary", ConditionFindings: "Updated findings",
+		Summary: "New summary", Description: "Updated description",
 	}); err != nil {
 		t.Fatalf("UpdateSections: %v", err)
 	}
@@ -93,8 +93,8 @@ func TestUpdateSections(t *testing.T) {
 	if !got.Summary.Valid || got.Summary.String != "New summary" {
 		t.Fatalf("got Summary=%+v, want valid 'New summary'", got.Summary)
 	}
-	if !got.ConditionFindings.Valid || got.ConditionFindings.String != "Updated findings" {
-		t.Fatalf("got ConditionFindings=%+v, want valid 'Updated findings'", got.ConditionFindings)
+	if !got.Description.Valid || got.Description.String != "Updated description" {
+		t.Fatalf("got Description=%+v, want valid 'Updated description'", got.Description)
 	}
 }
 

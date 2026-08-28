@@ -1,0 +1,182 @@
+---
+# Destructive maintenance, opt-in only: wipes real content data (Clients, Assets, Projects,
+# Assessments, Treatments, Reports, Media, MediaReferences, MediaAnnotationRegions,
+# VerificationTokens, and every User account except the bootstrap admin) and/or every file under
+# the media library - for resetting a staging/demo box, or scrubbing a production instance back to
+# a clean slate without reprovisioning it from scratch. Schema, migrations, Classifier reference
+# data (every <select> in the app reads from it) and AppSettings are left untouched, and the
+# bootstrap admin account (studio_bootstrap_admin_email, from the vault) survives so there's still
+# a way to log in afterwards.
+#
+# Requires -e confirm=RESET-DATA so it can never run by accident - the playbook refuses outright
+# without it. Both the database and the media library are backed up (tar, into the same
+# {{ studio_home }}/backups/ directory release.yml's own pre-update snapshots go to) before either
+# is touched, and the service is stopped for the duration so nothing races the cleanup.
+#
+# Wipe both (the common case):
+#   ansible-playbook reset-data.yml --ask-vault-pass -e confirm=RESET-DATA
+#
+# Database only, or media only:
+#   ansible-playbook reset-data.yml --ask-vault-pass -e confirm=RESET-DATA --tags database
+#   ansible-playbook reset-data.yml --ask-vault-pass -e confirm=RESET-DATA --tags media
+- name: Reset Studio's content data (dangerous - confirm=RESET-DATA required)
+  hosts: studio
+  become: true
+  # This playbook doesn't invoke the studio_app role (it must not run its install/provisioning
+  # tasks), so role defaults like studio_home/studio_system_user wouldn't normally load - pull
+  # them in explicitly instead. Same reasoning as update.yml's use of include_role.
+  vars_files:
+    - roles/studio_app/defaults/main.yml
+  vars:
+    studio_reset_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+    studio_db_path: "{{ studio_home }}/data/studio.db"
+    studio_media_dir: "{{ studio_home }}/data/media-storage"
+
+  pre_tasks:
+    - name: Refuse to run without explicit confirmation
+      ansible.builtin.fail:
+        msg: >-
+          This wipes real content data (and/or the media library). Re-run with
+          -e confirm=RESET-DATA to proceed - see this file's header comment for scoping to just
+          --tags database or --tags media.
+      when: (confirm | default('')) != 'RESET-DATA'
+
+    - name: Refuse to run without a bootstrap admin email to preserve
+      ansible.builtin.fail:
+        msg: "studio_bootstrap_admin_email is blank - nothing would be left to log in with afterwards."
+      when: (studio_bootstrap_admin_email | default('')) == ''
+      tags: [database]
+
+    - name: Stop the studio service before touching its data
+      ansible.builtin.systemd:
+        name: studio
+        state: stopped
+
+    - name: Ensure the backup directory exists
+      ansible.builtin.file:
+        path: "{{ studio_home }}/backups"
+        state: directory
+        owner: "{{ studio_system_user }}"
+        group: "{{ studio_system_user }}"
+        mode: "0750"
+
+  tasks:
+    - name: Database
+      tags: [database]
+      block:
+        - name: Check whether a database exists yet to back up
+          ansible.builtin.stat:
+            path: "{{ studio_db_path }}"
+          register: studio_reset_db_stat
+
+        - name: Back up the database before wiping it
+          when: studio_reset_db_stat.stat.exists
+          block:
+            - name: Snapshot the database (with its WAL/SHM sidecars, if present)
+              ansible.builtin.shell: |
+                set -euo pipefail
+                tar czf {{ studio_home }}/backups/studio-db-pre-reset-{{ studio_reset_timestamp }}.tar.gz \
+                  --ignore-failed-read -C {{ studio_home }}/data studio.db studio.db-wal studio.db-shm
+              args:
+                executable: /bin/bash
+
+            - name: Fix backup archive ownership
+              ansible.builtin.file:
+                path: "{{ studio_home }}/backups/studio-db-pre-reset-{{ studio_reset_timestamp }}.tar.gz"
+                owner: "{{ studio_system_user }}"
+                group: "{{ studio_system_user }}"
+                mode: "0640"
+
+        - name: Ensure the sqlite3 CLI is installed
+          ansible.builtin.apt:
+            name: sqlite3
+            state: present
+            update_cache: true
+          when: studio_reset_db_stat.stat.exists
+
+        # Deleting every User except a match on studio_bootstrap_admin_email would delete *every*
+        # User if that email doesn't actually exist in this database (a typo'd var, or the
+        # bootstrap admin was never created because BOOTSTRAP_ADMIN_* was blank at deploy time) -
+        # checked here, before the destructive script runs, rather than discovered afterwards by
+        # nobody being able to log in.
+        - name: Confirm the bootstrap admin account actually exists before wiping other Users
+          ansible.builtin.command: >-
+            sqlite3 {{ studio_db_path }} "SELECT COUNT(*) FROM User WHERE email = '{{ studio_bootstrap_admin_email }}'"
+          become_user: "{{ studio_system_user }}"
+          register: studio_bootstrap_admin_check
+          when: studio_reset_db_stat.stat.exists
+
+        - name: Refuse to continue if the bootstrap admin account isn't in the database
+          ansible.builtin.fail:
+            msg: >-
+              No User row matches studio_bootstrap_admin_email ({{ studio_bootstrap_admin_email }})
+              - wiping all Users would lock everyone out. Aborting before running the cleanup
+              script; fix the address or create that account first.
+          when: >-
+            studio_reset_db_stat.stat.exists and
+            (studio_bootstrap_admin_check.stdout | trim) == '0'
+
+        - name: Upload the cleanup SQL script
+          ansible.builtin.template:
+            src: reset-data.sql.j2
+            dest: "{{ studio_home }}/reset-data.sql"
+            owner: "{{ studio_system_user }}"
+            group: "{{ studio_system_user }}"
+            mode: "0600"
+          when: studio_reset_db_stat.stat.exists
+
+        - name: Run the cleanup script against the database
+          ansible.builtin.command: sqlite3 {{ studio_db_path }} -init {{ studio_home }}/reset-data.sql .quit
+          become_user: "{{ studio_system_user }}"
+          register: studio_reset_sql_out
+          when: studio_reset_db_stat.stat.exists
+
+        - name: Show the cleanup script's own summary output
+          ansible.builtin.debug:
+            var: studio_reset_sql_out.stdout_lines
+          when: studio_reset_db_stat.stat.exists
+
+        - name: Remove the uploaded cleanup script
+          ansible.builtin.file:
+            path: "{{ studio_home }}/reset-data.sql"
+            state: absent
+
+    - name: Media library
+      tags: [media]
+      block:
+        - name: Check whether the media library exists yet to back up
+          ansible.builtin.stat:
+            path: "{{ studio_media_dir }}"
+          register: studio_reset_media_stat
+
+        - name: Back up the media library before wiping it
+          when: studio_reset_media_stat.stat.exists
+          block:
+            - name: Snapshot the media library
+              ansible.builtin.shell: |
+                set -euo pipefail
+                tar czf {{ studio_home }}/backups/studio-media-pre-reset-{{ studio_reset_timestamp }}.tar.gz \
+                  -C {{ studio_home }}/data media-storage
+              args:
+                executable: /bin/bash
+
+            - name: Fix backup archive ownership
+              ansible.builtin.file:
+                path: "{{ studio_home }}/backups/studio-media-pre-reset-{{ studio_reset_timestamp }}.tar.gz"
+                owner: "{{ studio_system_user }}"
+                group: "{{ studio_system_user }}"
+                mode: "0640"
+
+            # find -delete rather than re-creating the directory - preserves its own ownership/
+            # mode exactly as deploy.yml set it up, instead of relying on a second task to restore
+            # them.
+            - name: Delete every file under the media library
+              ansible.builtin.shell: find {{ studio_media_dir }} -mindepth 1 -delete
+              args:
+                executable: /bin/bash
+
+  post_tasks:
+    - name: Restart the studio service
+      ansible.builtin.systemd:
+        name: studio
+        state: started

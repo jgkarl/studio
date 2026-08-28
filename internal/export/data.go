@@ -183,9 +183,10 @@ func (svc *Service) GetProjectExportData(ctx context.Context, id string) (*Doc, 
 	return &Doc{Title: project.Title, Subtitle: asset.DisplayName(), Sections: sections}, nil
 }
 
-// GetReportExportData renders a Report's five structured sections, skipping any the "Customize
-// layout" sidebar has hidden (report.Show*) and, for the cover, rendering it as its own
-// image-only section first if ShowCover and CoverMediaID are set.
+// GetReportExportData renders a Report's three structured sections (Description/Summary/
+// Recommendations), skipping any the "Customize layout" sidebar has hidden (report.Show*) and,
+// for the cover, rendering it as its own image-only section first if ShowCover and CoverMediaID
+// are set.
 func (svc *Service) GetReportExportData(ctx context.Context, id string) (*Doc, error) {
 	report, err := reporter.GetByID(ctx, svc.Pool, id)
 	if err != nil {
@@ -200,46 +201,34 @@ func (svc *Service) GetReportExportData(ctx context.Context, id string) (*Doc, e
 	if report.ShowCover && report.CoverMediaID.Valid {
 		sections = append(sections, Section{Heading: "Cover", Images: []Image{{MediaID: report.CoverMediaID.String}}})
 	}
+	if report.ShowDescription && report.Description.Valid && report.Description.String != "" {
+		sections = append(sections, Section{Heading: "Description", Paragraphs: []string{report.Description.String}})
+	}
 	if report.ShowSummary && report.Summary.Valid && report.Summary.String != "" {
 		sections = append(sections, Section{Heading: "Summary", Paragraphs: []string{report.Summary.String}})
-	}
-	if report.ShowCondition && report.ConditionFindings.Valid && report.ConditionFindings.String != "" {
-		sections = append(sections, Section{Heading: "Condition findings", Paragraphs: []string{report.ConditionFindings.String}})
-	}
-	if report.ShowTreatment && report.TreatmentPerformed.Valid && report.TreatmentPerformed.String != "" {
-		sections = append(sections, Section{Heading: "Treatment performed", Paragraphs: []string{report.TreatmentPerformed.String}})
-	}
-	if report.ShowMaterials && report.MaterialsUsed.Valid && report.MaterialsUsed.String != "" {
-		sections = append(sections, Section{Heading: "Materials used", Paragraphs: []string{report.MaterialsUsed.String}})
 	}
 	if report.ShowRecommendations && report.Recommendations.Valid && report.Recommendations.String != "" {
 		sections = append(sections, Section{Heading: "Recommendations", Paragraphs: []string{report.Recommendations.String}})
 	}
 
-	// "Standard + gallery" (report.LayoutStyle == "gallery") swaps this report's own Attachments
-	// for every image/video connected anywhere on the project (reporter.BuildGallery - the same
+	// "Standard + gallery" (report.LayoutStyle == "gallery") swaps this report's own gallery
+	// uploads for every image connected anywhere on the project (reporter.BuildGallery - the same
 	// asset/project-wide gallery the "Customize layout" cover-image picker draws from), which
-	// already includes this report's own attachments among everything else, so it replaces rather
-	// than adds to them.
-	heading := "Attachments"
+	// already includes this report's own uploads among everything else, so it replaces rather than
+	// adds to them. Image-only either way - the gallery (BuildGallery) excludes video by design;
+	// svc.mediaFor's own videos slice only ever has something in it for pre-existing video
+	// attachments uploaded before the gallery went image-only.
 	images, videos := svc.mediaFor(ctx, media.RefReport, report.ID)
 	if report.LayoutStyle == "gallery" {
-		if galleryItems, err := reporter.BuildGallery(ctx, svc.Media, svc.Pool, report.ProjectID); err == nil {
-			heading = "Gallery"
-			images, videos = nil, nil
+		if galleryItems, err := reporter.BuildGallery(ctx, svc.Media, svc.Pool, report.ProjectID, report.ID); err == nil {
+			images = nil
 			for _, item := range galleryItems {
-				img := Image{MediaID: item.MediaID, Caption: item.Caption.String}
-				switch item.Media.Kind {
-				case media.KindImage:
-					images = append(images, img)
-				case media.KindVideo:
-					videos = append(videos, img)
-				}
+				images = append(images, Image{MediaID: item.MediaID, Caption: item.Caption.String})
 			}
 		}
 	}
 	if len(images) > 0 || len(videos) > 0 {
-		sections = append(sections, Section{Heading: heading, Images: images, Videos: videos})
+		sections = append(sections, Section{Heading: "Gallery", Images: images, Videos: videos})
 	}
 	if len(sections) == 0 {
 		sections = []Section{{Heading: "Report", Paragraphs: []string{"(empty)"}}}

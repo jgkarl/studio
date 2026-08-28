@@ -169,6 +169,30 @@ ansible-playbook update.yml -e studio_release_version=v1.2.3
 
 (or set `studio_release_version: "v1.2.3"` in `group_vars/all/all.yml` to make the pin permanent).
 
+## Reset content data (dangerous, opt-in)
+
+`reset-data.yml` wipes real content — every Client/Asset/Project/Assessment/Treatment/Report/Media
+row and every User account except the bootstrap admin — and/or every file under the media library,
+for scrubbing a staging/demo box (or a production instance you genuinely want emptied) back to a
+clean slate without reprovisioning it. Schema, migrations, Classifier reference data, and
+AppSettings are left alone, and `studio_bootstrap_admin_email` (from the vault) survives so there's
+still a login afterwards - the playbook refuses to run if that account doesn't actually exist in
+the database, rather than risk wiping every account.
+
+Stops the service, backs up the database and/or media library first (same
+`{{ studio_home }}/backups/` directory as the update-time snapshots above, prefixed
+`*-pre-reset-<timestamp>.tar.gz`), then restarts it. Requires `-e confirm=RESET-DATA` - it refuses
+outright without that exact value, so it can't run by accident:
+
+```bash
+# both database and media library
+ansible-playbook reset-data.yml --ask-vault-pass -e confirm=RESET-DATA
+
+# just one or the other
+ansible-playbook reset-data.yml --ask-vault-pass -e confirm=RESET-DATA --tags database
+ansible-playbook reset-data.yml --ask-vault-pass -e confirm=RESET-DATA --tags media
+```
+
 ## What's not automated
 
 - **DNS** - point `studio_domain`'s `A`/`AAAA` record at your VPS yourself before the Caddy step

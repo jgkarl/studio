@@ -322,6 +322,7 @@ html[data-theme="dark"] .card {
 .badge-green { background: var(--green-bg); color: var(--green-text); }
 .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
 .badge-blue  { background: var(--blue-bg);  color: var(--blue-text); }
+.badge-red   { background: var(--red-bg);   color: var(--red-text); }
 
 .field {
   display: block;
@@ -1174,26 +1175,82 @@ html[data-theme="dark"] .stat-card {
 /* Report detail's "Image gallery" section — one row per image: thumbnail, timestamp, caption
    input. A plain flex list rather than a masonry grid since the caption input needs full width
    next to each thumbnail. */
+/* A real photo grid (Report's Image gallery), not the flat single-column thumbnail list this used
+   to be — 2 columns by default, 1 when the report's own gallery-columns picker (see
+   internal/reporter/views.templ) is set to it; always 1 below sm regardless, a 2-up grid having no
+   room to be useful that narrow. */
 .gallery-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.gallery-grid-1col {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 479px) {
+  .gallery-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .gallery-item {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* Drag-drop reorder (static/js/report-gallery.js) - a visual cue distinct from the browser's
+     own drag ghost, and dims the item being dragged so the reflow of the rest of the grid reads
+     clearly. */
+  cursor: grab;
+}
+
+.gallery-item.is-dragging {
+  opacity: 0.4;
+}
+
+/* Not .entity-thumb (a fixed 56x56 cropped square, meant for a row's leading icon) - a gallery
+   photo shows the whole image, sized either to its own natural dimensions (capped at the column's
+   width, centered) or stretched to fill the column exactly - see .gallery-item-stretch - always
+   preserving its aspect ratio either way (height: auto, never a fixed/cropped box). */
+.gallery-photo {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.gallery-item-stretch {
+  width: 100%;
+}
+
+/* Caption + "stretch" checkbox + Save button, deliberately kept to one row (only the text input
+   shrinks - the checkbox label and button stay their own natural width) rather than wrapping. */
+.gallery-item-form {
+  display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--border-light);
+  gap: 0.5rem;
 }
 
-.gallery-item:first-child {
-  border-top: none;
-}
-
-.gallery-item .row-actions {
+.gallery-item-form .input {
   flex: 1;
+  min-width: 0;
+}
+
+.gallery-item-form .checkbox-field {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* The upload control's own row (web.FileInput not used directly here so Upload can sit inline in
+   the same row instead of its own line below) - centered, no hint text underneath (see this
+   section's own doc comment in views.templ). */
+.gallery-upload-form {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
 }
 
 .card-header-row {
@@ -1449,6 +1506,29 @@ html[data-theme="dark"] .stat-card {
   margin: 0.75rem 0 0;
   font-size: 0.875rem;
   color: var(--text-muted);
+}
+
+/* Report detail's "Client / Asset / Project info" card: a plain rule separating the field lists
+   from the cover-photo preview beneath them (internal/reporter/views.templ). */
+.section-divider {
+  margin: 1rem 0;
+  border: none;
+  border-top: 1px solid var(--border-light);
+}
+
+.cover-photo-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+
+.cover-photo-preview img {
+  max-width: 100%;
+  max-height: 12rem;
+  width: auto;
+  height: auto;
+  border-radius: 4px;
 }
 
 /* --- Statistics tab counters (Settings -> Statistics) --------------------------------------- */
@@ -2072,43 +2152,19 @@ html[data-theme="dark"] .kanban-card {
    lists, all built on the shared [data-el-root]/EntityList* components) — every row reads as its
    own plain white card: a shadow-only hover lift, no odd/even striping, no border dividers.
    Scoped under [data-el-root] so plain .entity-list-row usages elsewhere (dashboard/detail
-   sub-lists) are unaffected by default - .entity-list-cards (no search/filter JS involved, just a
-   plain <ul class="entity-list entity-list-cards">) opts a nested "linked records" list (a
-   Project's Assessments/Treatments/Reports/Media, an Asset's per-project sub-lists, ...) into a
-   variant of the same look (it keeps an odd/even stripe - see below - since it sits inside an
-   already-white .card and needs the contrast), so a card-within-a-card still reads as its own row
-   instead of the older flat divider-line style. */
-[data-el-root] .entity-list,
-.entity-list-cards {
+   sub-lists - see "Simple table rows" below) are unaffected. */
+[data-el-root] .entity-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-[data-el-root] .entity-list-row,
-.entity-list-cards > .entity-list-row {
+[data-el-root] .entity-list-row {
   border-top: none;
   border-radius: 6px;
   padding: 0.875rem 1rem;
-  transition: box-shadow 150ms ease, background-color 150ms ease;
-}
-
-/* Every row is plain --surface (no odd/even stripe) - hover is shadow-only elevation, no
-   background-color change either, so the row's color never shifts, just lifts. */
-[data-el-root] .entity-list-row {
   background: var(--surface);
-}
-
-/* Odd rows use --bg (not --surface, the top-level rule's choice above) - a nested list already
-   sits inside a --surface .card, so a --surface "odd" row would be invisible against it in both
-   themes; --bg (the page's own background, always distinct from --surface) keeps every row
-   visibly its own card even on a single- or odd-count list. */
-.entity-list-cards > .entity-list-row:nth-child(odd) {
-  background: var(--bg);
-}
-
-.entity-list-cards > .entity-list-row:nth-child(even) {
-  background: var(--stripe-even);
+  transition: box-shadow 150ms ease, background-color 150ms ease;
 }
 
 [data-el-root] .entity-list-row:hover {
@@ -2116,14 +2172,7 @@ html[data-theme="dark"] .kanban-card {
   text-decoration: none;
 }
 
-.entity-list-cards > .entity-list-row:hover {
-  background: var(--green-bg);
-  box-shadow: var(--shadow-sm);
-  text-decoration: none;
-}
-
-html[data-theme="dark"] [data-el-root] .entity-list-row,
-html[data-theme="dark"] .entity-list-cards > .entity-list-row {
+html[data-theme="dark"] [data-el-root] .entity-list-row {
   border: 1px solid var(--border);
 }
 
@@ -2133,22 +2182,110 @@ html[data-theme="dark"] .entity-list-cards > .entity-list-row {
    once the whole card is the tap target and there's no single line left for it to trail - is
    dropped. */
 @media (max-width: 767px) {
-  [data-el-root] .entity-list-row,
-  .entity-list-cards > .entity-list-row {
+  [data-el-root] .entity-list-row {
     flex-wrap: wrap;
     row-gap: 0.625rem;
   }
 
-  [data-el-root] .entity-list-row > .row-actions,
-  .entity-list-cards > .entity-list-row > .row-actions {
+  [data-el-root] .entity-list-row > .row-actions {
     flex-basis: 100%;
     padding-top: 0.625rem;
     border-top: 1px solid var(--border-light);
   }
 
-  [data-el-root] .entity-list-chevron,
-  .entity-list-cards .entity-list-chevron {
+  [data-el-root] .entity-list-chevron {
     display: none;
+  }
+}
+
+/* --- Simple table rows (nested "linked records" lists — a Project's Assessments/Treatments/
+   Reports/Media, an Asset's per-project sub-lists, a Client's Assets, an annotated Media's other
+   versions, ...) — deliberately plain: no card background, no odd/even stripe, just a title-label,
+   optional chips, and actions on a divider-line row. Distinct from the [data-el-root] module
+   search-result pages above, which keep their own card-row look. Base .entity-list-row (no
+   modifier class) already *is* this style — border-top divider, no radius, no background/shadow. */
+
+.row-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+/* web.TableRowActions renders a row's actions twice: .row-actions-inline (plain, shown from sm
+   up) and .row-actions-menu (a "⋮" kebab opening the same actions in a dropdown, shown below sm) -
+   only one is ever visible at a time. */
+.row-actions-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.row-actions-menu {
+  display: none;
+  position: relative;
+}
+
+.row-actions-menu summary {
+  list-style: none;
+}
+
+.row-actions-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-actions-menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 10rem;
+  padding: 0.25rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.row-actions-menu-panel a,
+.row-actions-menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-family: var(--font-body);
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-actions-menu-panel a:hover,
+.row-actions-menu-panel button:hover {
+  background: var(--neutral-bg);
+}
+
+/* Lets a <form> wrapping one menu action (e.g. a data-confirm delete) participate directly in the
+   panel's own flex column, instead of adding an extra unstyled block level of its own. */
+.row-actions-menu-panel form {
+  display: contents;
+}
+
+@media (max-width: 639px) {
+  .row-actions-inline {
+    display: none;
+  }
+
+  .row-actions-menu {
+    display: inline-block;
   }
 }
 

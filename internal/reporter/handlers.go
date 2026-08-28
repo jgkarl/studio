@@ -3,6 +3,7 @@ package reporter
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -30,6 +31,8 @@ func Mount(mux *http.ServeMux, svc *Service) {
 	mux.HandleFunc("POST /reports/{id}/status", svc.Auth.RequireUser(svc.handleSetStatus))
 	mux.HandleFunc("POST /reports/{id}/attachments", svc.Auth.RequireUser(svc.handleAddAttachments))
 	mux.HandleFunc("POST /reports/{id}/media/{refId}/caption", svc.Auth.RequireUser(svc.handleSetCaption))
+	mux.HandleFunc("POST /reports/{id}/gallery/reorder", svc.Auth.RequireUser(svc.handleReorderGallery))
+	mux.HandleFunc("POST /reports/{id}/gallery/columns", svc.Auth.RequireUser(svc.handleSetGalleryColumns))
 	mux.HandleFunc("POST /reports/{id}/unlink", svc.Auth.RequireUser(svc.handleUnlink))
 }
 
@@ -43,7 +46,7 @@ func chromeFor(r *http.Request, user *auth.User, active string) web.Chrome {
 }
 
 func (svc *Service) handleList(w http.ResponseWriter, r *http.Request, user *auth.User) {
-	rows, err := List(r.Context(), svc.Pool)
+	rows, err := ListIncludingRemoved(r.Context(), svc.Pool)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -99,11 +102,6 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.NotFound(w, r)
 		return
 	}
-	refs, err := svc.Media.GetReferencedMedia(ctx, media.RefReport, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	projectAssessments, err := assessments.ListByProject(ctx, svc.Pool, report.ProjectID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -114,7 +112,7 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	gallery, err := BuildGallery(ctx, svc.Media, svc.Pool, report.ProjectID)
+	gallery, err := BuildGallery(ctx, svc.Media, svc.Pool, report.ProjectID, report.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -124,16 +122,24 @@ func (svc *Service) handleDetail(w http.ResponseWriter, r *http.Request, user *a
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeHTML(w, r, DetailPage(chromeFor(r, user, "/reports"), *report, refs, projectAssessments, projectTreatments, gallery, infoPanel))
+	writeHTML(w, r, DetailPage(chromeFor(r, user, "/reports"), *report, projectAssessments, projectTreatments, gallery, infoPanel))
 }
 
+// handleSetCaption saves one gallery image's caption and its "stretch to column width" flag
+// together, in the same request - the whole point of putting both in a single form/row (see
+// internal/reporter/views.templ's Image gallery section) is one Save click for both.
 func (svc *Service) handleSetCaption(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
 	id := r.PathValue("id")
-	if err := media.SetCaption(r.Context(), svc.Pool, r.PathValue("refId"), strings.TrimSpace(r.FormValue("caption"))); err != nil {
+	refID := r.PathValue("refId")
+	if err := media.SetCaption(r.Context(), svc.Pool, refID, strings.TrimSpace(r.FormValue("caption"))); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := SetGalleryItemStretch(r.Context(), svc.Pool, id, refID, r.FormValue("stretch") == "on"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -146,11 +152,9 @@ func (svc *Service) handleUpdateSections(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	in := SectionsInput{
-		Summary:            strings.TrimSpace(r.FormValue("summary")),
-		ConditionFindings:  strings.TrimSpace(r.FormValue("conditionFindings")),
-		TreatmentPerformed: strings.TrimSpace(r.FormValue("treatmentPerformed")),
-		MaterialsUsed:      strings.TrimSpace(r.FormValue("materialsUsed")),
-		Recommendations:    strings.TrimSpace(r.FormValue("recommendations")),
+		Description:     strings.TrimSpace(r.FormValue("description")),
+		Summary:         strings.TrimSpace(r.FormValue("summary")),
+		Recommendations: strings.TrimSpace(r.FormValue("recommendations")),
 	}
 	id := r.PathValue("id")
 	if err := UpdateSections(r.Context(), svc.Pool, id, in); err != nil {
@@ -190,10 +194,8 @@ func (svc *Service) handleUpdateLayout(w http.ResponseWriter, r *http.Request, u
 		LayoutStyle:         r.FormValue("layoutStyle"),
 		CoverMediaID:        r.FormValue("coverMediaId"),
 		ShowCover:           r.FormValue("showCover") == "on",
+		ShowDescription:     r.FormValue("showDescription") == "on",
 		ShowSummary:         r.FormValue("showSummary") == "on",
-		ShowCondition:       r.FormValue("showCondition") == "on",
-		ShowTreatment:       r.FormValue("showTreatment") == "on",
-		ShowMaterials:       r.FormValue("showMaterials") == "on",
 		ShowRecommendations: r.FormValue("showRecommendations") == "on",
 	}
 	if in.LayoutStyle == "" {
@@ -201,6 +203,39 @@ func (svc *Service) handleUpdateLayout(w http.ResponseWriter, r *http.Request, u
 	}
 	id := r.PathValue("id")
 	if err := UpdateLayout(r.Context(), svc.Pool, id, in); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
+}
+
+// handleReorderGallery persists a drag-drop reorder of the report's own image gallery -
+// orderedRefIds is a repeated form field, one MediaReference.id per image, in their new order
+// (see static/js/report-gallery.js).
+func (svc *Service) handleReorderGallery(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id := r.PathValue("id")
+	if err := ReorderGallery(r.Context(), svc.Pool, id, r.Form["refId"]); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (svc *Service) handleSetGalleryColumns(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	columns, err := strconv.Atoi(r.FormValue("columns"))
+	if err != nil || (columns != 1 && columns != 2) {
+		columns = 2
+	}
+	id := r.PathValue("id")
+	if err := SetGalleryColumns(r.Context(), svc.Pool, id, columns); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -225,13 +260,25 @@ func (svc *Service) handleSetStatus(w http.ResponseWriter, r *http.Request, user
 	http.Redirect(w, r, "/reports/"+id, http.StatusSeeOther)
 }
 
+// handleAddAttachments uploads directly into the report's own image gallery (the old separate
+// "Attachments" card is gone - see internal/reporter/views.templ's Image gallery section, which
+// is what this now posts from). Image-only: the gallery never shows video (BuildGallery already
+// filters it out on read), so a stray video in the upload is rejected here too rather than
+// accepted and then silently invisible.
 func (svc *Service) handleAddAttachments(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
 	id := r.PathValue("id")
-	if _, err := svc.Media.UploadAllAndAttachWithCaption(r.Context(), media.FilesFromForm(r, "photos"), user.ID, media.RefReport, id, "attachment", r.FormValue("photosCaption")); err != nil {
+	files := media.FilesFromForm(r, "photos")
+	images := files[:0]
+	for _, f := range files {
+		if strings.HasPrefix(f.MimeType, "image/") {
+			images = append(images, f)
+		}
+	}
+	if _, err := svc.Media.UploadAllAndAttachWithCaption(r.Context(), images, user.ID, media.RefReport, id, "gallery", r.FormValue("photosCaption")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

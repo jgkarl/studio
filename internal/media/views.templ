@@ -168,13 +168,15 @@ templ annotatedVersionsCard(m Media, derivedVersions []Media) {
 		if len(derivedVersions) == 0 {
 			<p class="empty-state">No annotated versions yet.</p>
 		} else {
-			<ul class="entity-list entity-list-cards">
+			<ul class="entity-list">
 				for _, v := range derivedVersions {
 					<li class="entity-list-row">
 						<a href={ templ.URL("/media/view/" + v.ID) } class="entity-list-name">{ v.DerivedLabel.String }</a>
 						<div class="row-actions">
-							if !v.IsBaked() {
-								<span class="badge badge-amber">Not saved yet</span>
+							@web.TableRowChips() {
+								if !v.IsBaked() {
+									<span class="badge badge-amber">Not saved yet</span>
+								}
 							}
 						</div>
 					</li>
