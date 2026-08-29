@@ -204,7 +204,8 @@ func SeedDemoData(ctx context.Context, pool *sql.DB, mediaSvc *media.Service) er
 	if err := mediaSvc.AttachMediaReference(ctx, beforePhoto.ID, media.RefAssessment, intakeAssessmentID, "before", 0); err != nil {
 		return fmt.Errorf("seed demo data: attaching before-photo: %w", err)
 	}
-	if _, err := media.CreateRegion(ctx, pool, beforePhoto.ID, "clsfr_annotation_type_loss", 20, 60, 15, 12); err != nil {
+	if _, err := media.CreateRegion(ctx, pool, beforePhoto.ID, "clsfr_annotation_type_loss", 20, 60, 15, 12,
+		"Paint loss in the lower-left corner, down to the ground layer."); err != nil {
 		return fmt.Errorf("seed demo data: annotating before-photo: %w", err)
 	}
 

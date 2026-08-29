@@ -31,15 +31,27 @@ type AnnotationRegion struct {
 	WidthPct         float64
 	HeightPct        float64
 	PathData         sql.NullString
-	CreatedAt        time.Time
+	// Note is an optional per-region free-text note (db/migrations/0020_media_annotation_note.sql)
+	// — editor/table metadata, distinct from Media.Description's whole-image caption.
+	Note      sql.NullString
+	CreatedAt time.Time
 }
 
-const annotationRegionColumns = "id, mediaId, annotationTypeId, shape, xPct, yPct, widthPct, heightPct, pathData, createdAt"
+const annotationRegionColumns = "id, mediaId, annotationTypeId, shape, xPct, yPct, widthPct, heightPct, pathData, note, createdAt"
 
 func scanAnnotationRegion(rows *sql.Rows) (AnnotationRegion, error) {
 	var a AnnotationRegion
-	err := rows.Scan(&a.ID, &a.MediaID, &a.AnnotationTypeID, &a.Shape, &a.XPct, &a.YPct, &a.WidthPct, &a.HeightPct, &a.PathData, &a.CreatedAt)
+	err := rows.Scan(&a.ID, &a.MediaID, &a.AnnotationTypeID, &a.Shape, &a.XPct, &a.YPct, &a.WidthPct, &a.HeightPct, &a.PathData, &a.Note, &a.CreatedAt)
 	return a, err
+}
+
+// nullableText maps "" → NULL for a nullable TEXT column, matching every other optional text
+// field in this app (see queries.go's UpdateDescription/SetCaption).
+func nullableText(s string) any {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return s
 }
 
 // ListRegionsForMedia returns every region on one Media item, oldest first (draw order — later
@@ -54,7 +66,7 @@ func ListRegionsForMedia(ctx context.Context, q studiodb.Querier, mediaID string
 // from x/y — a region can never claim to extend past the image, regardless of what a client sends
 // (the drag-to-draw JS should never produce one, but this is the actual guarantee, not just a
 // client-side nicety).
-func CreateRegion(ctx context.Context, q studiodb.Querier, mediaID, annotationTypeID string, x, y, w, h float64) (string, error) {
+func CreateRegion(ctx context.Context, q studiodb.Querier, mediaID, annotationTypeID string, x, y, w, h float64, note string) (string, error) {
 	x = clampPct(x)
 	y = clampPct(y)
 	w = clampPct(w)
@@ -68,9 +80,23 @@ func CreateRegion(ctx context.Context, q studiodb.Querier, mediaID, annotationTy
 
 	id := studiodb.NewID()
 	_, err := studiodb.Execute(ctx, q,
-		"INSERT INTO MediaAnnotationRegion (id, mediaId, annotationTypeId, xPct, yPct, widthPct, heightPct) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		id, mediaID, annotationTypeID, x, y, w, h)
+		"INSERT INTO MediaAnnotationRegion (id, mediaId, annotationTypeId, xPct, yPct, widthPct, heightPct, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		id, mediaID, annotationTypeID, x, y, w, h, nullableText(note))
 	return id, err
+}
+
+// UpdateRegion changes an existing region's annotation type and note — the two things the media
+// editor's inline row edit can touch (the drawn shape itself is fixed once created; redraw it by
+// deleting and marking a new one). annotationTypeID must be a non-empty annotation_type Classifier
+// id; note is optional ("" clears it).
+func UpdateRegion(ctx context.Context, q studiodb.Querier, regionID, annotationTypeID, note string) error {
+	if annotationTypeID == "" {
+		return fmt.Errorf("annotationTypeId is required")
+	}
+	_, err := studiodb.Execute(ctx, q,
+		"UPDATE MediaAnnotationRegion SET annotationTypeId = ?, note = ? WHERE id = ?",
+		annotationTypeID, nullableText(note), regionID)
+	return err
 }
 
 // point is one coordinate of a freehand region's outline — percentages of the image's own
@@ -86,7 +112,7 @@ type point struct {
 // is computed and stored in the same XPct/YPct/WidthPct/HeightPct columns rectangles use, so a
 // freehand region is still sortable/queryable like one — PathData carries the actual outline for
 // rendering as an SVG <polygon> (see PolygonPoints).
-func CreateFreehandRegion(ctx context.Context, q studiodb.Querier, mediaID, annotationTypeID, pointsJSON string) (string, error) {
+func CreateFreehandRegion(ctx context.Context, q studiodb.Querier, mediaID, annotationTypeID, pointsJSON, note string) (string, error) {
 	var raw []point
 	if err := json.Unmarshal([]byte(pointsJSON), &raw); err != nil {
 		return "", fmt.Errorf("invalid points: %w", err)
@@ -111,8 +137,8 @@ func CreateFreehandRegion(ctx context.Context, q studiodb.Querier, mediaID, anno
 
 	id := studiodb.NewID()
 	_, err = studiodb.Execute(ctx, q,
-		"INSERT INTO MediaAnnotationRegion (id, mediaId, annotationTypeId, shape, xPct, yPct, widthPct, heightPct, pathData) VALUES (?, ?, ?, 'freehand', ?, ?, ?, ?, ?)",
-		id, mediaID, annotationTypeID, minX, minY, maxX-minX, maxY-minY, string(pathBytes))
+		"INSERT INTO MediaAnnotationRegion (id, mediaId, annotationTypeId, shape, xPct, yPct, widthPct, heightPct, pathData, note) VALUES (?, ?, ?, 'freehand', ?, ?, ?, ?, ?, ?)",
+		id, mediaID, annotationTypeID, minX, minY, maxX-minX, maxY-minY, string(pathBytes), nullableText(note))
 	return id, err
 }
 

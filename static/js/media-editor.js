@@ -1,39 +1,40 @@
 // Media edit page (/media/edit/{id}, internal/media/views.templ's mediaEditBody) - the
-// pattern-layer annotation editor for one annotated version. Used to live in a lightbox modal
-// opened from the view page; now its own plain page/URL, so the browser's own back button/history
-// work like any other page and there's a real "Save" action instead of an implicit
-// bake-on-modal-close.
+// pattern-layer annotation editor for one annotated version.
 //
 // OpenSeadragon (vendored, static/openseadragon/) tiles the true original's IIIF endpoint with
-// quality=gray forced (matching what BakeAnnotatedVersion actually composites - grayscale, see
+// quality=gray forced (matching what BakeAnnotatedVersion composites - grayscale, see
 // internal/media/rasterize.go) - fetched and injected onto the parsed info.json object rather than
 // passed as a bare URL string, since OpenSeadragon's IIIFTileSource only honors a tileQuality
-// override already present on the object, not derivable from a URL. Its own toolbar/navigator are
-// off - a clean canvas with just the image and the pattern-layer SVG overlay on top.
+// override already present on the object. Its own toolbar/navigator are off - a clean canvas with
+// just the image and the pattern-layer SVG overlay on top.
 //
-// The stored annotation regions (internal/media/annotations.go) are server-rendered into one
-// 0-100 viewBox <svg id="pattern-layer-svg"> sibling of the OSD mount div, handed to OpenSeadragon
-// as one of its own overlays (viewer.addOverlay) so it tracks pan/zoom automatically instead of
-// needing hand-rolled viewport-transform math. New regions are drawn directly on this surface:
-// every coordinate a drag produces is converted from on-screen pixels to image-percentage via
-// viewport.viewerElementToImageCoordinates before it's POSTed, so a region is stored (and
-// replayed) in the same percent-of-image space regardless of what zoom/pan it was drawn at.
-// Drawing is armed by default (the "+ Add region" checkbox starts checked) - uncheck it to pan/
-// zoom instead.
+// Interaction model:
+//   - Default: the stage just pans/zooms (OpenSeadragon's own mouse/touch nav). No draw-mode
+//     toggle - the old "+ Add region" checkbox is gone.
+//   - "+ New annotation" opens the #annotation-draft panel and arms drawing: a drag marks one
+//     region (rectangle or freehand brush), shown as a dashed preview on the overlay but NOT yet
+//     persisted. Pick a type, optionally write a note, then "Save annotation" POSTs it.
+//   - Existing annotations are listed in #annotations-table (one <tr> each). "Edit" flips a row to
+//     an inline type <select> + note <input> (the drawn shape is fixed); its save/cancel icons
+//     persist or discard. "Delete" removes the region.
+//   - The bottom "Save & finish" button saves the whole-image note (POST /media/{id}/description)
+//     and re-bakes this version's file (POST /media/{id}/bake), then returns to the view page.
 //
-// Regions persist immediately as they're drawn/deleted (unchanged from before). The "Save" button
-// is what saves the whole-image note (POST /media/{id}/description) and re-bakes this version's
-// own file (POST /media/{id}/bake) in one explicit action, then returns to the view page -
-// replacing the old implicit bake-on-modal-close plus a separate tiny note-save button with one
-// clear action a conservator can point at.
+// After any create/edit/delete the editor re-fetches its own page and swaps in the fresh
+// #pattern-layer-svg (re-added as the OSD overlay) and #annotations-table - never a full reload,
+// which would tear down the live viewer.
 document.addEventListener("DOMContentLoaded", () => {
   const wrap = document.getElementById("pattern-layer-wrap");
   if (!wrap) return;
+  const mediaId = wrap.dataset.mediaId;
+  const SVG_NS = "http://www.w3.org/2000/svg";
 
   let viewer = null;
   let imageReady = false;
-
-  const addToggle = document.getElementById("pattern-layer-add-toggle");
+  // Whether the "+ New annotation" draft panel is open and drawing is armed. Declared up here
+  // (not with the rest of the draft state below) because ensureViewer's async "open" handler
+  // reads it, and the draft wiring further down early-returns when no annotation types exist.
+  let drafting = false;
 
   function ensureViewer() {
     if (viewer) return;
@@ -56,86 +57,30 @@ document.addEventListener("DOMContentLoaded", () => {
           imageReady = true;
           const svg = document.getElementById("pattern-layer-svg");
           const tiledImage = viewer.world.getItemAt(0);
-          if (svg) {
-            viewer.addOverlay({ element: svg, location: tiledImage.getBounds() });
-          }
-          viewer.setMouseNavEnabled(addToggle ? !addToggle.checked : true);
+          if (svg) viewer.addOverlay({ element: svg, location: tiledImage.getBounds() });
+          // Drawing is only armed while the draft panel is open; the default is plain pan/zoom.
+          viewer.setMouseNavEnabled(!drafting);
         });
       });
   }
   ensureViewer();
 
-  // --- Save: note + bake, one explicit action -------------------------------------------------
-
-  const saveBtn = document.getElementById("media-edit-save");
-  const saveStatus = document.getElementById("media-edit-save-status");
-  const noteInput = document.getElementById("media-edit-note");
-
-  if (saveBtn) {
-    saveBtn.addEventListener("click", () => {
-      const mediaId = wrap.dataset.mediaId;
-      saveBtn.disabled = true;
-      if (saveStatus) saveStatus.textContent = "Saving…";
-
-      fetch(`/media/${mediaId}/description`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-Requested-With": "fetch",
-        },
-        body: `description=${encodeURIComponent(noteInput ? noteInput.value : "")}`,
-      })
-        .then(() => fetch(`/media/${mediaId}/bake`, { method: "POST", headers: { "X-Requested-With": "fetch" } }))
-        .then((res) => {
-          if (!res.ok) throw new Error("bake failed");
-          window.location.href = `/media/view/${mediaId}`;
-        })
-        .catch(() => {
-          saveBtn.disabled = false;
-          if (saveStatus) saveStatus.textContent = "Couldn't save — try again.";
-        });
-    });
+  function svgEl() {
+    return document.getElementById("pattern-layer-svg");
   }
 
-  // --- Pattern-layer draw tool ------------------------------------------------------------------
-  // The "+ Add region" checkbox (armed by default) freezes OpenSeadragon's own pan/zoom while
-  // checked, so a draw-drag doesn't also move the viewport - uncheck it to pan/zoom instead. Two
-  // icon-toggle buttons pick rectangle vs. freehand brush; a Type <select> picks the annotation
-  // type ("the reason" for the marked area) — see internal/media/annotations.go's
-  // CreateRegion/CreateFreehandRegion.
-
-  const toolButtons = document.querySelectorAll(".pattern-layer-tool-btn");
-  const typeSelect = document.getElementById("pattern-layer-type");
-  if (!addToggle || !typeSelect) return;
-
-  let currentTool = "rect";
-  toolButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      currentTool = btn.dataset.tool;
-      toolButtons.forEach((b) => b.classList.toggle("is-active", b === btn));
-    });
-  });
-
-  wrap.classList.toggle("is-add-mode", addToggle.checked);
-  addToggle.addEventListener("change", () => {
-    wrap.classList.toggle("is-add-mode", addToggle.checked);
-    if (viewer && viewer !== "loading") viewer.setMouseNavEnabled(!addToggle.checked);
-  });
-
-  function reloadOverlay() {
-    // Re-fetch this same edit page and swap in its freshly-rendered SVG overlay + legend, rather
-    // than a full page reload — that would also tear down the live OpenSeadragon viewer the user
-    // is actively drawing in. OpenSeadragon already has a live reference to the old SVG element as
-    // its overlay; replacing that element in the DOM doesn't move the overlay, so it's re-added
-    // the same way the "open" handler did the first time.
-    fetch(window.location.pathname, { headers: { "X-Requested-With": "fetch" } })
+  // Re-fetch this edit page and swap in its freshly-rendered overlay + annotations table, rather
+  // than a full page reload (which would tear down the live OpenSeadragon viewer). OSD holds a
+  // live reference to the old SVG element as its overlay, so it's removed and the fresh one
+  // re-added the same way the "open" handler did the first time.
+  function reloadEditor() {
+    return fetch(window.location.pathname, { headers: { "X-Requested-With": "fetch" } })
       .then((res) => res.text())
       .then((html) => {
         const doc = new DOMParser().parseFromString(html, "text/html");
+
         const freshSvg = doc.getElementById("pattern-layer-svg");
-        const freshLegend = doc.querySelector(".pattern-layer-legend");
-        const svg = document.getElementById("pattern-layer-svg");
-        const legend = document.querySelector(".pattern-layer-legend");
+        const svg = svgEl();
         if (freshSvg && svg) {
           svg.replaceWith(freshSvg);
           if (viewer && viewer !== "loading" && imageReady) {
@@ -143,24 +88,204 @@ document.addEventListener("DOMContentLoaded", () => {
             viewer.addOverlay({ element: freshSvg, location: viewer.world.getItemAt(0).getBounds() });
           }
         }
-        if (freshLegend && legend) legend.replaceWith(freshLegend);
+
+        const freshTable = doc.getElementById("annotations-table");
+        const table = document.getElementById("annotations-table");
+        if (freshTable && table) table.replaceWith(freshTable);
       });
   }
 
-  function postRegion(body) {
-    const mediaId = wrap.dataset.mediaId;
-    return fetch(`/media/${mediaId}/annotations`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Requested-With": "fetch",
-      },
-      body,
-    }).then((res) => {
-      if (res.ok) reloadOverlay();
-      return res;
+  // --- Bottom "Save & finish": whole-image note + bake, one explicit action -------------------
+
+  const saveBtn = document.getElementById("media-edit-save");
+  const saveStatus = document.getElementById("media-edit-save-status");
+  const noteInput = document.getElementById("media-edit-note");
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async () => {
+      saveBtn.disabled = true;
+      if (saveStatus) saveStatus.textContent = "Saving…";
+      try {
+        const descRes = await fetch(`/media/${mediaId}/description`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "fetch" },
+          body: `description=${encodeURIComponent(noteInput ? noteInput.value : "")}`,
+        });
+        if (!descRes.ok) {
+          throw new Error(`saving the note failed (HTTP ${descRes.status}): ${(await descRes.text()).trim()}`);
+        }
+        const bakeRes = await fetch(`/media/${mediaId}/bake`, {
+          method: "POST",
+          headers: { "X-Requested-With": "fetch" },
+        });
+        if (!bakeRes.ok) {
+          throw new Error(`baking the image failed (HTTP ${bakeRes.status}): ${(await bakeRes.text()).trim()}`);
+        }
+        window.location.href = `/media/view/${mediaId}`;
+      } catch (err) {
+        console.error("media edit save failed:", err);
+        saveBtn.disabled = false;
+        if (saveStatus) saveStatus.textContent = `Couldn't save — ${err.message}`;
+      }
     });
   }
+
+  // --- Annotations table: inline edit / delete (event-delegated, survives table swaps) --------
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".annotation-act");
+    if (!btn) return;
+    const row = btn.closest(".annotation-row");
+    if (!row) return;
+    const regionId = row.dataset.regionId;
+
+    if (btn.classList.contains("annotation-act-edit")) {
+      row.classList.add("is-editing");
+      return;
+    }
+    if (btn.classList.contains("annotation-act-cancel")) {
+      // Reload to restore the row's stored values verbatim (the user may have typed into the
+      // inline fields before cancelling).
+      reloadEditor();
+      return;
+    }
+    if (btn.classList.contains("annotation-act-delete")) {
+      if (!window.confirm("Delete this annotation?")) return;
+      setRowBusy(row, true);
+      fetch(`/media/${mediaId}/annotations/${regionId}/delete`, {
+        method: "POST",
+        headers: { "X-Requested-With": "fetch" },
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return reloadEditor();
+        })
+        .catch((err) => {
+          setRowBusy(row, false);
+          window.alert(`Couldn't delete the annotation — ${err.message}`);
+        });
+      return;
+    }
+    if (btn.classList.contains("annotation-act-save")) {
+      const typeId = row.querySelector(".annotation-edit-type").value;
+      const note = row.querySelector(".annotation-edit-note").value;
+      setRowBusy(row, true);
+      fetch(`/media/${mediaId}/annotations/${regionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "fetch" },
+        body: `annotationTypeId=${encodeURIComponent(typeId)}&note=${encodeURIComponent(note)}`,
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return reloadEditor();
+        })
+        .catch((err) => {
+          setRowBusy(row, false);
+          window.alert(`Couldn't save the annotation — ${err.message}`);
+        });
+    }
+  });
+
+  function setRowBusy(row, busy) {
+    row.classList.toggle("is-busy", busy);
+    row.querySelectorAll(".annotation-act").forEach((b) => (b.disabled = busy));
+  }
+
+  // --- "+ New annotation" draft: draw a region, pick a type + note, then save ------------------
+
+  const newBtn = document.getElementById("annotation-new");
+  const draft = document.getElementById("annotation-draft");
+  if (!newBtn || !draft) return;
+
+  const draftType = document.getElementById("annotation-draft-type");
+  const draftNote = document.getElementById("annotation-draft-note");
+  const draftSave = document.getElementById("annotation-draft-save");
+  const draftCancel = document.getElementById("annotation-draft-cancel");
+  const draftStatus = document.getElementById("annotation-draft-status");
+  const toolButtons = draft.querySelectorAll(".pattern-layer-tool-btn");
+
+  let currentTool = "rect";
+  let pending = null; // {shape:"rect", xPct,yPct,widthPct,heightPct} | {shape:"freehand", points:[{x,y}]}
+  let previewNode = null;
+
+  function clearPreview() {
+    if (previewNode) previewNode.remove();
+    previewNode = null;
+  }
+
+  function setDrafting(on) {
+    drafting = on;
+    draft.hidden = !on;
+    newBtn.hidden = on;
+    wrap.classList.toggle("is-add-mode", on);
+    if (viewer && viewer !== "loading") viewer.setMouseNavEnabled(!on);
+    if (!on) {
+      clearPreview();
+      pending = null;
+      if (draftNote) draftNote.value = "";
+      if (draftStatus) draftStatus.textContent = "";
+      setToolActive("rect");
+    }
+  }
+
+  function setToolActive(tool) {
+    currentTool = tool;
+    toolButtons.forEach((b) => b.classList.toggle("is-active", b.dataset.tool === tool));
+  }
+
+  newBtn.addEventListener("click", () => setDrafting(true));
+  draftCancel.addEventListener("click", () => setDrafting(false));
+  toolButtons.forEach((b) => {
+    b.addEventListener("click", () => {
+      setToolActive(b.dataset.tool);
+      clearPreview();
+      pending = null;
+      if (draftStatus) draftStatus.textContent = "";
+    });
+  });
+
+  draftSave.addEventListener("click", () => {
+    if (!pending) {
+      draftStatus.textContent = "Draw a region on the image first.";
+      return;
+    }
+    const typeId = draftType.value;
+    if (!typeId) {
+      draftStatus.textContent = "Pick an annotation type.";
+      return;
+    }
+    let body;
+    if (pending.shape === "freehand") {
+      body =
+        `shape=freehand&annotationTypeId=${encodeURIComponent(typeId)}` +
+        `&points=${encodeURIComponent(JSON.stringify(pending.points))}` +
+        `&note=${encodeURIComponent(draftNote.value)}`;
+    } else {
+      body =
+        `shape=rect&annotationTypeId=${encodeURIComponent(typeId)}` +
+        `&xPct=${pending.xPct}&yPct=${pending.yPct}&widthPct=${pending.widthPct}&heightPct=${pending.heightPct}` +
+        `&note=${encodeURIComponent(draftNote.value)}`;
+    }
+    draftSave.disabled = true;
+    draftStatus.textContent = "Saving…";
+    fetch(`/media/${mediaId}/annotations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "fetch" },
+      body,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return reloadEditor();
+      })
+      .then(() => {
+        draftSave.disabled = false;
+        setDrafting(false);
+      })
+      .catch((err) => {
+        draftSave.disabled = false;
+        draftStatus.textContent = `Couldn't save — ${err.message}`;
+      });
+  });
 
   // A drag's on-screen pixel position, resolved to a percentage of the full (untiled) image —
   // stable across whatever zoom/pan the viewport happens to be at.
@@ -175,10 +300,9 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // --- Rectangle tool ---------------------------------------------------------------------
-  // Live drag feedback is a plain on-screen box in pixel space (cheap, and the drag hasn't
-  // produced a real region yet) - only the final corners get converted to image-percent, once,
-  // when the drag ends.
+  // --- Rectangle tool -------------------------------------------------------------------------
+  // Live drag feedback is a plain on-screen box in pixel space; only the final corners get
+  // converted to image-percent, once, when the drag ends.
 
   let dragBox = null;
   let dragStartClient = null;
@@ -207,7 +331,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function endRectDrag(e) {
     dragBox.remove();
     dragBox = null;
-
     const p1 = pixelToImagePct(dragStartClient.x, dragStartClient.y);
     const p2 = pixelToImagePct(e.clientX, e.clientY);
     dragStartClient = null;
@@ -217,44 +340,44 @@ document.addEventListener("DOMContentLoaded", () => {
     const heightPct = Math.abs(p2.y - p1.y);
     if (widthPct < 0.5 || heightPct < 0.5) return;
 
-    postRegion(
-      `shape=rect&annotationTypeId=${encodeURIComponent(typeSelect.value)}&xPct=${xPct}&yPct=${yPct}&widthPct=${widthPct}&heightPct=${heightPct}`
-    );
+    pending = { shape: "rect", xPct, yPct, widthPct, heightPct };
+    clearPreview();
+    const el = document.createElementNS(SVG_NS, "rect");
+    el.setAttribute("x", xPct);
+    el.setAttribute("y", yPct);
+    el.setAttribute("width", widthPct);
+    el.setAttribute("height", heightPct);
+    el.setAttribute("class", "annotation-preview");
+    svgEl().appendChild(el);
+    previewNode = el;
+    draftStatus.textContent = "Region marked — pick a type and save.";
   }
 
   // --- Freehand brush tool ------------------------------------------------------------------
-  // Every point is converted to image-percent as the drag happens (not just the endpoints) -
-  // the live preview polyline lives in the same percent-space SVG the persisted regions do, so
-  // it must already be in that space to render in the right place at the current zoom/pan.
+  // Every point is converted to image-percent as the drag happens - the live preview polyline
+  // lives in the same percent-space SVG the persisted regions do.
 
-  const SVG_NS = "http://www.w3.org/2000/svg";
   let freehandPoints = null;
   let previewPolyline = null;
 
   function startFreehandDrag(e) {
     freehandPoints = [pixelToImagePct(e.clientX, e.clientY)];
-    const svg = document.getElementById("pattern-layer-svg");
     previewPolyline = document.createElementNS(SVG_NS, "polyline");
-    previewPolyline.setAttribute("fill", "none");
-    previewPolyline.setAttribute("stroke", "var(--accent, #3FA864)");
-    previewPolyline.setAttribute("stroke-width", "0.4");
-    previewPolyline.setAttribute("vector-effect", "non-scaling-stroke");
-    svg.appendChild(previewPolyline);
-    updatePreview();
+    previewPolyline.setAttribute("class", "annotation-preview annotation-preview-line");
+    svgEl().appendChild(previewPolyline);
+    updateFreehandPreview();
   }
 
-  function updatePreview() {
+  function updateFreehandPreview() {
     previewPolyline.setAttribute("points", freehandPoints.map((p) => `${p.x},${p.y}`).join(" "));
   }
 
   function moveFreehandDrag(e) {
     const next = pixelToImagePct(e.clientX, e.clientY);
     const last = freehandPoints[freehandPoints.length - 1];
-    // Only keep a new point once the pointer has moved a visible amount — keeps the point count
-    // (and the JSON payload) reasonable for a long brush stroke.
     if (Math.hypot(next.x - last.x, next.y - last.y) < 0.5) return;
     freehandPoints.push(next);
-    updatePreview();
+    updateFreehandPreview();
   }
 
   function endFreehandDrag() {
@@ -264,21 +387,23 @@ document.addEventListener("DOMContentLoaded", () => {
     freehandPoints = null;
     if (points.length < 3) return;
 
-    postRegion(
-      `shape=freehand&annotationTypeId=${encodeURIComponent(typeSelect.value)}&points=${encodeURIComponent(JSON.stringify(points))}`
-    );
+    pending = { shape: "freehand", points };
+    clearPreview();
+    const el = document.createElementNS(SVG_NS, "polygon");
+    el.setAttribute("points", points.map((p) => `${p.x},${p.y}`).join(" "));
+    el.setAttribute("class", "annotation-preview");
+    svgEl().appendChild(el);
+    previewNode = el;
+    draftStatus.textContent = "Region marked — pick a type and save.";
   }
 
-  // --- Shared drag wiring --------------------------------------------------------------------
+  // --- Shared drag wiring (mouse) -----------------------------------------------------------
 
   wrap.addEventListener("mousedown", (e) => {
-    if (!addToggle.checked || !typeSelect.value || !imageReady) return;
+    if (!drafting || !imageReady) return;
     e.preventDefault();
-    if (currentTool === "freehand") {
-      startFreehandDrag(e);
-    } else {
-      startRectDrag(e);
-    }
+    if (currentTool === "freehand") startFreehandDrag(e);
+    else startRectDrag(e);
   });
 
   window.addEventListener("mousemove", (e) => {
@@ -291,15 +416,9 @@ document.addEventListener("DOMContentLoaded", () => {
     else if (freehandPoints) endFreehandDrag();
   });
 
-  // --- Touch wiring (phone/tablet) -------------------------------------------------------------
-  // Mirrors the mouse wiring above exactly rather than duplicating the drag logic - every start/
-  // move/end helper only ever reads clientX/clientY off whatever event it's given, so a touch's
-  // own coordinates thread straight through unchanged via this tiny adapter. preventDefault is
-  // only called once a draw is actually happening, so it never blocks normal page scrolling; while
-  // it is, it also stops OpenSeadragon's own touch pan/zoom from fighting the same gesture - moot
-  // in practice since setMouseNavEnabled(false) (the addToggle "change" handler above) already
-  // disables OSD's tracker for both mouse and touch input whenever add-mode is armed, but the two
-  // together make the intent explicit.
+  // --- Touch wiring (phone/tablet) --------------------------------------------------------------
+  // Mirrors the mouse wiring - every start/move/end helper only reads clientX/clientY off whatever
+  // event it's given, so a touch's coordinates thread straight through via this tiny adapter.
 
   function touchPoint(touchEvent, list) {
     const t = touchEvent[list][0];
@@ -322,14 +441,11 @@ document.addEventListener("DOMContentLoaded", () => {
   wrap.addEventListener(
     "touchstart",
     (e) => {
-      if (!addToggle.checked || !typeSelect.value || !imageReady || e.touches.length !== 1) return;
+      if (!drafting || !imageReady || e.touches.length !== 1) return;
       e.preventDefault();
       const point = touchPoint(e, "touches");
-      if (currentTool === "freehand") {
-        startFreehandDrag(point);
-      } else {
-        startRectDrag(point);
-      }
+      if (currentTool === "freehand") startFreehandDrag(point);
+      else startRectDrag(point);
     },
     { passive: false }
   );
@@ -339,8 +455,6 @@ document.addEventListener("DOMContentLoaded", () => {
     (e) => {
       if (!dragBox && !freehandPoints) return;
       if (e.touches.length > 1) {
-        // A second finger showed up mid-draw (a pinch-zoom attempt, most likely) - abandon the
-        // in-progress region rather than keep drawing from a now-ambiguous single touch point.
         abandonTouchDraw();
         return;
       }

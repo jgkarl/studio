@@ -23,13 +23,13 @@ func TestPolygonPointsInvalidJSON(t *testing.T) {
 func TestCreateFreehandRegionRejectsInvalidJSON(t *testing.T) {
 	// Validation happens before any database access, so a nil Querier is safe here — these cases
 	// must fail before ever reaching studiodb.Execute.
-	if _, err := CreateFreehandRegion(context.Background(), nil, "m1", "t1", "not json"); err == nil {
+	if _, err := CreateFreehandRegion(context.Background(), nil, "m1", "t1", "not json", ""); err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
 }
 
 func TestCreateFreehandRegionRejectsTooFewPoints(t *testing.T) {
-	if _, err := CreateFreehandRegion(context.Background(), nil, "m1", "t1", `[{"x":1,"y":1},{"x":2,"y":2}]`); err == nil {
+	if _, err := CreateFreehandRegion(context.Background(), nil, "m1", "t1", `[{"x":1,"y":1},{"x":2,"y":2}]`, ""); err == nil {
 		t.Fatal("expected error for fewer than 3 points")
 	} else if !strings.Contains(err.Error(), "3 points") {
 		t.Fatalf("unexpected error: %v", err)

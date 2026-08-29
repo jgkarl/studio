@@ -232,33 +232,93 @@ templ regionShape(r AnnotationRegion, t AnnotationTypeOption) {
 	}
 }
 
-templ patternLayerLegend(regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
-	<div class="pattern-layer-legend">
+// annotationTypeChip is the rounded-border "type" chip shown in each annotations-table row (and,
+// while a row is being edited, hidden behind the inline <select> that replaces it) - the type's
+// actual hatch pattern + color swatch next to its label, so the table reads the same visual
+// language as the marked regions on the image itself.
+templ annotationTypeChip(t AnnotationTypeOption) {
+	<span class="annotation-chip">
+		if t.Hatch != "" {
+			@legendSwatch(t)
+		}
+		<span class="annotation-chip-label">
+			if t.Label != "" {
+				{ t.Label }
+			} else {
+				Unknown type
+			}
+		</span>
+	</span>
+}
+
+// annotationsTable is the list of an annotated version's regions, one row each, rendered under the
+// image on the editor page. static/js/media-editor.js re-fetches the edit page and swaps this
+// whole #annotations-table subtree in after any create/edit/delete, so it always reflects the
+// stored set without a full page reload (which would tear down the live OpenSeadragon viewer).
+templ annotationsTable(m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+	<div id="annotations-table" class="table-wrap">
 		if len(regions) == 0 {
-			<p class="page-subtitle">No regions marked yet.</p>
+			<p class="empty-state">No annotations yet — use “+ New annotation” to mark one.</p>
 		} else {
-			<div class="pattern-layer-legend-swatches">
-				for _, t := range UsedTypeOptions(regions, annotationTypes) {
-					<div class="pattern-layer-legend-item">
-						@legendSwatch(t)
-						{ t.Label }
-					</div>
-				}
-			</div>
-			<ul class="pattern-layer-region-list">
-				for _, r := range regions {
-					<li>
-						<span>{ OptionByID(annotationTypes, r.AnnotationTypeID).Label }</span>
-						<form method="post" action={ templ.URL("/media/" + r.MediaID + "/annotations/" + r.ID + "/delete") } data-confirm="Remove this region?">
-							<button type="submit" class="tag-pill-remove" aria-label="Remove region">
-								@web.Icon("close", 10)
-							</button>
-						</form>
-					</li>
-				}
-			</ul>
+			<table class="table annotations-table">
+				<thead>
+					<tr>
+						<th>Type</th>
+						<th>Note</th>
+						<th class="annotations-actions-col" aria-label="Actions"></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, r := range regions {
+						@annotationRow(m, r, annotationTypes)
+					}
+				</tbody>
+			</table>
 		}
 	</div>
+}
+
+// annotationRow renders one region as a table row that toggles (via .is-editing, set by
+// static/js/media-editor.js) between a read view - the type chip + note text + edit/delete icon
+// buttons - and an inline edit view - a type <select> + note <input> + save/cancel icon buttons.
+// The drawn shape itself isn't editable here; redrawing means deleting and marking a new region.
+templ annotationRow(m Media, r AnnotationRegion, annotationTypes []AnnotationTypeOption) {
+	<tr class="annotation-row" data-region-id={ r.ID } data-media-id={ m.ID }>
+		<td class="annotation-cell-type">
+			@annotationTypeChip(OptionByID(annotationTypes, r.AnnotationTypeID))
+			<select class="input annotation-edit-field annotation-edit-type" aria-label="Annotation type">
+				for _, t := range annotationTypes {
+					if t.ID == r.AnnotationTypeID {
+						<option value={ t.ID } selected>{ t.Label }</option>
+					} else {
+						<option value={ t.ID }>{ t.Label }</option>
+					}
+				}
+			</select>
+		</td>
+		<td class="annotation-cell-note">
+			if r.Note.Valid && r.Note.String != "" {
+				<span class="annotation-note-text">{ r.Note.String }</span>
+			} else {
+				<span class="annotation-note-text annotation-note-empty">—</span>
+			}
+			<input type="text" class="input annotation-edit-field annotation-edit-note" value={ r.Note.String } placeholder="Note (optional)" aria-label="Note"/>
+		</td>
+		<td class="annotation-cell-actions">
+			<button type="button" class="row-action-icon annotation-act annotation-act-edit" title="Edit" aria-label="Edit annotation">
+				@web.Icon("edit", 16)
+			</button>
+			<button type="button" class="row-action-icon annotation-act annotation-act-delete" title="Delete" aria-label="Delete annotation">
+				@web.Icon("delete", 16)
+			</button>
+			<button type="button" class="row-action-icon annotation-act annotation-act-save" title="Save" aria-label="Save annotation">
+				@web.Icon("check", 16)
+			</button>
+			<button type="button" class="row-action-icon annotation-act annotation-act-cancel" title="Cancel" aria-label="Cancel edit">
+				@web.Icon("close", 16)
+			</button>
+		</td>
+	</tr>
 }
 
 // liveLegendSwatchSize is legendSwatch's own physical render size (its viewBox matches it 1:1, unlike
@@ -306,19 +366,19 @@ func formatPct(n float64) string {
 // match what BakeAnnotatedVersion actually composites - a clean canvas with no OpenSeadragon
 // toolbar/navigator, just the image and the pattern layer on top of it. The pattern layer (a
 // percentage-coordinate SVG overlay of stored regions - rect or freehand-brush outlines, see
-// AnnotationRegion) is added as an OpenSeadragon overlay so it tracks pan/zoom automatically. A
-// rectangle/brush draw tool (armed by default) with a type dropdown ("the reason" for a marked
-// area) sits below a legend that's always directly under the image (whether or not anything's
-// marked yet). Regions persist immediately as they're drawn (unchanged); a single "Save" button
-// is what saves the whole-image note (Media.Description) and re-bakes this version's own file in
-// one explicit action, replacing the old implicit bake-on-modal-close plus a separate tiny
-// note-save button.
+// AnnotationRegion) is added as an OpenSeadragon overlay so it tracks pan/zoom automatically.
+//
+// The stage defaults to plain pan/zoom - there's no draw-mode toggle. "+ New annotation" opens a
+// small draft panel that arms drawing: mark a region, pick its type, add an optional note, then
+// "Save annotation". Existing annotations are listed in a table under the image (annotationsTable),
+// each row edit/delete-able inline (type + note; the shape is fixed). A single "Save" button at the
+// bottom still saves the whole-image note (Media.Description) and re-bakes this version's file.
 templ MediaEditPage(c web.Chrome, m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media) {
 	@web.AppLayout("Edit — "+mediaViewTitle(m, nil), c, mediaEditBody(m, regions, annotationTypes, source))
 }
 
 templ mediaEditBody(m Media, regions []AnnotationRegion, annotationTypes []AnnotationTypeOption, source *Media) {
-	@web.PageHeader("Edit "+mediaViewTitle(m, nil), "Mark regions, add a note, then Save.", mediaEditActions(m))
+	@web.PageHeader("Edit "+mediaViewTitle(m, nil), "Pan and zoom the image. Use “+ New annotation” to mark a region.", mediaEditActions(m))
 	@web.Card() {
 		<div
 			class="pattern-layer-stage"
@@ -338,42 +398,56 @@ templ mediaEditBody(m Media, regions []AnnotationRegion, annotationTypes []Annot
 				}
 			</svg>
 		</div>
-		@patternLayerLegend(regions, annotationTypes)
-		<div class="lightbox-controls">
-			if len(annotationTypes) == 0 {
-				<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
-			} else {
-				<div class="lightbox-control-row pattern-layer-toolbar">
-					<label class="checkbox-field">
-						<input type="checkbox" id="pattern-layer-add-toggle" checked/>
-						+ Add region
-					</label>
-					<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
-						<button type="button" id="pattern-layer-tool-rect" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
-							@web.Icon("crop_square", 16)
-						</button>
-						<button type="button" id="pattern-layer-tool-freehand" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
-							@web.Icon("brush", 16)
-						</button>
-					</div>
-					<label class="pattern-layer-select-field">
-						Type
-						<select id="pattern-layer-type" class="input">
-							for _, t := range annotationTypes {
-								<option value={ t.ID }>{ t.Label }</option>
-							}
-						</select>
-					</label>
+		if len(annotationTypes) == 0 {
+			<p class="page-subtitle">No annotation types configured — add some under Settings → Classifiers → Annotation Types before marking a loss/damage area.</p>
+		} else {
+			<div class="annotation-editor">
+				<div class="annotation-toolbar">
+					<button type="button" id="annotation-new" class="btn btn-secondary">
+						@web.Icon("add", 14)
+						New annotation
+					</button>
 				</div>
-			}
+				<div id="annotation-draft" class="annotation-draft" hidden>
+					<p class="annotation-draft-hint">Drag on the image to mark a region, choose its type, add an optional note, then save.</p>
+					<div class="annotation-draft-controls">
+						<div class="pattern-layer-tool-group" role="group" aria-label="Draw tool">
+							<button type="button" class="pattern-layer-tool-btn is-active" data-tool="rect" title="Rectangle" aria-label="Rectangle">
+								@web.Icon("crop_square", 16)
+							</button>
+							<button type="button" class="pattern-layer-tool-btn" data-tool="freehand" title="Freehand brush" aria-label="Freehand brush">
+								@web.Icon("brush", 16)
+							</button>
+						</div>
+						<label class="pattern-layer-select-field">
+							Type
+							<select id="annotation-draft-type" class="input">
+								for _, t := range annotationTypes {
+									<option value={ t.ID }>{ t.Label }</option>
+								}
+							</select>
+						</label>
+						<input type="text" id="annotation-draft-note" class="input annotation-draft-note" placeholder="Note (optional)"/>
+						<button type="button" id="annotation-draft-save" class="btn btn-primary">
+							@web.Icon("check", 14)
+							Save annotation
+						</button>
+						<button type="button" id="annotation-draft-cancel" class="btn btn-ghost">Cancel</button>
+					</div>
+					<span id="annotation-draft-status" class="page-subtitle" aria-live="polite"></span>
+				</div>
+				@annotationsTable(m, regions, annotationTypes)
+			</div>
+		}
+		<div class="lightbox-controls">
 			<div class="lightbox-note-row">
-				<label for="media-edit-note">Note</label>
-				<input type="text" id="media-edit-note" class="input" placeholder="Add a note…" value={ m.Description.String }/>
+				<label for="media-edit-note">Whole-image note</label>
+				<input type="text" id="media-edit-note" class="input" placeholder="A caption for the whole image (optional)…" value={ m.Description.String }/>
 			</div>
 			<div class="media-edit-save-row">
 				<button type="button" id="media-edit-save" class="btn btn-primary">
 					@web.Icon("check_circle", 14)
-					Save
+					Save &amp; finish
 				</button>
 				<span id="media-edit-save-status" class="page-subtitle" aria-live="polite"></span>
 			</div>

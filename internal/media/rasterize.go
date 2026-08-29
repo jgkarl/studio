@@ -74,6 +74,22 @@ func legendMarkup(usedTypes []AnnotationTypeOption, containerWidth, sidePadding 
 	return "<defs>" + defs.String() + "</defs>" + items.String(), height
 }
 
+// rasterizeSVG renders one of this file's composed annotation SVGs (the base photo embedded as a
+// base64 data: URI, plus the vector region/legend/note markup) to a libvips image.
+//
+// It sets svgload's "unlimited" flag. librsvg/libxml2 otherwise refuse to parse any single XML
+// node larger than ~10 MB, and the base64 of a full-resolution conservation photo in the
+// <image xlink:href="data:..."> attribute sails right past that — libxml2 stops mid-attribute and
+// librsvg reports `XML parse error ... Extra content at the end of the document` (seen in prod as
+// a bake 500, "cannot save annotated image", for every real upload while tiny CI/demo images were
+// fine). The SVG is built entirely from our own trusted bytes, so the untrusted-SVG
+// decompression-bomb guard that flag disables isn't protecting anything here.
+func rasterizeSVG(svg string) (*vips.ImageRef, error) {
+	params := vips.NewImportParams()
+	params.SvgUnlimited.Set(true)
+	return vips.LoadImageFromBuffer([]byte(svg), params)
+}
+
 // RenderAnnotatedImage flattens a Media image's drawn regions (see annotations.go) and their
 // legend into the image itself: builds one standalone SVG (the "web" variant as a data: URI, the
 // same region shapes and legend the live editor/viewer render) and rasterizes it to PNG via
@@ -135,7 +151,7 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 		`<g transform="translate(0, %d)">%s</g></svg>`,
 		width, totalHeight, width, totalHeight, width, height, dataURI, shapes.String(), height, legend)
 
-	rendered, err := vips.NewImageFromBuffer([]byte(svg))
+	rendered, err := rasterizeSVG(svg)
 	if err != nil {
 		return nil, "", fmt.Errorf("rasterizing annotated image: %w", err)
 	}
@@ -199,14 +215,19 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 		return err
 	}
 	annotationTypes := BuildAnnotationTypeOptions(classifiers, locale)
+	slog.DebugContext(ctx, "bake: inputs loaded", "media_id", target.ID, "source_id", source.ID,
+		"source_storage_key", source.StorageKey, "regions", len(regions), "annotation_types", len(annotationTypes),
+		"has_note", target.Description.String != "", "locale", string(locale), "category", "media", "event", "bake_step")
 
 	original, err := s.Storage.Get(source.StorageKey)
 	if err != nil {
 		return fmt.Errorf("reading source original: %w", err)
 	}
+	slog.DebugContext(ctx, "bake: read source original", "media_id", target.ID, "bytes", len(original),
+		"source_mime", source.MimeType, "category", "media", "event", "bake_step")
 	img, err := vips.NewImageFromBuffer(original)
 	if err != nil {
-		return fmt.Errorf("decoding source original: %w", err)
+		return fmt.Errorf("decoding source original (%s, %d bytes): %w", source.MimeType, len(original), err)
 	}
 	defer img.Close()
 	if err := img.AutoRotate(); err != nil {
@@ -226,6 +247,8 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 	if err != nil {
 		return fmt.Errorf("exporting grayscale base: %w", err)
 	}
+	slog.DebugContext(ctx, "bake: grayscale base prepared", "media_id", target.ID, "img_w", imgW, "img_h", imgH,
+		"gray_png_bytes", len(grayPng), "category", "media", "event", "bake_step")
 
 	var shapes bytes.Buffer
 	if err := regionsAndDefsFragment(regions, annotationTypes).Render(ctx, &shapes); err != nil {
@@ -283,8 +306,18 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 		imgW, totalHeight, imgW, totalHeight, imgW, imgH, dataURI, shapes.String(),
 		divider, belowDividerY, legend, noteY, note.String())
 
-	rendered, err := vips.NewImageFromBuffer([]byte(svg))
+	slog.DebugContext(ctx, "bake: SVG composed", "media_id", target.ID, "svg_bytes", len(svg),
+		"img_w", imgW, "img_h", imgH, "total_height", totalHeight, "legend_height", legendHeight,
+		"note_lines", len(noteLines), "used_types", len(usedTypes), "shapes_bytes", shapes.Len(),
+		"category", "media", "event", "bake_step")
+
+	rendered, err := rasterizeSVG(svg)
 	if err != nil {
+		// The embedded base64 image is stripped from svg_markup - it's huge and never the cause;
+		// what's left is the legend/note/region markup that actually varies and can be malformed
+		// or reference a font librsvg can't resolve.
+		slog.ErrorContext(ctx, "bake: rasterizing composed SVG failed", "err", err, "media_id", target.ID,
+			"svg_bytes", len(svg), "svg_markup", svgForLog(svg), "category", "media", "event", "bake_rasterize_failed")
 		return fmt.Errorf("rasterizing baked image: %w", err)
 	}
 	defer rendered.Close()
@@ -292,6 +325,8 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 	if err != nil {
 		return fmt.Errorf("exporting baked PNG: %w", err)
 	}
+	slog.DebugContext(ctx, "bake: composite rasterized", "media_id", target.ID, "baked_png_bytes", len(baked),
+		"category", "media", "event", "bake_step")
 
 	// Preserve whatever was there from an earlier bake, rather than silently discarding it.
 	if existing, err := s.Storage.Get(target.StorageKey); err == nil && len(existing) > 0 {
@@ -306,10 +341,31 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 	s.storeImageVariants(ctx, target.ID, baked)
 
 	sum := sha256.Sum256(baked)
-	_, err = studiodb.Execute(ctx, s.Pool,
+	if _, err := studiodb.Execute(ctx, s.Pool,
 		"UPDATE Media SET mimeType = 'image/png', sizeBytes = ?, width = ?, height = ?, checksum = ? WHERE id = ?",
-		len(baked), imgW, totalHeight, hex.EncodeToString(sum[:]), target.ID)
-	return err
+		len(baked), imgW, totalHeight, hex.EncodeToString(sum[:]), target.ID); err != nil {
+		return fmt.Errorf("updating Media row after bake: %w", err)
+	}
+	slog.InfoContext(ctx, "bake: annotated version saved", "media_id", target.ID, "regions", len(regions),
+		"img_w", imgW, "total_height", totalHeight, "baked_png_bytes", len(baked), "category", "media", "event", "bake_saved")
+	return nil
+}
+
+// svgForLog replaces the (large, base64) embedded image data URI in a composed bake SVG with a
+// short placeholder so the rest of the markup - the legend/note/region shapes that actually vary -
+// can be logged when a rasterize fails without dumping a megabyte of base64.
+func svgForLog(svg string) string {
+	const marker = `xlink:href="data:`
+	start := strings.Index(svg, marker)
+	if start < 0 {
+		return svg
+	}
+	rest := start + len(marker)
+	end := strings.IndexByte(svg[rest:], '"')
+	if end < 0 {
+		return svg
+	}
+	return svg[:rest] + "…omitted…" + svg[rest+end:]
 }
 
 // wrapText is a plain word-wrap for the note baked under the legend - no font metrics available

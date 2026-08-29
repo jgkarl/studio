@@ -29,6 +29,7 @@ func Mount(mux *http.ServeMux, svc *HandlerService) {
 	mux.HandleFunc("GET /media/view/{mediaId}", svc.Auth.RequireUser(svc.handleMediaView))
 	mux.HandleFunc("GET /media/edit/{mediaId}", svc.Auth.RequireUser(svc.handleMediaEdit))
 	mux.HandleFunc("POST /media/{id}/annotations", svc.Auth.RequireUser(svc.handleCreateAnnotation))
+	mux.HandleFunc("POST /media/{id}/annotations/{regionId}", svc.Auth.RequireUser(svc.handleUpdateAnnotation))
 	mux.HandleFunc("POST /media/{id}/annotations/{regionId}/delete", svc.Auth.RequireUser(svc.handleDeleteAnnotation))
 	mux.HandleFunc("POST /media/{id}/description", svc.Auth.RequireUser(svc.handleUpdateDescription))
 	mux.HandleFunc("POST /media/{id}/annotated-versions", svc.Auth.RequireUser(svc.handleCreateAnnotatedVersion))
@@ -199,8 +200,11 @@ func (svc *HandlerService) handleCreateAnnotation(w http.ResponseWriter, r *http
 		return
 	}
 
+	note := r.FormValue("note")
 	if r.FormValue("shape") == "freehand" {
-		if _, err := CreateFreehandRegion(r.Context(), svc.Pool, id, typeID, r.FormValue("points")); err != nil {
+		if _, err := CreateFreehandRegion(r.Context(), svc.Pool, id, typeID, r.FormValue("points"), note); err != nil {
+			slog.WarnContext(r.Context(), "creating freehand annotation region", "err", err, "media_id", id,
+				"annotation_type", typeID, "category", "media", "event", "region_create_failed")
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -213,7 +217,9 @@ func (svc *HandlerService) handleCreateAnnotation(w http.ResponseWriter, r *http
 			http.Error(w, "xPct/yPct/widthPct/heightPct must be numbers", http.StatusBadRequest)
 			return
 		}
-		if _, err := CreateRegion(r.Context(), svc.Pool, id, typeID, x, y, width, height); err != nil {
+		if _, err := CreateRegion(r.Context(), svc.Pool, id, typeID, x, y, width, height, note); err != nil {
+			slog.ErrorContext(r.Context(), "creating annotation region", "err", err, "media_id", id,
+				"annotation_type", typeID, "category", "media", "event", "region_create_failed")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -221,6 +227,34 @@ func (svc *HandlerService) handleCreateAnnotation(w http.ResponseWriter, r *http
 	// The drag-to-draw UI (static/js/media-editor.js) posts via fetch and reloads the page
 	// itself on success — a redirect response body would just be discarded. A plain form post
 	// (no JS) still gets sent back to the editor page, same convention as handleSetStage.
+	if r.Header.Get("X-Requested-With") == "fetch" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, "/media/edit/"+id, http.StatusSeeOther)
+}
+
+// handleUpdateAnnotation saves an inline row edit from the media editor's annotations table:
+// the region's annotation type and its optional note (the drawn shape itself isn't editable —
+// see UpdateRegion). Same fetch-or-plain-form-post convention as handleCreateAnnotation.
+func (svc *HandlerService) handleUpdateAnnotation(w http.ResponseWriter, r *http.Request, user *auth.User) {
+	id := r.PathValue("id")
+	regionID := r.PathValue("regionId")
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	typeID := r.FormValue("annotationTypeId")
+	if typeID == "" {
+		http.Error(w, "annotationTypeId is required", http.StatusBadRequest)
+		return
+	}
+	if err := UpdateRegion(r.Context(), svc.Pool, regionID, typeID, r.FormValue("note")); err != nil {
+		slog.ErrorContext(r.Context(), "updating annotation region", "err", err, "media_id", id,
+			"region_id", regionID, "annotation_type", typeID, "category", "media", "event", "region_update_failed")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if r.Header.Get("X-Requested-With") == "fetch" {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -237,6 +271,7 @@ func (svc *HandlerService) handleUpdateDescription(w http.ResponseWriter, r *htt
 		return
 	}
 	if err := UpdateDescription(r.Context(), svc.Pool, id, r.FormValue("description")); err != nil {
+		slog.ErrorContext(r.Context(), "saving media description", "err", err, "media_id", id, "category", "media", "event", "description_save_failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -276,12 +311,16 @@ func (svc *HandlerService) handleCreateAnnotatedVersion(w http.ResponseWriter, r
 // convention as handleCreateAnnotation.
 func (svc *HandlerService) handleBakeAnnotatedVersion(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	id := r.PathValue("id")
+	slog.DebugContext(r.Context(), "bake requested", "media_id", id, "category", "media", "event", "bake_requested")
 	target, err := GetByID(r.Context(), svc.Pool, id)
 	if err != nil {
+		slog.ErrorContext(r.Context(), "baking annotated version: loading target", "err", err, "media_id", id, "category", "media", "event", "bake_failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if target == nil || !target.IsAnnotatedVersion() {
+		slog.WarnContext(r.Context(), "bake rejected: not an annotated version", "media_id", id,
+			"found", target != nil, "category", "media", "event", "bake_rejected")
 		http.Error(w, "not an annotated version", http.StatusBadRequest)
 		return
 	}
@@ -295,8 +334,15 @@ func (svc *HandlerService) handleBakeAnnotatedVersion(w http.ResponseWriter, r *
 
 func (svc *HandlerService) handleDeleteAnnotation(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	id := r.PathValue("id")
-	if err := DeleteRegion(r.Context(), svc.Pool, r.PathValue("regionId")); err != nil {
+	regionID := r.PathValue("regionId")
+	if err := DeleteRegion(r.Context(), svc.Pool, regionID); err != nil {
+		slog.ErrorContext(r.Context(), "deleting annotation region", "err", err, "media_id", id,
+			"region_id", regionID, "category", "media", "event", "region_delete_failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if r.Header.Get("X-Requested-With") == "fetch" {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	http.Redirect(w, r, "/media/edit/"+id, http.StatusSeeOther)

@@ -3,6 +3,30 @@
 Notable user- and operator-visible changes, one entry per shipped version. See `git log` for full
 commit-level detail. Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
+## [v0.4.11] - 2026-08-29
+
+### Fixed
+- Saving an annotated image still 500'd for any real photo even with the font installed: the bake
+  SVG embeds the full-resolution base image as a base64 `data:` URI, and librsvg/libxml2 refuse to
+  parse any single XML node larger than ~10 MB (`XML parse error … Extra content at the end of the
+  document`). The rasterizer now loads that SVG with libvips' `svgload` "unlimited" flag. Tiny
+  CI/demo images stayed under the limit, which is why it only ever failed in production. Same fix
+  applied to the annotated-image path in report HTML/PDF exports.
+
+### Added
+- The pattern-layer annotation editor is reworked. The image now just pans/zooms by default (the
+  "+ Add region" mode toggle is gone). **+ New annotation** opens a small panel to mark one region
+  (rectangle or freehand), pick its type, and add an optional note before saving. Existing
+  annotations are listed in a table under the image — each row editable inline (type + note) or
+  deletable. Regions can now carry a per-region note
+  (`db/migrations/0020_media_annotation_note.sql`), separate from the whole-image caption.
+
+### Changed
+- Every stage of an annotated-version bake now logs at debug (`category=media`, `event=bake_step`
+  / `bake_rasterize_failed` / `bake_saved`), and libvips' own diagnostics are routed through slog
+  (`event=libvips`) instead of bare stderr. The editor's Save button surfaces the real server
+  error instead of a generic "couldn't save".
+
 ## [v0.4.10] - 2026-08-29
 
 ### Fixed

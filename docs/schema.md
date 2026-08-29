@@ -247,6 +247,7 @@ CREATE TABLE MediaAnnotationRegion (
     heightPct          REAL NOT NULL,
     shape              TEXT NOT NULL DEFAULT 'rect',  -- 'rect' | freehand
     pathData           TEXT,                          -- SVG path, when shape != 'rect'
+    note               TEXT,                          -- optional per-region free-text note
     createdAt          DATETIME NOT NULL
 );
 
@@ -469,6 +470,7 @@ erDiagram
         real heightPct
         string shape
         string pathData
+        string note
         datetime createdAt
     }
     AppSetting {

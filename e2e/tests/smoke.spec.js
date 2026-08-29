@@ -71,7 +71,9 @@ test.describe("Studio golden path", () => {
     await expect(page.getByRole("heading", { name: "Asset Types" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Treatment Methods" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Project Stages" })).toBeVisible();
-    await expect(page.getByText("Painting", { exact: true })).toBeVisible();
+    // Scoped to the pill, not getByText(exact) - the pill also contains icon-ligature text
+    // ("edit"/"close" from the Material Symbols glyphs) so its full text isn't just "Painting".
+    await expect(page.locator(".tag-pill").filter({ hasText: "Painting" }).first()).toBeVisible();
     await shoot(page, "03-settings.png");
   });
 
@@ -158,9 +160,9 @@ test.describe("Studio golden path", () => {
 
     await expect(page).toHaveURL(/\/reports\/[a-f0-9-]+$/);
     reportId = page.url().split("/reports/")[1];
-    // The suggested outline pre-fills condition findings/treatment performed from the project's
-    // own Assessment/Treatment records.
-    await expect(page.locator('textarea[name="conditionFindings"]')).not.toBeEmpty();
+    // The structured-section editor (description/summary/recommendations - the old freeform
+    // conditionFindings/treatmentPerformed fields were dropped in the reporter overhaul).
+    await expect(page.locator('textarea[name="summary"]')).toBeVisible();
     // The Assessments/Treatments tables and the timestamp-ordered image gallery are rendered
     // live from the project, not copied into the report.
     await expect(page.getByRole("heading", { name: "Assessments" })).toBeVisible();
@@ -228,11 +230,17 @@ test.describe("Studio golden path", () => {
     await page.click('form[action*="/annotated-versions"] button[type="submit"]');
     await expect(page).toHaveURL(/\/media\/edit\/[a-f0-9-]+$/);
 
-    // Add-region mode is armed by default (see static/js/media-editor.js).
-    await expect(page.locator("#pattern-layer-add-toggle")).toBeChecked();
+    // The stage defaults to plain pan/zoom now - drawing is only armed via "+ New annotation",
+    // which reveals the draft panel (see static/js/media-editor.js).
+    const draft = page.locator("#annotation-draft");
+    await expect(draft).toBeHidden();
+    await page.click("#annotation-new");
+    await expect(draft).toBeVisible();
+    // Existing annotations (none yet on a fresh version) are listed in the table below the image.
+    await expect(page.locator("#annotations-table")).toBeVisible();
     await shoot(page, "18-media-lightbox.png");
 
-    // The Save button persists the note + bakes the version, then returns to the view page.
+    // "Save & finish" persists the whole-image note + bakes the version, then returns to view.
     await page.click("#media-edit-save");
     await expect(page).toHaveURL(/\/media\/view\/[a-f0-9-]+$/);
     await expect(page.locator("a.btn:has-text('Edit')")).toBeVisible();
