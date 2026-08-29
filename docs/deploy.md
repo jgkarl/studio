@@ -41,7 +41,8 @@ dynamically linked against `libvips.so.42`, so the build OS needs to match the d
 
 `harden.yml` runs first, once: creates a dedicated pubkey-only `ansible` automation user, fully
 disables root over SSH, restricts logins to just the accounts you name, and enables a baseline
-`ufw` firewall. `deploy.yml` then installs `libvips42`, creates the `studio` system user,
+`ufw` firewall. `deploy.yml` then installs `libvips42` (plus `fonts-dejavu-core`, which librsvg
+needs to rasterize the text in baked annotated images), creates the `studio` system user,
 downloads the release binary, templates the systemd unit and env file, opens 80/443 in `ufw`, and
 (if `studio_domain` is set) installs and configures Caddy with automatic Let's Encrypt
 certificates.

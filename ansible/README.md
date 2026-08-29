@@ -134,7 +134,8 @@ yourself out, since `AllowUsers` takes effect the moment this run finishes.
 ansible-playbook deploy.yml
 ```
 
-Fully idempotent - installs libvips42 + Caddy, creates the `studio` system user and
+Fully idempotent - installs libvips42 (+ `fonts-dejavu-core`, which librsvg needs to rasterize
+text in baked annotated images) + Caddy, creates the `studio` system user and
 `/opt/app/studio/data`, templates the env file and systemd unit from your vault values, fetches
 the release binary, opens 80/443 in ufw if `studio_domain` is set, and starts everything. Safe to
 re-run any time; only touches what's actually out of date.
@@ -172,7 +173,8 @@ ansible-playbook update.yml -e studio_release_version=v1.2.3
 ## Reset content data (dangerous, opt-in)
 
 `reset-data.yml` wipes real content — every Client/Asset/Project/Assessment/Treatment/Report/Media
-row and every User account except the bootstrap admin — and/or every file under the media library,
+row (plus report gallery items and retired Notebook activity) and every User account except the
+bootstrap admin — and/or every file under the media library,
 for scrubbing a staging/demo box (or a production instance you genuinely want emptied) back to a
 clean slate without reprovisioning it. Schema, migrations, Classifier reference data, and
 AppSettings are left alone, and `studio_bootstrap_admin_email` (from the vault) survives so there's

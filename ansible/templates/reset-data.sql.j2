@@ -10,12 +10,14 @@
 
 PRAGMA foreign_keys=OFF;
 BEGIN;
+DELETE FROM ReportGalleryItem;   -- FKs -> Report, MediaReference (both wiped below); would orphan
 DELETE FROM MediaAnnotationRegion;
 DELETE FROM MediaReference;
 DELETE FROM Media;
 DELETE FROM Report;
 DELETE FROM Treatment;
 DELETE FROM Assessment;
+DELETE FROM Activity;            -- retired Notebook data; FKs -> Project, User (both wiped below)
 DELETE FROM Project;
 DELETE FROM Asset;
 DELETE FROM Client;
@@ -33,5 +35,6 @@ UNION ALL SELECT 'clients_remaining', COUNT(*) FROM Client
 UNION ALL SELECT 'assets_remaining', COUNT(*) FROM Asset
 UNION ALL SELECT 'projects_remaining', COUNT(*) FROM Project
 UNION ALL SELECT 'media_remaining', COUNT(*) FROM Media
+UNION ALL SELECT 'report_gallery_items_remaining', COUNT(*) FROM ReportGalleryItem
 UNION ALL SELECT 'classifiers_kept', COUNT(*) FROM Classifier
 UNION ALL SELECT 'app_settings_kept', COUNT(*) FROM AppSetting;

@@ -1,12 +1,12 @@
 ---
 # Destructive maintenance, opt-in only: wipes real content data (Clients, Assets, Projects,
-# Assessments, Treatments, Reports, Media, MediaReferences, MediaAnnotationRegions,
-# VerificationTokens, and every User account except the bootstrap admin) and/or every file under
-# the media library - for resetting a staging/demo box, or scrubbing a production instance back to
-# a clean slate without reprovisioning it from scratch. Schema, migrations, Classifier reference
-# data (every <select> in the app reads from it) and AppSettings are left untouched, and the
-# bootstrap admin account (studio_bootstrap_admin_email, from the vault) survives so there's still
-# a way to log in afterwards.
+# Assessments, Treatments, Reports, ReportGalleryItems, retired Activity/Notebook rows, Media,
+# MediaReferences, MediaAnnotationRegions, VerificationTokens, and every User account except the
+# bootstrap admin) and/or every file under the media library - for resetting a staging/demo box,
+# or scrubbing a production instance back to a clean slate without reprovisioning it from scratch.
+# Schema, migrations, Classifier reference data (every <select> in the app reads from it) and
+# AppSettings are left untouched, and the bootstrap admin account (studio_bootstrap_admin_email,
+# from the vault) survives so there's still a way to log in afterwards.
 #
 # Requires -e confirm=RESET-DATA so it can never run by accident - the playbook refuses outright
 # without it. Both the database and the media library are backed up (tar, into the same

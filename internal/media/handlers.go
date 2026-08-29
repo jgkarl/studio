@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -285,6 +286,7 @@ func (svc *HandlerService) handleBakeAnnotatedVersion(w http.ResponseWriter, r *
 		return
 	}
 	if err := svc.BakeAnnotatedVersion(r.Context(), *target, i18n.GetLocale(r)); err != nil {
+		slog.ErrorContext(r.Context(), "baking annotated version", "err", err, "media_id", id, "category", "media", "event", "bake_failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -3,6 +3,21 @@
 Notable user- and operator-visible changes, one entry per shipped version. See `git log` for full
 commit-level detail. Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
+## [v0.4.10] - 2026-08-29
+
+### Fixed
+- Saving an annotated image on a freshly provisioned host failed with a 500 ("cannot save
+  annotated image"): librsvg renders the legend/note text in a baked version through Pango, which
+  needs a font on disk, and a minimal server has none. `deploy.yml` now installs
+  `fonts-dejavu-core`. Also affected the annotated-image path in report HTML/PDF exports.
+- `ansible/reset-data.yml` left orphaned `ReportGalleryItem` rows (and retired `Activity` rows)
+  behind — its cleanup script deletes their parent rows with foreign keys disabled, so the
+  cascade never fired. Both are now wiped in the same pass.
+
+### Changed
+- Annotated-version bake failures are now logged server-side (`category=media`, `event=bake_failed`)
+  with the underlying error, instead of only being returned in the HTTP response.
+
 ## [v0.4.9] - 2026-08-28
 
 ### Added

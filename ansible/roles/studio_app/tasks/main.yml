@@ -20,6 +20,14 @@
       - libvips42
       - ca-certificates
       - logrotate
+      # libvips rasterizes the baked "annotated version" images from an SVG that carries the
+      # region legend + whole-image note as <text> (internal/media/rasterize.go). librsvg renders
+      # that text via Pango/Cairo, which needs a real font on disk - a minimal Ubuntu server has
+      # none, so the bake fails with a 500 ("cannot save annotated image"). fonts-dejavu-core is
+      # ~1MB and satisfies the generic "sans-serif" family fontconfig resolves for that text; its
+      # postinst runs fc-cache, so the cache is built at install time (rendering itself then only
+      # needs read access, which is fine under the service's ProtectSystem=strict sandbox).
+      - fonts-dejavu-core
     state: present
 
 - name: Create system group

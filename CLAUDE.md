@@ -192,7 +192,8 @@ including the pre-Ansible VPS bootstrap steps):
 1. **`harden.yml`** — generic, reusable host hardening: creates a dedicated `ansible` automation
    user (pubkey-only SSH, passwordless sudo), fully disables root login, restricts SSH to named
    accounts (`AllowUsers`), enables a baseline `ufw` firewall.
-2. **`deploy.yml`** — installs `libvips42`, downloads the release binary, runs it under systemd at
+2. **`deploy.yml`** — installs `libvips42` and `fonts-dejavu-core` (librsvg needs a real font to
+   rasterize the text in baked annotated images), downloads the release binary, runs it under systemd at
    `/opt/app/studio`, optionally installs Caddy (opens 80/443 in ufw itself) as reverse
    proxy/TLS terminator with automatic Let's Encrypt certs.
 

@@ -100,7 +100,11 @@ needs it.
   (`apt install libvips-dev` — works cleanly on plain Ubuntu 24.04, see `docs/deploy.md`), and
   why the Docker/release builds run inside a container: reproducible regardless of what's
   installed on your own machine. `libvips42`'s Ubuntu package links `librsvg` directly, so no
-  separate package is needed for the SVG rasterization path.
+  separate package is needed for the SVG *decode* path — but librsvg renders the legend/note
+  `<text>` in a baked annotated version through Pango/Cairo, which needs an actual font file on
+  disk. A minimal server has none, so `deploy.yml` also installs `fonts-dejavu-core` (the generic
+  `sans-serif` family that markup asks for); without it `BakeAnnotatedVersion` and the annotated
+  report exports fail at rasterization.
 
 ## Auth: hand-rolled, no external provider
 
