@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -74,6 +75,54 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// ptOnA4 is the inverse of bakedTextPx for a landscape/square canvas (one that fills the A4
+// content width): given a font size in the baked canvas's pixel space, what point size does it
+// render at on the page.
+func ptOnA4(px float64, canvasW int) float64 {
+	mmPerPx := bakeA4ContentWidthMM / float64(canvasW)
+	return px * mmPerPx / bakeMMPerPoint
+}
+
+func TestBakedTextPx(t *testing.T) {
+	// A mid-size landscape photo's note lands right on the target point size on A4.
+	if got := ptOnA4(bakedTextPx(3000, 2000, bakeNotePt), 3000); math.Abs(got-bakeNotePt) > 0.01 {
+		t.Errorf("3000x2000 note renders at %.2fpt on A4, want %.2fpt", got, bakeNotePt)
+	}
+	// Same target point size regardless of how many megapixels the source was - that's the point.
+	for _, w := range []int{600, 1200, 2400, 4000, 9000} {
+		if got := ptOnA4(bakedTextPx(w, w*2/3, bakeNotePt), w); math.Abs(got-bakeNotePt) > 0.01 {
+			t.Errorf("%dpx-wide note renders at %.2fpt on A4, want %.2fpt", w, got, bakeNotePt)
+		}
+	}
+	// Bigger canvas -> bigger pixel font (so it stays constant on paper).
+	if bakedTextPx(4000, 3000, bakeNotePt) <= bakedTextPx(1000, 750, bakeNotePt) {
+		t.Errorf("expected a wider canvas to get a larger pixel font")
+	}
+	// The 20pt ceiling and 8pt floor are hard: an absurd request is clamped before scaling.
+	if got := ptOnA4(bakedTextPx(3000, 2000, 40), 3000); math.Abs(got-bakeTextMaxPt) > 0.01 {
+		t.Errorf("40pt request renders at %.2fpt on A4, want the %.0fpt ceiling", got, bakeTextMaxPt)
+	}
+	if got := ptOnA4(bakedTextPx(3000, 2000, 3), 3000); math.Abs(got-bakeTextMinPt) > 0.01 {
+		t.Errorf("3pt request renders at %.2fpt on A4, want the %.0fpt floor", got, bakeTextMinPt)
+	}
+	// The legend label sits above the note size.
+	if !(bakedTextPx(3000, 2000, bakeNotePt) < bakedTextPx(3000, 2000, bakeLegendLabelPt)) {
+		t.Errorf("legend label should be larger than the note")
+	}
+	// A tall portrait image is shown narrower than full width (it hits the page height first), so
+	// its caption gets a larger pixel font - sized so it still lands near the target once displayed
+	// at that narrower width, rather than ballooning past the ceiling.
+	if !(bakedTextPx(2000, 5000, bakeNotePt) > bakedTextPx(2000, 1333, bakeNotePt)) {
+		t.Errorf("a portrait canvas should get a larger pixel font than a landscape one of the same width")
+	}
+	// That portrait, displayed at its height-bound width, still renders at the target point size.
+	portraitDisplayMM := bakeA4ContentHeightMM * 2000.0 / 5000.0
+	gotPt := bakedTextPx(2000, 5000, bakeNotePt) * (portraitDisplayMM / 2000.0) / bakeMMPerPoint
+	if math.Abs(gotPt-bakeNotePt) > 0.01 {
+		t.Errorf("portrait note renders at %.2fpt when shown full-page, want %.2fpt", gotPt, bakeNotePt)
+	}
 }
 
 // TestBakeAnnotatedVersionRealImage runs the whole save-an-annotated-image path end to end on a

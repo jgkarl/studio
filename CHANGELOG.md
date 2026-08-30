@@ -3,6 +3,17 @@
 Notable user- and operator-visible changes, one entry per shipped version. See `git log` for full
 commit-level detail. Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
+## [v0.4.12] - 2026-08-30
+
+### Changed
+- The legend and whole-image note baked under an annotated image are now sized for the image's
+  pixel dimensions instead of a fixed 15px. They're calibrated to read at a comfortable ~11-12pt
+  when the image is placed full-width on an A4 page — capped at 20pt and floored at 8pt — so a
+  4-megapixel and a 24-megapixel photo end up with the same, readable caption instead of text
+  that's either enormous or a hairline. Portrait images (shown narrower than full width on the
+  page) are accounted for. The whole caption block — swatch size, spacing, word wrap — scales
+  with the type.
+
 ## [v0.4.11] - 2026-08-29
 
 ### Fixed

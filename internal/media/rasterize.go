@@ -21,11 +21,48 @@ import (
 	"studio/internal/settings"
 )
 
+// --- Baked-caption typography -----------------------------------------------------------------
+//
+// The legend and whole-image note under a baked photo are drawn in the image's own pixel space.
+// A fixed pixel size therefore looks enormous on an 800px photo and dwindles to nothing on a
+// 24-megapixel one. Instead the text is sized for the export that actually matters: the annotated
+// image placed full-width on an A4 page. bakedTextPx maps a target point size to the pixel size
+// that renders at (about) that point size once the baked canvas is scaled down to
+// bakeA4ContentWidthMM. Point sizes are clamped to [bakeTextMinPt, bakeTextMaxPt] so an unusual
+// image can't yield unreadably small or oversized text — the 20pt ceiling is the hard requirement.
+//
+// Image DPI/resolution metadata is deliberately not consulted: the printed width is fixed by the
+// page layout, not by whatever density the file claims (phone photos routinely lie), so the pixel
+// width of the baked canvas is the only input that determines on-paper size.
 const (
-	legendRowHeight  = 34 // taller than a plain 16px color swatch to fit legendSwatchSize's pattern preview
-	legendSwatchSize = 22 // was a flat 16x16 solid-color square - big enough now to actually show the hatch, not just the color
-	legendColGap     = 24
+	bakeA4ContentWidthMM  = 170.0       // A4 (210mm) less ~20mm margin each side — "typical full-width"
+	bakeA4ContentHeightMM = 250.0       // A4 (297mm) less ~24mm top+bottom — the height a full-page image gets
+	bakeMMPerPoint        = 25.4 / 72.0 // 1pt in mm
+
+	bakeNotePt        = 11.0 // whole-image note: comfortable body text on A4
+	bakeLegendLabelPt = 12.0 // legend labels: the key, a touch larger than the note
+	bakeTextMinPt     = 8.0  // never smaller than this on paper, however large the source
+	bakeTextMaxPt     = 20.0 // never larger than this on paper, however small the source
 )
+
+// bakedTextPx is the pixel font-size for a baked-caption element of point size pt, chosen so it
+// renders near pt when the composite is placed as large as it goes on an A4 page. pt is clamped to
+// [bakeTextMinPt, bakeTextMaxPt] first.
+//
+// A landscape/square composite fills the content width (bakeA4ContentWidthMM); a portrait one hits
+// the page height first and is shown narrower than that, so its displayed width — and thus the
+// px→pt scale — is driven by the height instead. Sizing for that narrower width keeps a tall
+// image's caption from blowing past the 20pt ceiling once it's actually on the page.
+func bakedTextPx(canvasW, canvasH int, pt float64) float64 {
+	pt = math.Max(bakeTextMinPt, math.Min(bakeTextMaxPt, pt))
+	displayWidthMM := bakeA4ContentWidthMM
+	if canvasH > 0 {
+		if heightBound := bakeA4ContentHeightMM * float64(canvasW) / float64(canvasH); heightBound < displayWidthMM {
+			displayWidthMM = heightBound
+		}
+	}
+	return pt * bakeMMPerPoint * (float64(canvasW) / displayWidthMM)
+}
 
 // legendMarkup renders the "used annotation types" legend as SVG fragments - shared by
 // RenderAnnotatedImage's on-demand flatten and BakeAnnotatedVersion's saved composite so both
@@ -33,43 +70,50 @@ const (
 // fill) so the legend actually distinguishes types by pattern as well as color, matching what's
 // drawn on the image itself. Lays out two columns once there's more than one type to list (a
 // single column would waste half the available width), one otherwise. containerWidth/sidePadding
-// describe the horizontal space the legend has to fill; height is the vertical space it took up,
+// describe the horizontal space the legend has to fill; labelPx is the (already A4-scaled) label
+// font size every other dimension here is derived from; height is the vertical space it took up,
 // for the caller to lay out whatever comes next.
-func legendMarkup(usedTypes []AnnotationTypeOption, containerWidth, sidePadding int) (markup string, height int) {
+func legendMarkup(usedTypes []AnnotationTypeOption, containerWidth, sidePadding int, labelPx float64) (markup string, height int) {
 	if len(usedTypes) == 0 {
 		return "", 0
 	}
+	swatch := int(math.Round(labelPx * 1.5))
+	rowH := int(math.Round(labelPx * 2.5))
+	colGap := int(math.Round(labelPx * 1.8))
+	stroke := math.Max(1, labelPx*0.09)
+	tile := math.Max(3, labelPx*0.3) // legend-swatch hatch tile, so the pattern reads at any swatch size
+
 	cols := 1
 	if len(usedTypes) > 1 {
 		cols = 2
 	}
 	colWidth := containerWidth - 2*sidePadding
 	if cols == 2 {
-		colWidth = (colWidth - legendColGap) / 2
+		colWidth = (colWidth - colGap) / 2
 	}
 	rows := (len(usedTypes) + cols - 1) / cols
-	height = legendRowHeight/2 + rows*legendRowHeight
+	height = rowH/2 + rows*rowH
 
 	var defs, items strings.Builder
 	for i, t := range usedTypes {
 		col, row := i%cols, i/cols
-		x := sidePadding + col*(colWidth+legendColGap)
-		y := row * legendRowHeight
+		x := sidePadding + col*(colWidth+colGap)
+		y := row * rowH
 		patID := fmt.Sprintf("legend-pattern-%d", i)
 		fmt.Fprintf(&defs,
-			`<pattern id="%s" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(%d)">`+
-				`<line x1="0" y1="1" x2="4" y2="1" stroke="%s" stroke-width="1.4"/></pattern>`,
-			patID, HatchAngle(t.Hatch), html.EscapeString(t.Color))
+			`<pattern id="%s" width="%.2f" height="%.2f" patternUnits="userSpaceOnUse" patternTransform="rotate(%d)">`+
+				`<line x1="0" y1="%.2f" x2="%.2f" y2="%.2f" stroke="%s" stroke-width="%.2f"/></pattern>`,
+			patID, tile, tile, HatchAngle(t.Hatch), tile*0.25, tile, tile*0.25, html.EscapeString(t.Color), tile*0.35)
 		fmt.Fprintf(&items,
 			`<g transform="translate(%d, %d)">`+
-				`<rect width="%d" height="%d" rx="5" fill="url(#%s)" fill-opacity="0.8"/>`+
-				`<rect x="1" y="1" width="%d" height="%d" rx="4" fill="none" stroke="%s" stroke-width="1.5"/>`+
-				`<text x="%d" y="%d" font-family="sans-serif" font-size="15" fill="#111111">%s</text>`+
+				`<rect width="%d" height="%d" rx="%.1f" fill="url(#%s)" fill-opacity="0.8"/>`+
+				`<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" rx="%.1f" fill="none" stroke="%s" stroke-width="%.2f"/>`+
+				`<text x="%d" y="%.1f" font-family="sans-serif" font-size="%.1f" fill="#111111">%s</text>`+
 				`</g>`,
 			x, y,
-			legendSwatchSize, legendSwatchSize, patID,
-			legendSwatchSize-2, legendSwatchSize-2, html.EscapeString(t.Color),
-			legendSwatchSize+8, legendSwatchSize-6, html.EscapeString(t.Label))
+			swatch, swatch, labelPx*0.25, patID,
+			stroke, stroke, float64(swatch)-2*stroke, float64(swatch)-2*stroke, labelPx*0.2, html.EscapeString(t.Color), stroke,
+			swatch+int(math.Round(labelPx*0.5)), float64(swatch)*0.5+labelPx*0.34, labelPx, html.EscapeString(t.Label))
 	}
 	return "<defs>" + defs.String() + "</defs>" + items.String(), height
 }
@@ -132,7 +176,7 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 	}
 
 	usedTypes := UsedTypeOptions(regions, annotationTypes)
-	legend, legendHeight := legendMarkup(usedTypes, width, 16)
+	legend, legendHeight := legendMarkup(usedTypes, width, 16, bakedTextPx(width, height, bakeLegendLabelPt))
 
 	dataURI := "data:" + file.MimeType + ";base64," + base64.StdEncoding.EncodeToString(file.Data)
 	totalHeight := height + legendHeight
@@ -167,19 +211,13 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 // Layout constants for BakeAnnotatedVersion's composited image: the original photo, a solid black
 // divider spanning the image's full width, then the region-type legend, then the whole-image note
 // as wrapped text - see the "Annotated versions" design in internal/media/views.templ for the
-// corresponding read-only rendering.
+// corresponding read-only rendering. The type sizes (legend labels, note) are computed per-image
+// by bakedTextPx above; the divider gap and word-wrap width below are derived from the note size
+// so the caption block keeps proportional breathing room whether the photo is 0.5 or 25 megapixels.
 const (
-	bakeMaxDimension = 4000 // cap on the long edge - a real deliverable, not a thumbnail, but still bounded against pathological raw-camera-file memory use
-	bakeSidePadding  = 24   // left/right inset for the legend/note *text* only - the divider itself runs edge to edge
-
-	bakeDividerTopGap    = 6                     // breathing room between the image and the divider line above the legend
-	bakeLegendPad        = bakeDividerTopGap * 2 // gap between the divider and the legend content itself
-	bakeDividerBottomGap = bakeDividerTopGap     // gap after the legend (before the note), matching the gap above the divider
-
-	bakeDividerHeight = 1 // a hairline rule, not a thick color bar - see BakeAnnotatedVersion
-	bakeNoteFontSize  = 15
-	bakeNoteLineGap   = 6
-	bakeNoteCharWidth = 8 // rough average glyph advance at bakeNoteFontSize, for word-wrap width estimation
+	bakeMaxDimension  = 4000 // cap on the long edge - a real deliverable, not a thumbnail, but still bounded against pathological raw-camera-file memory use
+	bakeSidePadding   = 24   // left/right inset for the legend/note *text* only - the divider itself runs edge to edge
+	bakeDividerHeight = 1    // a hairline rule, not a thick color bar - see BakeAnnotatedVersion
 )
 
 // BakeAnnotatedVersion renders the *current* full set of regions (internal/media/annotations.go)
@@ -255,29 +293,37 @@ func (s *Service) BakeAnnotatedVersion(ctx context.Context, target Media, locale
 		return err
 	}
 
+	// Type sizes scaled for this image's pixel width (see bakedTextPx); the divider gap and the
+	// note's line spacing / word-wrap width are all derived from the note size so the whole caption
+	// block scales together.
+	notePx := bakedTextPx(imgW, imgH, bakeNotePt)
+	gap := int(math.Round(notePx * 0.4)) // vertical breathing room around the divider/legend/note
+	noteLineGap := notePx * 0.42
+	noteCharWidth := notePx * 0.5 // ~average glyph advance for a sans-serif at notePx
+
 	usedTypes := UsedTypeOptions(regions, annotationTypes)
-	legend, legendHeight := legendMarkup(usedTypes, imgW, bakeSidePadding)
-	// bakeDividerBottomGap (== bakeDividerTopGap) separates the legend from whatever follows it,
-	// mirroring the gap above the divider - symmetric breathing room around the whole legend block,
-	// not just above it.
+	legend, legendHeight := legendMarkup(usedTypes, imgW, bakeSidePadding, bakedTextPx(imgW, imgH, bakeLegendLabelPt))
+	// `gap` after the legend mirrors the gap above the divider - symmetric breathing room around
+	// the whole legend block, not just above it.
 	legendBottomPad := 0
 	if legendHeight > 0 {
-		legendBottomPad = bakeDividerBottomGap
+		legendBottomPad = gap
 	}
 
-	noteLines := wrapText(target.Description.String, (imgW-2*bakeSidePadding)/bakeNoteCharWidth)
+	noteLines := wrapText(target.Description.String, int(float64(imgW-2*bakeSidePadding)/noteCharWidth))
 	noteHeight := 0
 	var note bytes.Buffer
 	if len(noteLines) > 0 {
-		noteHeight = len(noteLines)*(bakeNoteFontSize+bakeNoteLineGap) + bakeNoteLineGap
+		noteHeight = int(math.Round(float64(len(noteLines))*(notePx+noteLineGap) + noteLineGap))
 		for i, line := range noteLines {
-			fmt.Fprintf(&note, `<text x="%d" y="%d" font-family="sans-serif" font-size="%d" fill="#333333">%s</text>`,
-				bakeSidePadding, bakeNoteLineGap+(i+1)*(bakeNoteFontSize+bakeNoteLineGap)-bakeNoteLineGap, bakeNoteFontSize, html.EscapeString(line))
+			baseline := float64(i+1) * (notePx + noteLineGap)
+			fmt.Fprintf(&note, `<text x="%d" y="%.1f" font-family="sans-serif" font-size="%.1f" fill="#333333">%s</text>`,
+				bakeSidePadding, baseline, notePx, html.EscapeString(line))
 		}
 	}
 
-	dividerY := imgH + bakeDividerTopGap
-	belowDividerY := dividerY + bakeDividerHeight + bakeLegendPad
+	dividerY := imgH + gap
+	belowDividerY := dividerY + bakeDividerHeight + 2*gap
 	noteY := belowDividerY + legendHeight + legendBottomPad
 	totalHeight := noteY + noteHeight
 	if legendHeight == 0 && noteHeight == 0 {
@@ -369,8 +415,8 @@ func svgForLog(svg string) string {
 }
 
 // wrapText is a plain word-wrap for the note baked under the legend - no font metrics available
-// server-side, so it estimates each line's capacity from bakeNoteCharWidth's rough average glyph
-// advance rather than measuring exactly. Good enough for a short caption; not meant for long prose.
+// server-side, so the caller estimates each line's capacity from a rough average glyph advance
+// (~0.5em) rather than measuring exactly. Good enough for a short caption; not meant for long prose.
 func wrapText(text string, maxCharsPerLine int) []string {
 	text = strings.TrimSpace(text)
 	if text == "" {
