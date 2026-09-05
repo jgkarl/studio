@@ -49,7 +49,7 @@ func NextDerivedLabel(ctx context.Context, q studiodb.Querier, originalID string
 	return fmt.Sprintf("annotated %d", count+1), nil
 }
 
-// UpdateDescription saves the lightbox editor's whole-image note.
+// UpdateDescription saves the media editor's whole-image note.
 func UpdateDescription(ctx context.Context, q studiodb.Querier, mediaID, description string) error {
 	var val any
 	if description != "" {

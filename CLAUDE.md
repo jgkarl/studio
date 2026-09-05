@@ -92,15 +92,22 @@ constructs each module's `Service`, calls every module's `Mount(mux, svc)` in se
 **IIIF/media pipeline**: `internal/media` handles upload + a "web" thumbnail variant (non-fatal on
 failure); `internal/iiif` is a from-scratch IIIF Image API v3 implementation (region/size/rotation/
 quality/format transforms via govips, not run through the official validator) backing both the
-deep-zoom viewer/editor (`static/js/lightbox.js` + vendored OpenSeadragon) and the pattern-layer
-grayscale base image (`quality=gray`, real pixel conversion, not a CSS filter). Annotating a true
-original starts an "annotated version" — its own real `Media` row (`EditedFromID` + `DerivedLabel`,
+deep-zoom viewer (`static/js/media-viewer.js`, plain/read-only) and editor (`static/js/media-editor.js`)
+— both on vendored OpenSeadragon — plus the pattern-layer grayscale base image (`quality=gray`, real
+pixel conversion, not a CSS filter). The editor defaults to plain pan/zoom; **+ New annotation**
+opens a draft panel to mark one region (rect or freehand), pick its annotation type, and add an
+optional per-region note (`MediaAnnotationRegion.note`, migration 0020, distinct from
+`Media.description`'s whole-image caption), then save; existing regions are listed in a table under
+the image, each row inline-editable (type + note) or deletable. Annotating a true original starts an
+"annotated version" — its own real `Media` row (`EditedFromID` + `DerivedLabel`,
 `internal/media/rasterize.go`'s `BakeAnnotatedVersion`) baked from the original plus its region
-legend/note on editor-close, not just an ephemeral download; a version can be re-baked repeatedly
-(its previous file kept as a timestamped backup, never silently discarded), and a fresh version can
-always be branched from the original instead. `RenderAnnotatedImage` (same file) is the older,
-purely on-demand flatten still used by report exports for media with regions attached the
-pre-versioning way.
+legend + whole-image note when the editor's **Save & finish** button is pressed, not just an
+ephemeral download; a version can be re-baked repeatedly (its previous file kept as a timestamped
+backup, never silently discarded), and a fresh version can always be branched from the original
+instead. The baked legend/note text is sized per-image for a full-width A4 export (readable ~11–12pt,
+hard-capped at 20pt — see `bakedTextPx`), not a fixed pixel size. `RenderAnnotatedImage` (same file)
+is the older, purely on-demand flatten still used by report exports for media with regions attached
+the pre-versioning way.
 
 **Seeding** (`internal/seed`, runs from `cmd/server/main.go` on every boot): `BootstrapAdmin`
 creates the one admin account from `BOOTSTRAP_ADMIN_NAME`/`EMAIL`/`PASSWORD` if set (idempotent,

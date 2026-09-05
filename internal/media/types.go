@@ -1,5 +1,5 @@
 // Package media is the Media module: local-disk file storage, upload with a web-sized thumbnail
-// variant (govips), an OpenSeadragon deep-zoom lightbox viewer/editor for drawing pattern-layer
+// variant (govips), an OpenSeadragon deep-zoom viewer/editor for drawing pattern-layer
 // annotations (see annotations.go), annotated versions as their own real, persisted Media rows
 // baked from the original (see rasterize.go's BakeAnnotatedVersion and Media.EditedFromID/
 // DerivedLabel), and the media grid (every Media row, annotated with which Asset/Project/Client

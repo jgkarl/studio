@@ -93,9 +93,11 @@ needs it.
   file) renders the *current* region set onto a grayscale conversion of the original at full
   resolution, with a black divider + the region legend + the whole-image note appended below (the
   canvas widens only in height, never distorting the photo itself), and persists that PNG as the
-  version's own file plus its own web thumbnail. Runs once per editor session, on close
-  (`static/js/lightbox.js`); a version's previous file is kept alongside as a timestamped backup
-  rather than overwritten silently.
+  version's own file plus its own web thumbnail. Runs on the editor's explicit **Save & finish**
+  button (`static/js/media-editor.js`), which also saves the whole-image note; a version's previous
+  file is kept alongside as a timestamped backup rather than overwritten silently. The baked
+  legend/note `<text>` is sized per-image by `bakedTextPx` for a full-width A4 export — readable
+  ~11–12pt regardless of the source's megapixels, hard-capped at 20pt — rather than a fixed size.
 - This is why local `go build` needs `libvips-dev` installed to compile against
   (`apt install libvips-dev` — works cleanly on plain Ubuntu 24.04, see `docs/deploy.md`), and
   why the Docker/release builds run inside a container: reproducible regardless of what's
@@ -122,12 +124,16 @@ needs it.
 There is no `npm run build` step for the frontend — no webpack/esbuild/vite, and (with one
 deliberate exception) no vendored or CDN-loaded third-party JS. That exception is
 [OpenSeadragon](https://openseadragon.github.io/) (`static/openseadragon/`, vendored — real tiled
-deep zoom is enough of a lift that hand-rolling it wasn't worth it, unlike the rest of the app):
-`static/js/lightbox.js` initializes it against `internal/iiif`'s own Image API `info.json` route
-as the Media view's one image viewer/editor — rotate/brightness/contrast/download, the
-rect/freehand pattern-layer drawing tool and its save-on-drop calls, and the description-save
-note, all layered on that same deep-zoom surface via OpenSeadragon's overlay/coordinate-conversion
-API rather than a plain flat `<img>`. Everything else stays hand-rolled vanilla JS, including
+deep zoom is enough of a lift that hand-rolling it wasn't worth it, unlike the rest of the app),
+initialized against `internal/iiif`'s own Image API `info.json` route by two scripts: the Media
+view page's `static/js/media-viewer.js` (a plain, read-only, true-color deep-zoom embed) and the
+annotated-version editor's `static/js/media-editor.js` (grayscale, matching the bake). The editor
+defaults to plain pan/zoom; **+ New annotation** arms a rect/freehand draw of one region, which is
+POSTed with its type and optional note on save; existing regions are a table under the image, each
+row inline-editable or deletable; **Save & finish** persists the whole-image note and re-bakes the
+version's file. All of that is layered on the deep-zoom surface via OpenSeadragon's
+overlay/coordinate-conversion API rather than a plain flat `<img>`. Everything else stays
+hand-rolled vanilla JS, including
 `internal/reporter`'s structured sections, which replaced a CDN-loaded TipTap. Every other script
 is plain vanilla JS loaded via `<script type="module">`, reused across every kanban board on a
 shared `data-url-template`/`data-status-field` convention (`static/js/kanban.js` — native HTML5

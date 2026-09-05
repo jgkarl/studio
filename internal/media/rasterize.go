@@ -156,7 +156,7 @@ func (s *Service) RenderAnnotatedImage(ctx context.Context, mediaID string, loca
 	}
 	annotationTypes := BuildAnnotationTypeOptions(classifiers, locale)
 
-	// The "web" variant (not the original) — same file the lightbox/viewer display, so the
+	// The "web" variant (not the original) — same file the editor/viewer display, so the
 	// percentage-coordinate regions land in exactly the same place a conservator drew them, and a
 	// guaranteed-JPEG format librsvg can always decode inside an embedded <image>.
 	file, err := s.ReadMediaFile(ctx, mediaID, "web")
@@ -226,7 +226,7 @@ const (
 // RenderAnnotatedImage above (which is a pure on-demand, never-saved flatten, still used by
 // "download annotated" on media with regions attached the old way and by internal/export), this is
 // the "edit session finished" save: the original image, converted to grayscale (matching what the
-// editor showed while drawing - see static/js/lightbox.js's IIIF tileQuality=gray), at its own full
+// editor showed while drawing - see static/js/media-editor.js's IIIF tileQuality=gray), at its own full
 // resolution (capped at bakeMaxDimension) rather than the "web" thumbnail, canvas width kept
 // exactly equal to the image's own width so the photo itself is never stretched - only the
 // (taller) canvas grows to fit the divider/legend/note beneath it. If `target` already has a

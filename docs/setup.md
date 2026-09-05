@@ -86,7 +86,8 @@ production deploy, see `ansible/roles/studio_app/defaults/main.yml`), one more s
   creates, so there's a non-admin account to sign in as too.
 - Two `Client`s, two `Asset`s (with condition-state history), a `Project`, a `Treatment`, a
   `Report`, and four `Media` images — from `internal/seed/testdata/cats` — wired into the media
-  library (including one annotated region), so every screen has something to look at immediately.
+  library (including one annotated region with a note), so every screen has something to look at
+  immediately.
 
 A production boot (`SEED_EXAMPLE_DATA` unset/`false`) never runs this — only the Classifiers and
 the one `BootstrapAdmin` account above. `e2e/tests/smoke.spec.js` still populates its own fresh

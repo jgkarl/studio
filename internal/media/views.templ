@@ -465,7 +465,7 @@ templ mediaEditActions(m Media) {
 }
 
 // tileSourceID is whose IIIF endpoint the deep-zoom stage tiles against: an annotated version
-// always shows its true original's (grayscale, see static/js/lightbox.js) pixels live while
+// always shows its true original's (grayscale, see static/js/media-editor.js) pixels live while
 // editing - the version's own file only exists once baked, and even then the editor always edits
 // against the original, never a previously-baked-with-legend copy of itself.
 func tileSourceID(m Media, source *Media) string {
@@ -536,7 +536,7 @@ func mediaViewSubtitle(m Media, uploadedByName string) string {
 }
 
 // MediaGrid renders every media reference for one entity (Asset/Project/Assessment/Activity/
-// Report/Treatment) - a small grid of thumbnails linking to the lightbox viewer (images) or the
+// Report/Treatment) - a small grid of thumbnails linking to the media view page (images) or the
 // raw file (video). Reused from every module's detail page (Assets, Projects, Reports,
 // Treatments, Assessments).
 templ MediaGrid(refs []ReferenceWithMedia) {

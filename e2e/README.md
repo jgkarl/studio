@@ -32,8 +32,9 @@ step is needed.
 
 `tests/smoke.spec.js` is one continuous session through the golden path — login, settings
 (classifier chip-groups), client, asset (with an intake photo), treatment, project (kanban stage
-moves), report (structured sections + customize layout), export, media grid + lightbox, user
-management, and a mobile viewport check — screenshotting each step into `docs/screenshots/`.
+moves), report (structured sections + customize layout), export, media grid + the annotation
+editor, user management, and a mobile viewport check — screenshotting each step into
+`docs/screenshots/`.
 Tests run serially in a single shared browser context (real login cookie carried through, same as
 one person's browser tab) and each depends on state the previous one created, so a fresh database
 is required for a clean run — a stale `A-0001` reference code from a prior run will fail asset

@@ -97,8 +97,9 @@ func (s *Service) UploadMedia(ctx context.Context, data []byte, mimeType, upload
 // Media row (EditedFromID pointing at the original, DerivedLabel computed via NextDerivedLabel) so
 // the drag-to-draw editor has something to attach regions to via POST /media/{id}/annotations
 // immediately - it has no real file/thumbnail on disk yet (SizeBytes 0, Width/Height NULL; see
-// Media.IsBaked) until the first BakeAnnotatedVersion call, which happens when the editor closes
-// (static/js/lightbox.js). Every MediaReference the original has is copied onto the new draft too,
+// Media.IsBaked) until the first BakeAnnotatedVersion call, which happens when the editor's
+// "Save & finish" button is pressed (static/js/media-editor.js). Every MediaReference the original
+// has is copied onto the new draft too,
 // so the annotated version shows up in the same Asset/Project/etc. context the original does, not
 // just reachable by drilling in from the original's own page.
 func (s *Service) CreateAnnotatedVersion(ctx context.Context, original Media, uploadedByUserID string) (*Media, error) {

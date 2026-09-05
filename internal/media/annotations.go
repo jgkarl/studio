@@ -107,7 +107,7 @@ type point struct {
 }
 
 // CreateFreehandRegion stores a brush-drawn area: pointsJSON is a JSON array of {"x","y"}
-// percentage points as posted by static/js/lightbox.js's freehand tool. Every point is
+// percentage points as posted by static/js/media-editor.js's freehand tool. Every point is
 // clamped into [0,100] (same guarantee CreateRegion makes for rectangles), and the bounding box
 // is computed and stored in the same XPct/YPct/WidthPct/HeightPct columns rectangles use, so a
 // freehand region is still sortable/queryable like one — PathData carries the actual outline for
